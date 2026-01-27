@@ -23,7 +23,17 @@ if 'check_count' not in st.session_state:
     st.session_state['check_count'] = 0
 if 'profiles' not in st.session_state:
     st.session_state['profiles'] = {
-        "Demo Profile": "1. Colors: Black & White. 2. Tone: Professional. 3. Font: Sans-Serif."
+        "NWRPCA (Official)": """
+        1. COLOR PALETTE: Primary: Vermilion Orange (#F45D0D), Black (#000000), White (#FFFFFF). Secondary: Dusk Pink (#EAA792), Cornflower Blue (#618DAE), Dark Olive Green (#394214), Tamarillo (#772621).
+        2. TYPOGRAPHY: Headlines: Montserrat Black. Body: Montserrat Regular. Accents: Kepler Std (Italic Display).
+        3. LOGO SAFETY: Clearspace: 32% of height. Min Size: 60px.
+        4. VOICE: Bold, Relevant, Authentic. No passive tone. Active verbs only.
+        """,
+        "Castellan PR (Internal)": """
+        1. COLOR PALETTE: Dark Charcoal (#1A1A1A), Gold Accent (#D4AF37), Castellan Blue (#24363b), White.
+        2. TYPOGRAPHY: Headlines: Clean Modern Sans-Serif (e.g., Inter, Helvetica). Body: High-readability Serif.
+        3. VOICE: Strategic, Intelligent, "The Architect". Avoids "peppy" marketing fluff.
+        """
     }
 
 # DAILY LIMIT (Hardcoded for MVP)
@@ -144,3 +154,4 @@ elif app_mode == "📂 Manager":
     if st.button("Save Changes"):
         st.session_state['profiles'][target] = new_rules
         st.success("Saved!")
+
