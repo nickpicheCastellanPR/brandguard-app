@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Load env variables (for local testing)
 load_dotenv()
 
-class BrandGuardLogic:
+class SignetLogic:
     def __init__(self):
         # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
@@ -25,7 +25,7 @@ class BrandGuardLogic:
 
     def check_password(self, input_password):
         """Simple Beta Gatekeeper"""
-        # Hardcoded for MVP. In production, use st.secrets or a DB.
+        # Hardcoded for MVP.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
@@ -87,7 +87,7 @@ class BrandGuardLogic:
         model = genai.GenerativeModel(model_name)
         
         prompt = f"""
-        ### ROLE: BrandGuard Compliance Officer.
+        ### ROLE: Signet Compliance Engine.
         ### STRICT GUIDELINES:
         {rules}
         
@@ -95,20 +95,19 @@ class BrandGuardLogic:
         Audit the image against the guidelines. 
         
         ### CRITICAL INSTRUCTION ON COLORS:
-        - Treat the Color Palette as a list of ALLOWED colors, not a list of REQUIRED colors.
-        - A single asset (like a logo) does NOT need to use every color in the palette.
-        - FAIL only if the image uses a dominant color that is NOT in the palette (e.g., using Red when only Blue is allowed).
-        - If the image uses a subset of the allowed colors (e.g., only Blue and White), that is a PASS.
+        - Treat the Color Palette as a list of ALLOWED colors.
+        - FAIL only if the image uses a dominant color that is NOT in the palette.
+        - If the image uses a subset of the allowed colors, that is a PASS.
         
         ### OUTPUT FORMAT:
         **STATUS:** [PASS / FAIL]
         
-        **1. 🎨 Visual Identity:** [Pass/Fail] - [Analyze if the colors used are VALID. Do not penalize for missing colors.]
-        **2. 🔠 Typography:** [Pass/Fail] - [Analyze Fonts]
-        **3. ✍️ Quality Check:** [Pass/Fail] - [Check for typos or grammar errors in the design]
-        **4. 🗣️ Voice/Tone:** [Pass/Fail] - [Does the text match the brand voice?]
+        **1. VISUAL IDENTITY:** [Pass/Fail] - [Analyze if the colors used are VALID. Do not penalize for missing colors.]
+        **2. TYPOGRAPHY:** [Pass/Fail] - [Analyze Fonts]
+        **3. QUALITY CHECK:** [Pass/Fail] - [Check for typos or grammar errors in the design]
+        **4. VOICE & TONE:** [Pass/Fail] - [Does the text match the brand voice?]
         
-        **🔧 REQUIRED FIXES:**
+        **REQUIRED FIXES:**
         * [Actionable bullet points. Only list fixes for actual violations.]
         """
         response = model.generate_content([prompt, image])
@@ -131,9 +130,9 @@ class BrandGuardLogic:
         2. Rewrite the text to strictly match the Brand Voice defined above.
         
         ### OUTPUT:
-        **1. 🔴 Edits Made:** [List errors]
-        **2. 🟢 Polished Copy:** [ The Rewrite ]
-        **3. 💡 Strategy Note:** [Why this fits better]
+        **1. CRITICAL EDITS:** [List errors]
+        **2. POLISHED COPY:** [ The Rewrite ]
+        **3. STRATEGY NOTE:** [Why this fits better]
         """
         response = model.generate_content(prompt)
         return response.text
@@ -153,7 +152,7 @@ class BrandGuardLogic:
         
         ### CRITICAL INSTRUCTIONS:
         1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. If the brand name matches a famous company, IGNORE the real-world brand. Only use the attributes provided in the inputs.
-        2. **STRICT VOCABULARY:** Do not expand on the user's adjectives. If the user says "Fun", the rule is "Fun".
+        2. **STRICT VOCABULARY:** Do not expand on the user's adjectives.
         3. **FORMAT:** Organize the output into these numbered sections:
            1. STRATEGY (Mission, Values, Archetype)
            2. COLOR PALETTE (Hex Codes)
