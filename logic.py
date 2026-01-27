@@ -118,7 +118,7 @@ class BrandGuardLogic:
         response = model.generate_content(prompt)
         return response.text
 
-def generate_brand_rules(self, inputs):
+    def generate_brand_rules(self, inputs):
         """Inputs is a string prompt constructed in the UI"""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
