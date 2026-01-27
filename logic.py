@@ -62,7 +62,7 @@ class BrandGuardLogic:
 
     # --- AI TASKS ---
 
-def run_visual_audit(self, image, rules):
+    def run_visual_audit(self, image, rules):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
