@@ -5,18 +5,16 @@ from fpdf import FPDF
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load env variables (for local testing)
+# Load env variables
 load_dotenv()
 
 class SignetLogic:
     def __init__(self):
-        # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
         if self.api_key:
             genai.configure(api_key=self.api_key)
 
     def _get_api_key(self):
-        """Robust API Key Fetcher"""
         if "GOOGLE_API_KEY" in st.secrets:
             return st.secrets["GOOGLE_API_KEY"]
         elif os.getenv("GOOGLE_API_KEY"):
@@ -24,12 +22,10 @@ class SignetLogic:
         return None
 
     def check_password(self, input_password):
-        """Simple Beta Gatekeeper"""
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
     def get_model(self):
-        """Silently finds the best Flash model"""
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
@@ -51,7 +47,6 @@ class SignetLogic:
             return f"Error reading PDF: {e}"
             
     def extract_text_from_image(self, image):
-        """OCR: Extracts text from an image (screenshot/photo)."""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         prompt = "Transcribe all the text in this image exactly as written."
@@ -90,9 +85,6 @@ class SignetLogic:
         ### STRICT GUIDELINES:
         {rules}
         ### TASK: Audit the image against the guidelines.
-        ### CRITICAL INSTRUCTION ON COLORS:
-        - Treat the Color Palette as a list of ALLOWED colors.
-        - FAIL only if the image uses a dominant color that is NOT in the palette.
         ### OUTPUT FORMAT:
         **STATUS:** [PASS / FAIL]
         **1. VISUAL IDENTITY:** [Pass/Fail]
@@ -113,10 +105,7 @@ class SignetLogic:
         {rules}
         ### DRAFT TEXT:
         "{text}"
-        ### TASK:
-        1. Correct spelling/grammar.
-        2. Rewrite to strictly match the Brand Voice.
-        3. MIMIC the "Style Signature" if defined.
+        ### TASK: Correct spelling/grammar and rewrite to strictly match the Brand Voice.
         ### OUTPUT:
         **1. CRITICAL EDITS:**
         **2. POLISHED COPY:**
@@ -125,14 +114,33 @@ class SignetLogic:
         response = model.generate_content(prompt)
         return response.text
 
-    def run_content_generator(self, topic, format_type, key_points, audience, rules):
-        """Generates new content."""
+    def run_content_generator(self, topic, format_type, key_points, audience, rules, samples=[]):
+        """
+        Generates content.
+        samples: List of dicts [{'type': 'Internal', 'content': '...'}]
+        """
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
+        
+        # Filter samples to find relevant ones (Context-Aware)
+        relevant_samples = ""
+        if samples:
+            # Simple keyword matching for context
+            matches = [s['content'] for s in samples if s['type'].lower() in format_type.lower()]
+            if not matches:
+                # If no exact match, use all samples for tone
+                matches = [s['content'] for s in samples]
+            
+            relevant_samples = "\n---\n".join(matches[:3]) # Limit to top 3 to avoid token overflow
+
         prompt = f"""
         ### ROLE: Executive Ghost Writer.
         ### BRAND RULES:
         {rules}
+        
+        ### REFERENCE VOICE SAMPLES (Mimic this specific tone):
+        {relevant_samples}
+        
         ### TASK: Write a {format_type} about "{topic}".
         ### TARGET AUDIENCE: {audience}
         ### KEY DETAILS:
@@ -148,52 +156,32 @@ class SignetLogic:
         return response.text
         
     def run_social_assistant(self, platform, topic, image, rules):
-        """Generates social captions and hashtags."""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        
         inputs = [f"""
         ### ROLE: Social Media Manager.
         ### BRAND RULES:
         {rules}
         ### PLATFORM: {platform}
-        ### TOPIC/CONTEXT: {topic}
-        
-        ### TASK:
-        1. Write a caption optimized for {platform} (consider length, tone, emoji usage standards).
-        2. Generate a set of hashtags (Mix of high-volume and niche).
-        3. If an image is provided, ensure the caption relates to it.
-        
-        ### OUTPUT FORMAT:
-        **CAPTION:** [The text]
-        **HASHTAGS:** [List of 10-15 tags]
-        **STRATEGY:** [Why this works for {platform}]
+        ### TOPIC: {topic}
+        ### TASK: Write caption & hashtags.
         """]
-        
-        if image:
-            inputs.append(image)
-            
+        if image: inputs.append(image)
         response = model.generate_content(inputs)
         return response.text
 
     def generate_brand_rules(self, inputs):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        grounded_prompt = f"""
+        response = model.generate_content(f"""
         ### ROLE: Brand Strategist.
-        ### TASK: Create brand guidelines from inputs.
-        ### USER INPUTS:
-        {inputs}
-        ### INSTRUCTIONS:
-        1. NO OUTSIDE KNOWLEDGE.
-        2. ANALYZE VOICE SAMPLES: Extract "Style Signature" (Sentence length, vocabulary, quirks).
-           - Note the CONTEXT of the sample (e.g. if it's an Internal Email, the signature applies to internal comms).
-        3. FORMAT:
+        ### TASK: Create brand guidelines.
+        ### INPUTS: {inputs}
+        ### FORMAT:
            1. STRATEGY (Mission, Values, Archetype)
            2. COLOR PALETTE
            3. TYPOGRAPHY
            4. LOGO RULES
-           5. VOICE & TONE (Including Style Signature)
-        """
-        response = model.generate_content(grounded_prompt)
+           5. VOICE & TONE (Analyze provided samples for style signature)
+        """)
         return response.text
