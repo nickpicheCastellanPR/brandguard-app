@@ -25,6 +25,7 @@ class SignetLogic:
 
     def check_password(self, input_password):
         """Simple Beta Gatekeeper"""
+        # Hardcoded for MVP.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
@@ -133,6 +134,34 @@ class SignetLogic:
         **1. CRITICAL EDITS:** [List errors or style violations]
         **2. POLISHED COPY:** [ The Rewrite ]
         **3. STRATEGY NOTE:** [Why this fits the brand better]
+        """
+        response = model.generate_content(prompt)
+        return response.text
+
+    def run_content_generator(self, topic, format_type, key_points, rules):
+        """Generates new content based on bullets and brand rules."""
+        model_name = self.get_model()
+        model = genai.GenerativeModel(model_name)
+        
+        prompt = f"""
+        ### ROLE: Executive Ghost Writer & Brand Strategist.
+        ### BRAND RULES:
+        {rules}
+        
+        ### TASK:
+        Write a {format_type} about "{topic}".
+        
+        ### KEY DETAILS TO INCLUDE (Bullet Points):
+        {key_points}
+        
+        ### INSTRUCTIONS:
+        1. **VOICE ALIGNMENT:** Strictly adhere to the Brand Voice, Archetype, and Style Signature defined in the rules. 
+        2. **FORMATTING:** Use standard formatting for a {format_type} (e.g., Subject Line for emails, Headline/Dateline for Press Releases).
+        3. **EXPANSION:** Expand the bullet points into full, flowing prose. Do not just list them.
+        4. **NO FLUFF:** Keep it high-impact and professional.
+        
+        ### OUTPUT:
+        [Generate the full text here]
         """
         response = model.generate_content(prompt)
         return response.text
