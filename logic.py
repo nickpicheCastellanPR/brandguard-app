@@ -25,7 +25,6 @@ class SignetLogic:
 
     def check_password(self, input_password):
         """Simple Beta Gatekeeper"""
-        # Hardcoded for MVP.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
@@ -50,6 +49,17 @@ class SignetLogic:
             return text
         except Exception as e:
             return f"Error reading PDF: {e}"
+            
+    def extract_text_from_image(self, image):
+        """OCR: Extracts text from an image (screenshot/photo)."""
+        model_name = self.get_model()
+        model = genai.GenerativeModel(model_name)
+        prompt = "Transcribe all the text in this image exactly as written."
+        try:
+            response = model.generate_content([prompt, image])
+            return response.text
+        except:
+            return ""
 
     def create_pdf(self, brand_name, rules_text):
         pdf = FPDF()
@@ -63,52 +73,33 @@ class SignetLogic:
     # --- AI TASKS ---
 
     def describe_logo(self, image):
-        """Generates a technical description of an uploaded logo."""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        
-        prompt = """
-        Describe this logo in technical detail for a Brand Guideline document.
-        Focus on:
-        1. Symbols/Iconography used.
-        2. Colors observed.
-        3. Layout (Icon left of text, stacked, etc).
-        4. Vibe (Modern, Classic, Tech, Organic).
-        Keep it concise (2-3 sentences).
-        """
+        prompt = "Describe this logo in technical detail for a Brand Guideline document. Focus on symbols, colors, layout, and vibe. Concise."
         try:
             response = model.generate_content([prompt, image])
             return response.text
         except Exception as e:
-            return "Logo analysis failed. Please describe manually."
+            return "Logo analysis failed."
 
     def run_visual_audit(self, image, rules):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        
         prompt = f"""
         ### ROLE: Signet Compliance Engine.
         ### STRICT GUIDELINES:
         {rules}
-        
-        ### TASK:
-        Audit the image against the guidelines. 
-        
+        ### TASK: Audit the image against the guidelines.
         ### CRITICAL INSTRUCTION ON COLORS:
         - Treat the Color Palette as a list of ALLOWED colors.
         - FAIL only if the image uses a dominant color that is NOT in the palette.
-        - If the image uses a subset of the allowed colors, that is a PASS.
-        
         ### OUTPUT FORMAT:
         **STATUS:** [PASS / FAIL]
-        
-        **1. VISUAL IDENTITY:** [Pass/Fail] - [Analyze if the colors used are VALID. Do not penalize for missing colors.]
-        **2. TYPOGRAPHY:** [Pass/Fail] - [Analyze Fonts]
-        **3. QUALITY CHECK:** [Pass/Fail] - [Check for typos or grammar errors in the design]
-        **4. VOICE & TONE:** [Pass/Fail] - [Does the text match the brand voice?]
-        
-        **REQUIRED FIXES:**
-        * [Actionable bullet points. Only list fixes for actual violations.]
+        **1. VISUAL IDENTITY:** [Pass/Fail]
+        **2. TYPOGRAPHY:** [Pass/Fail]
+        **3. QUALITY CHECK:** [Pass/Fail]
+        **4. VOICE & TONE:** [Pass/Fail]
+        **REQUIRED FIXES:** [Bullets]
         """
         response = model.generate_content([prompt, image])
         return response.text
@@ -116,83 +107,93 @@ class SignetLogic:
     def run_copy_editor(self, text, rules):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        
         prompt = f"""
         ### ROLE: Senior Copy Editor.
         ### BRAND RULES:
         {rules}
-        
         ### DRAFT TEXT:
         "{text}"
-        
         ### TASK:
-        1. Correct all spelling/grammar.
-        2. Rewrite the text to strictly match the Brand Voice defined above.
-        3. If the brand rules include a "Style Signature" (sentence structure, vocabulary), MIMIC IT EXACTLY.
-        
+        1. Correct spelling/grammar.
+        2. Rewrite to strictly match the Brand Voice.
+        3. MIMIC the "Style Signature" if defined.
         ### OUTPUT:
-        **1. CRITICAL EDITS:** [List errors or style violations]
-        **2. POLISHED COPY:** [ The Rewrite ]
-        **3. STRATEGY NOTE:** [Why this fits the brand better]
+        **1. CRITICAL EDITS:**
+        **2. POLISHED COPY:**
+        **3. STRATEGY NOTE:**
         """
         response = model.generate_content(prompt)
         return response.text
 
-    def run_content_generator(self, topic, format_type, key_points, rules):
-        """Generates new content based on bullets and brand rules."""
+    def run_content_generator(self, topic, format_type, key_points, audience, rules):
+        """Generates new content."""
+        model_name = self.get_model()
+        model = genai.GenerativeModel(model_name)
+        prompt = f"""
+        ### ROLE: Executive Ghost Writer.
+        ### BRAND RULES:
+        {rules}
+        ### TASK: Write a {format_type} about "{topic}".
+        ### TARGET AUDIENCE: {audience}
+        ### KEY DETAILS:
+        {key_points}
+        ### INSTRUCTIONS:
+        1. Adhere to Brand Voice/Archetype.
+        2. Use standard formatting for {format_type}.
+        3. Expand bullets into prose.
+        ### OUTPUT:
+        [Generate text]
+        """
+        response = model.generate_content(prompt)
+        return response.text
+        
+    def run_social_assistant(self, platform, topic, image, rules):
+        """Generates social captions and hashtags."""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
-        prompt = f"""
-        ### ROLE: Executive Ghost Writer & Brand Strategist.
+        inputs = [f"""
+        ### ROLE: Social Media Manager.
         ### BRAND RULES:
         {rules}
+        ### PLATFORM: {platform}
+        ### TOPIC/CONTEXT: {topic}
         
         ### TASK:
-        Write a {format_type} about "{topic}".
+        1. Write a caption optimized for {platform} (consider length, tone, emoji usage standards).
+        2. Generate a set of hashtags (Mix of high-volume and niche).
+        3. If an image is provided, ensure the caption relates to it.
         
-        ### KEY DETAILS TO INCLUDE (Bullet Points):
-        {key_points}
+        ### OUTPUT FORMAT:
+        **CAPTION:** [The text]
+        **HASHTAGS:** [List of 10-15 tags]
+        **STRATEGY:** [Why this works for {platform}]
+        """]
         
-        ### INSTRUCTIONS:
-        1. **VOICE ALIGNMENT:** Strictly adhere to the Brand Voice, Archetype, and Style Signature defined in the rules. 
-        2. **FORMATTING:** Use standard formatting for a {format_type} (e.g., Subject Line for emails, Headline/Dateline for Press Releases).
-        3. **EXPANSION:** Expand the bullet points into full, flowing prose. Do not just list them.
-        4. **NO FLUFF:** Keep it high-impact and professional.
-        
-        ### OUTPUT:
-        [Generate the full text here]
-        """
-        response = model.generate_content(prompt)
+        if image:
+            inputs.append(image)
+            
+        response = model.generate_content(inputs)
         return response.text
 
     def generate_brand_rules(self, inputs):
-        """Inputs is a string prompt constructed in the UI"""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        
-        # Updated Prompt to handle "Voice Samples"
         grounded_prompt = f"""
-        ### ROLE: Brand Strategist & Linguistic Analyst.
-        ### TASK: Create a comprehensive brand guideline document based STRICTLY on the user's provided inputs.
-        
+        ### ROLE: Brand Strategist.
+        ### TASK: Create brand guidelines from inputs.
         ### USER INPUTS:
         {inputs}
-        
-        ### CRITICAL INSTRUCTIONS:
-        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. 
-        2. **ANALYZE VOICE SAMPLES:** If "Voice Samples" are provided, analyze them to extract a "Style Signature". Look for:
-           - Sentence length (Short/Punchy vs. Long/Flowing).
-           - Vocabulary level (Simple vs. Academic vs. Technical).
-           - Formatting quirks (Bullet points, emojis, oxford commas).
-           - Add these findings to the VOICE & TONE section.
-        3. **FORMAT:** Organize the output into these numbered sections:
+        ### INSTRUCTIONS:
+        1. NO OUTSIDE KNOWLEDGE.
+        2. ANALYZE VOICE SAMPLES: Extract "Style Signature" (Sentence length, vocabulary, quirks).
+           - Note the CONTEXT of the sample (e.g. if it's an Internal Email, the signature applies to internal comms).
+        3. FORMAT:
            1. STRATEGY (Mission, Values, Archetype)
-           2. COLOR PALETTE (Hex Codes)
-           3. TYPOGRAPHY (Headlines, Body)
+           2. COLOR PALETTE
+           3. TYPOGRAPHY
            4. LOGO RULES
-           5. VOICE & TONE (Including "Style Signature" derived from samples)
+           5. VOICE & TONE (Including Style Signature)
         """
-        
         response = model.generate_content(grounded_prompt)
         return response.text
