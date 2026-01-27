@@ -25,7 +25,6 @@ class SignetLogic:
 
     def check_password(self, input_password):
         """Simple Beta Gatekeeper"""
-        # Hardcoded for MVP.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
@@ -128,11 +127,12 @@ class SignetLogic:
         ### TASK:
         1. Correct all spelling/grammar.
         2. Rewrite the text to strictly match the Brand Voice defined above.
+        3. If the brand rules include a "Style Signature" (sentence structure, vocabulary), MIMIC IT EXACTLY.
         
         ### OUTPUT:
-        **1. CRITICAL EDITS:** [List errors]
+        **1. CRITICAL EDITS:** [List errors or style violations]
         **2. POLISHED COPY:** [ The Rewrite ]
-        **3. STRATEGY NOTE:** [Why this fits better]
+        **3. STRATEGY NOTE:** [Why this fits the brand better]
         """
         response = model.generate_content(prompt)
         return response.text
@@ -142,23 +142,27 @@ class SignetLogic:
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
-        # We wrap the user's input in a strict "Grounding System Prompt"
+        # Updated Prompt to handle "Voice Samples"
         grounded_prompt = f"""
-        ### ROLE: Brand Strategist.
+        ### ROLE: Brand Strategist & Linguistic Analyst.
         ### TASK: Create a comprehensive brand guideline document based STRICTLY on the user's provided inputs.
         
         ### USER INPUTS:
         {inputs}
         
         ### CRITICAL INSTRUCTIONS:
-        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. If the brand name matches a famous company, IGNORE the real-world brand. Only use the attributes provided in the inputs.
-        2. **STRICT VOCABULARY:** Do not expand on the user's adjectives.
+        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. 
+        2. **ANALYZE VOICE SAMPLES:** If "Voice Samples" are provided, analyze them to extract a "Style Signature". Look for:
+           - Sentence length (Short/Punchy vs. Long/Flowing).
+           - Vocabulary level (Simple vs. Academic vs. Technical).
+           - Formatting quirks (Bullet points, emojis, oxford commas).
+           - Add these findings to the VOICE & TONE section.
         3. **FORMAT:** Organize the output into these numbered sections:
            1. STRATEGY (Mission, Values, Archetype)
            2. COLOR PALETTE (Hex Codes)
            3. TYPOGRAPHY (Headlines, Body)
            4. LOGO RULES
-           5. VOICE & TONE
+           5. VOICE & TONE (Including "Style Signature" derived from samples)
         """
         
         response = model.generate_content(grounded_prompt)
