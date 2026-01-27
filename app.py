@@ -1,27 +1,46 @@
 import streamlit as st
 from PIL import Image
-from logic import BrandGuardLogic
+import os
+from logic import SignetLogic
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="BrandGuard Pro", page_icon="🛡️", layout="wide")
+st.set_page_config(
+    page_title="Signet", 
+    page_icon="Signet_Icon_Color.png", # Uses your icon if present
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Initialize Logic
-logic = BrandGuardLogic()
+logic = SignetLogic()
 
-# --- CSS POLISH ---
+# --- CUSTOM CSS ---
 st.markdown("""
 <style>
-    .stDeployButton {display:none;}
     .block-container {padding-top: 2rem;}
-    div[data-testid="stExpander"] div[role="button"] p {
-        font-size: 1.1rem;
+    .stButton>button {
+        width: 100%; 
+        border-radius: 4px; 
         font-weight: 600;
-        color: #E0E0E0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
+    div[data-testid="stExpander"] div[role="button"] p {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #888888;
+    }
+    .reportview-container { margin-top: -2em; }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
+    
+    /* Clean Alert Styling */
+    .stAlert {border-radius: 4px; border: 1px solid #333;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE & LIMITS ---
+# --- SESSION STATE ---
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 if 'check_count' not in st.session_state:
@@ -42,178 +61,178 @@ if 'profiles' not in st.session_state:
         """
     }
 
-# DAILY LIMIT
 MAX_CHECKS = 50
 
 # --- LOGIN SCREEN ---
 if not st.session_state['authenticated']:
-    st.title("🛡️ BrandGuard Private Beta")
-    st.write("Please enter the access code to continue.")
-    
-    password = st.text_input("Access Code", type="password")
-    if st.button("Enter"):
-        if logic.check_password(password):
-            st.session_state['authenticated'] = True
-            st.rerun()
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        # Check for Logo
+        if os.path.exists("Signet_Logo_Color.png"):
+            st.image("Signet_Logo_Color.png", width=300)
         else:
-            st.error("Invalid Code. Try 'beta'")
+            st.title("SIGNET")
+            
+        st.write("Authorized Access Only.")
+        
+        password = st.text_input("Access Code", type="password")
+        if st.button("Enter System"):
+            if logic.check_password(password):
+                st.session_state['authenticated'] = True
+                st.rerun()
+            else:
+                st.error("Access Denied.")
     st.stop()
 
-# --- MAIN APP ---
-
+# --- MAIN SIDEBAR ---
 with st.sidebar:
-    st.title("BrandGuard")
-    st.caption(f"Usage: {st.session_state['check_count']} / {MAX_CHECKS} checks")
+    if os.path.exists("Signet_Logo_Color.png"):
+        st.image("Signet_Logo_Color.png", use_container_width=True)
+    else:
+        st.header("SIGNET")
     
-    app_mode = st.radio("Toolbox", ["🚀 Visual Audit", "✍️ Copy Editor", "🏗️ Brand Builder", "📂 Manager"])
+    st.caption(f"System Status: Online | Usage: {st.session_state['check_count']}/{MAX_CHECKS}")
+    st.divider()
+    
+    app_mode = st.radio("SELECT MODULE", [
+        "Visual Compliance", 
+        "Copy Editor", 
+        "Brand Architect", 
+        "Profile Manager"
+    ])
     
     st.divider()
     if st.button("Logout"):
         st.session_state['authenticated'] = False
         st.rerun()
 
+# --- LIMIT CHECK ---
 if st.session_state['check_count'] >= MAX_CHECKS:
-    st.error("🚫 Daily limit reached. Please upgrade or contact support.")
+    st.error("🚫 Daily API limit reached. Contact Administrator.")
     st.stop()
 
-# --- TOOL 1: VISUAL AUDIT ---
-if app_mode == "🚀 Visual Audit":
-    st.header("🚀 Visual Compliance")
+# ==========================================
+# MODULE 1: VISUAL COMPLIANCE
+# ==========================================
+if app_mode == "Visual Compliance":
+    st.subheader("Visual Compliance Audit")
+    st.caption("Upload creative assets to verify brand alignment.")
     
     if not st.session_state['profiles']:
-        st.warning("Create a profile first!")
+        st.warning("No profiles found. Go to 'Brand Architect' to create one.")
     else:
-        profile = st.selectbox("Select Profile", list(st.session_state['profiles'].keys()))
+        profile = st.selectbox("Active Brand Profile", list(st.session_state['profiles'].keys()))
         rules = st.session_state['profiles'][profile]
         
-        uploaded_file = st.file_uploader("Upload Creative", type=["jpg", "png"])
+        uploaded_file = st.file_uploader("Upload Asset (JPG/PNG)", type=["jpg", "png", "jpeg"])
         
-        if uploaded_file and st.button("Run Audit"):
+        if uploaded_file and st.button("Run Audit", type="primary"):
             image = Image.open(uploaded_file)
-            st.image(image, width=300)
-            
-            with st.spinner("Analyzing..."):
-                result = logic.run_visual_audit(image, rules)
-                st.markdown(result)
-                st.session_state['check_count'] += 1
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.image(image, caption="Preview", use_container_width=True)
+            with c2:
+                with st.spinner("Analyzing against Brand Guidelines..."):
+                    result = logic.run_visual_audit(image, rules)
+                    st.session_state['check_count'] += 1
+                    
+                    st.markdown("### Audit Report")
+                    st.markdown(result)
 
-# --- TOOL 2: COPY EDITOR ---
-elif app_mode == "✍️ Copy Editor":
-    st.header("✍️ Smart Copy Editor")
+# ==========================================
+# MODULE 2: COPY EDITOR
+# ==========================================
+elif app_mode == "Copy Editor":
+    st.subheader("Intelligent Copy Editor")
+    st.caption("Rewrite drafts to match the brand voice and strategy.")
     
-    profile = st.selectbox("Select Profile", list(st.session_state['profiles'].keys()))
+    profile = st.selectbox("Active Brand Profile", list(st.session_state['profiles'].keys()))
     rules = st.session_state['profiles'][profile]
     
-    text_input = st.text_area("Paste Draft Copy", height=200)
-    
-    if st.button("Proof & Polish"):
-        if text_input:
-            with st.spinner("Editing..."):
+    c1, c2 = st.columns(2)
+    with c1:
+        text_input = st.text_area("Original Draft", height=300, placeholder="Paste your draft text here...")
+    with c2:
+        st.write("**Polished Output**")
+        if text_input and st.button("Proof & Polish", type="primary"):
+            with st.spinner("Rewriting..."):
                 result = logic.run_copy_editor(text_input, rules)
-                st.markdown(result)
                 st.session_state['check_count'] += 1
-        else:
-            st.warning("Paste text first.")
+                st.markdown(result)
 
-# --- TOOL 3: BRAND BUILDER ---
-elif app_mode == "🏗️ Brand Builder":
-    st.header("🏗️ Brand Identity Builder")
-    tab1, tab2 = st.tabs(["✨ Deep-Dive Wizard", "📄 PDF Extraction"])
+# ==========================================
+# MODULE 3: BRAND ARCHITECT (WIZARD)
+# ==========================================
+elif app_mode == "Brand Architect":
+    st.subheader("Brand Architect")
+    st.caption("Create a new brand system from scratch or existing files.")
+    
+    tab1, tab2 = st.tabs(["Deep-Dive Wizard", "PDF Extraction"])
     
     # --- DEEP DIVE WIZARD ---
     with tab1:
-        st.write("Build a comprehensive brand system from scratch.")
-        
-        # 1. STRATEGY SECTION
-        with st.expander("1. Brand Strategy (The Core)", expanded=True):
-            wiz_name = st.text_input("Brand Name", placeholder="e.g. Northwest Regional PCA")
-            
+        with st.expander("1. Strategy (The Core)", expanded=True):
+            wiz_name = st.text_input("Brand Name", placeholder="e.g. Zenith Financial")
             c1, c2 = st.columns(2)
             with c1:
-                wiz_mission = st.text_area("Mission Statement", placeholder="e.g. To strengthen community health centers...")
+                wiz_mission = st.text_area("Mission", placeholder="To empower...")
             with c2:
-                wiz_values = st.text_area("Core Values", placeholder="e.g. Social Justice, Health Equity, Collaboration...")
+                wiz_values = st.text_area("Values", placeholder="Transparency, Agility...")
         
-        # 2. VOICE SECTION
-        with st.expander("2. Voice & Tone (The Personality)", expanded=False):
-            st.caption("Based on the '12 Brand Archetypes' framework (Jungian).")
+        with st.expander("2. Voice (The Personality)", expanded=False):
             c3, c4 = st.columns(2)
             with c3:
-                wiz_archetype = st.selectbox("Brand Archetype", 
-                    ["The Ruler (Control, Leadership)", "The Creator (Innovation, Art)", 
-                     "The Sage (Wisdom, Truth)", "The Innocent (Safety, Optimism)", 
-                     "The Outlaw (Disruption, Liberation)", "The Magician (Vision, Transformation)", 
-                     "The Hero (Mastery, Action)", "The Lover (Intimacy, Connection)", 
-                     "The Jester (Pleasure, Humor)", "The Everyman (Belonging, Down-to-earth)", 
-                     "The Caregiver (Service, Nurturing)", "The Explorer (Freedom, Discovery)"])
+                wiz_archetype = st.selectbox("Archetype", ["The Ruler", "The Creator", "The Sage", "The Innocent", "The Outlaw", "The Magician", "The Hero", "The Lover", "The Jester", "The Everyman", "The Caregiver", "The Explorer"])
             with c4:
-                wiz_tone_adjectives = st.text_input("Tone Adjectives", placeholder="e.g. Professional, Empathetic, Authoritative")
-            
-            wiz_voice_dos = st.text_area("Voice Do's & Don'ts", placeholder="Do: Use active verbs. Don't: Use passive voice or slang.")
+                wiz_tone_adjectives = st.text_input("Tone Keywords", placeholder="Professional, Direct")
+            wiz_voice_dos = st.text_area("Do's & Don'ts", placeholder="Do use active verbs...")
 
-        # 3. VISUALS SECTION
-        with st.expander("3. Visual Identity (The Look)", expanded=False):
-            st.subheader("🎨 Colors")
+        with st.expander("3. Visuals (The Look)", expanded=False):
+            st.markdown("**Colors**")
             vc1, vc2 = st.columns(2)
             with vc1:
-                st.markdown("**Primary Palette**")
-                p_col1_name = st.text_input("Primary Color 1 Name", "Brand Blue")
-                p_col1_hex = st.color_picker("Hex", "#0000FF", key="p1")
+                p_col1_name = st.text_input("Primary Color Name", "Brand Blue")
+                p_col1_hex = st.color_picker("Hex", "#0000FF")
             with vc2:
-                st.markdown("**Secondary/Accent**")
-                s_col_list = st.text_area("Additional Hex Codes (List)", placeholder="#EAA792 (Dusk Pink)\n#618DAE (Cornflower)\n#394214 (Olive)")
+                s_col_list = st.text_area("Secondary Palette", placeholder="#EAA792, #618DAE")
 
-            st.divider()
-            
-            st.subheader("🔠 Typography")
+            st.markdown("**Typography**")
             tc1, tc2 = st.columns(2)
             with tc1:
-                st.markdown("**Headlines**")
-                head_fam = st.selectbox("Headline Style", ["Sans-Serif (Modern/Clean)", "Serif (Traditional/Trustworthy)", "Slab Serif (Bold/Industrial)", "Script (Personal/Elegant)", "Display (Unique/Stylized)"])
-                head_name = st.text_input("Font Name", placeholder="e.g. Montserrat")
+                head_fam = st.selectbox("Headline Style", ["Sans-Serif", "Serif", "Slab Serif", "Script", "Display"])
+                head_name = st.text_input("Head Font Name", placeholder="Montserrat")
             with tc2:
-                st.markdown("**Body Copy**")
-                body_fam = st.selectbox("Body Style", ["Sans-Serif (High Readability)", "Serif (High Readability)", "Monospace (Tech)"])
-                body_name = st.text_input("Body Font Name", placeholder="e.g. Open Sans")
+                body_fam = st.selectbox("Body Style", ["Sans-Serif", "Serif", "Monospace"])
+                body_name = st.text_input("Body Font Name", placeholder="Open Sans")
 
-            st.divider()
-            st.subheader("🖼️ Logo")
-            
-            # LOGO UPLOADER & DESCRIBER
-            logo_col1, logo_col2 = st.columns(2)
-            with logo_col1:
-                 wiz_logo_file = st.file_uploader("Upload Logo (Optional)", type=["png", "jpg", "jpeg"])
-            with logo_col2:
-                 wiz_logo_desc = st.text_input("Logo Description (Optional if uploaded)", placeholder="e.g. A pine tree inside a blue shield")
+            st.markdown("**Logo**")
+            lc1, lc2 = st.columns(2)
+            with lc1:
+                wiz_logo_file = st.file_uploader("Upload Logo", type=["png", "jpg"])
+            with lc2:
+                wiz_logo_desc = st.text_input("Or Describe Logo", placeholder="Blue shield icon...")
 
-        # GENERATE BUTTON
-        if st.button("✨ Generate Comprehensive Profile", type="primary"):
+        if st.button("Generate System", type="primary"):
             if not wiz_name:
                 st.error("Brand Name is required.")
             else:
-                with st.spinner("Analyzing Brand DNA..."):
-                    
-                    # LOGO LOGIC: If file uploaded but no desc, ask AI to describe it
+                with st.spinner("Architecting Brand System..."):
+                    # Logo Logic
                     final_logo_desc = wiz_logo_desc
                     if wiz_logo_file and not wiz_logo_desc:
-                        with st.spinner("👀 Analyzing Logo Image..."):
-                            img = Image.open(wiz_logo_file)
-                            final_logo_desc = logic.describe_logo(img)
-                            st.info(f"AI Detected Logo: {final_logo_desc}")
+                        img = Image.open(wiz_logo_file)
+                        final_logo_desc = logic.describe_logo(img)
+                        st.info(f"AI Detected Logo: {final_logo_desc}")
 
-                    # Construct the Mega-Prompt
                     prompt = f"""
                     Create a comprehensive technical brand profile for "{wiz_name}".
-                    
                     ### 1. STRATEGY
                     - Mission: {wiz_mission}
                     - Values: {wiz_values}
-                    
                     ### 2. VOICE
                     - Archetype: {wiz_archetype}
                     - Tone Keywords: {wiz_tone_adjectives}
                     - Do's/Don'ts: {wiz_voice_dos}
-                    
                     ### 3. VISUALS
                     - Primary Color: {p_col1_name} ({p_col1_hex})
                     - Secondary Palette: {s_col_list}
@@ -224,16 +243,14 @@ elif app_mode == "🏗️ Brand Builder":
                     
                     rules = logic.generate_brand_rules(prompt)
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = rules
-                    st.success(f"Profile for {wiz_name} created successfully!")
-                    with st.expander("View Generated Rules"):
-                        st.write(rules)
+                    st.success(f"Profile for {wiz_name} created!")
+                    st.text_area("Result", rules, height=400)
 
-    # --- PDF EXTRACT TAB ---
+    # --- PDF EXTRACT ---
     with tab2:
-        st.write("Upload an existing PDF Brand Guide to automatically extract and encode the rules.")
-        pdf = st.file_uploader("Choose PDF", type=["pdf"])
-        if pdf and st.button("Extract from PDF"):
-            with st.spinner("Reading..."):
+        pdf = st.file_uploader("Upload PDF Brand Guide", type=["pdf"])
+        if pdf and st.button("Extract Rules"):
+            with st.spinner("Extracting..."):
                 raw_text = logic.extract_text_from_pdf(pdf)
                 prompt = f"Extract strict rules from this text: {raw_text[:25000]}"
                 rules = logic.generate_brand_rules(prompt)
@@ -241,24 +258,43 @@ elif app_mode == "🏗️ Brand Builder":
                 name = pdf.name.split(".")[0]
                 st.session_state['profiles'][f"{name} (PDF)"] = rules
                 st.success("Extracted!")
+                st.text_area("Result", rules, height=400)
 
-# --- TOOL 4: MANAGER ---
-elif app_mode == "📂 Manager":
-    st.header("Manage Profiles")
+# ==========================================
+# MODULE 4: PROFILE MANAGER
+# ==========================================
+elif app_mode == "Profile Manager":
+    st.subheader("Profile Manager")
+    st.caption("Edit, Delete, or Export your brand profiles.")
+    
     if st.session_state['profiles']:
-        target = st.selectbox("Edit Profile", list(st.session_state['profiles'].keys()))
-        
+        target = st.selectbox("Select Profile", list(st.session_state['profiles'].keys()))
         current_rules = st.session_state['profiles'][target]
-        new_rules = st.text_area("Edit Rules", current_rules, height=600) # Made bigger for detail
         
-        col1, col2 = st.columns([1, 4])
-        with col1:
-             if st.button("🗑️ Delete"):
-                del st.session_state['profiles'][target]
-                st.rerun()
-        with col2:
-            if st.button("Save Changes"):
+        # Edit Area
+        new_rules = st.text_area("Edit Rules (Markdown Supported)", current_rules, height=500)
+        
+        # Action Buttons
+        c1, c2, c3 = st.columns([1, 1, 1])
+        
+        with c1:
+            if st.button("Save Changes", type="primary"):
                 st.session_state['profiles'][target] = new_rules
                 st.success("Saved!")
+        
+        with c2:
+            # EXPORT BUTTON
+            pdf_bytes = logic.create_pdf(target, new_rules)
+            st.download_button(
+                label="Download PDF",
+                data=pdf_bytes,
+                file_name=f"{target}_Guidelines.pdf",
+                mime='application/pdf'
+            )
+            
+        with c3:
+            if st.button("Delete Profile"):
+                del st.session_state['profiles'][target]
+                st.rerun()
     else:
-        st.info("No profiles available.")
+        st.info("No profiles found.")
