@@ -63,6 +63,22 @@ if 'profiles' not in st.session_state:
 
 MAX_CHECKS = 50
 
+# --- ARCHETYPE DEFINITIONS ---
+ARCHETYPES = [
+    "The Ruler: Control, leadership, responsibility (e.g., Mercedes-Benz, Rolex)",
+    "The Creator: Innovation, imagination, expression (e.g., Apple, Lego)",
+    "The Sage: Wisdom, truth, expertise (e.g., Google, BBC, MIT)",
+    "The Innocent: Optimism, safety, simplicity (e.g., Dove, Coca-Cola)",
+    "The Outlaw: Disruption, liberation, rebellion (e.g., Harley-Davidson, Virgin)",
+    "The Magician: Transformation, vision, wonder (e.g., Disney, Dyson)",
+    "The Hero: Mastery, action, courage (e.g., Nike, FedEx)",
+    "The Lover: Intimacy, connection, indulgence (e.g., Victoria's Secret, Chanel)",
+    "The Jester: Humor, play, enjoyment (e.g., Old Spice, M&Ms)",
+    "The Everyman: Belonging, connection, down-to-earth (e.g., IKEA, Target)",
+    "The Caregiver: Service, nurturing, protection (e.g., Johnson & Johnson, Volvo)",
+    "The Explorer: Freedom, discovery, authenticity (e.g., Jeep, Patagonia)"
+]
+
 # --- LOGIN SCREEN ---
 if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
@@ -96,6 +112,7 @@ with st.sidebar:
     app_mode = st.radio("SELECT MODULE", [
         "Visual Compliance", 
         "Copy Editor", 
+        "Content Generator", # NEW MODULE
         "Brand Architect", 
         "Profile Manager"
     ])
@@ -160,7 +177,35 @@ elif app_mode == "Copy Editor":
                 st.markdown(result)
 
 # ==========================================
-# MODULE 3: BRAND ARCHITECT (WIZARD)
+# MODULE 3: CONTENT GENERATOR (NEW)
+# ==========================================
+elif app_mode == "Content Generator":
+    st.subheader("Content Generator")
+    st.caption("Generate new on-brand assets from bullet points.")
+    
+    profile = st.selectbox("Active Brand Profile", list(st.session_state['profiles'].keys()))
+    rules = st.session_state['profiles'][profile]
+    
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        content_format = st.selectbox("Asset Type", ["Press Release", "Email to Staff", "LinkedIn Post", "Website Article", "Client Letter"])
+    with c2:
+        topic = st.text_input("Topic / Headline", placeholder="e.g. Q4 Earnings Results")
+        
+    key_points = st.text_area("Key Points / Bullets", height=200, placeholder="- Record revenue growth\n- Expanding to Europe\n- Thanking the team\n- CEO quote about future")
+    
+    if st.button("Generate Draft", type="primary"):
+        if not key_points or not topic:
+            st.error("Please provide a topic and key points.")
+        else:
+            with st.spinner(f"Drafting {content_format}..."):
+                result = logic.run_content_generator(topic, content_format, key_points, rules)
+                st.session_state['check_count'] += 1
+                st.markdown("### Generated Draft")
+                st.markdown(result)
+
+# ==========================================
+# MODULE 4: BRAND ARCHITECT (WIZARD)
 # ==========================================
 elif app_mode == "Brand Architect":
     st.subheader("Brand Architect")
@@ -181,10 +226,10 @@ elif app_mode == "Brand Architect":
         with st.expander("2. Voice (The Personality)", expanded=False):
             c3, c4 = st.columns(2)
             with c3:
-                # UPDATED: No default selection, placeholder added
+                # UPDATED: New Archetype List
                 wiz_archetype = st.selectbox(
                     "Archetype * (Required)", 
-                    ["The Ruler", "The Creator", "The Sage", "The Innocent", "The Outlaw", "The Magician", "The Hero", "The Lover", "The Jester", "The Everyman", "The Caregiver", "The Explorer"],
+                    ARCHETYPES,
                     index=None,
                     placeholder="Select an Archetype..."
                 )
@@ -223,7 +268,6 @@ elif app_mode == "Brand Architect":
                 wiz_logo_desc = st.text_input("Or Describe Logo", placeholder="Blue shield icon...")
 
         if st.button("Generate System", type="primary"):
-            # UPDATED VALIDATION LOGIC
             if not wiz_name:
                 st.error("⚠️ Error: Brand Name is required.")
             elif not wiz_archetype:
@@ -275,7 +319,7 @@ elif app_mode == "Brand Architect":
                 st.text_area("Result", rules, height=400)
 
 # ==========================================
-# MODULE 4: PROFILE MANAGER
+# MODULE 5: PROFILE MANAGER
 # ==========================================
 elif app_mode == "Profile Manager":
     st.subheader("Profile Manager")
