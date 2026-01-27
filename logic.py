@@ -62,7 +62,7 @@ class BrandGuardLogic:
 
     # --- AI TASKS ---
 
-    def run_visual_audit(self, image, rules):
+def run_visual_audit(self, image, rules):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
@@ -72,18 +72,24 @@ class BrandGuardLogic:
         {rules}
         
         ### TASK:
-        Audit the image against the guidelines. Be extremely strict.
+        Audit the image against the guidelines. 
+        
+        ### CRITICAL INSTRUCTION ON COLORS:
+        - Treat the Color Palette as a list of ALLOWED colors, not a list of REQUIRED colors.
+        - A single asset (like a logo) does NOT need to use every color in the palette.
+        - FAIL only if the image uses a dominant color that is NOT in the palette (e.g., using Red when only Blue is allowed).
+        - If the image uses a subset of the allowed colors (e.g., only Blue and White), that is a PASS.
         
         ### OUTPUT FORMAT:
         **STATUS:** [PASS / FAIL]
         
-        **1. 🎨 Visual Identity:** [Pass/Fail] - [Analyze Colors & Logo]
+        **1. 🎨 Visual Identity:** [Pass/Fail] - [Analyze if the colors used are VALID. Do not penalize for missing colors.]
         **2. 🔠 Typography:** [Pass/Fail] - [Analyze Fonts]
         **3. ✍️ Quality Check:** [Pass/Fail] - [Check for typos or grammar errors in the design]
         **4. 🗣️ Voice/Tone:** [Pass/Fail] - [Does the text match the brand voice?]
         
         **🔧 REQUIRED FIXES:**
-        * [Actionable bullet points]
+        * [Actionable bullet points. Only list fixes for actual violations.]
         """
         response = model.generate_content([prompt, image])
         return response.text
