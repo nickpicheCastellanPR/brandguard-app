@@ -136,6 +136,7 @@ elif app_mode == "🏗️ Brand Builder":
         
         # 2. VOICE SECTION
         with st.expander("2. Voice & Tone (The Personality)", expanded=False):
+            st.caption("Based on the '12 Brand Archetypes' framework (Jungian).")
             c3, c4 = st.columns(2)
             with c3:
                 wiz_archetype = st.selectbox("Brand Archetype", 
@@ -176,38 +177,51 @@ elif app_mode == "🏗️ Brand Builder":
                 body_name = st.text_input("Body Font Name", placeholder="e.g. Open Sans")
 
             st.divider()
-            st.subheader("🖼️ Logo & Imagery")
-            wiz_logo_desc = st.text_input("Logo Description", placeholder="e.g. A pine tree inside a blue shield")
-            wiz_logo_rules = st.text_input("Logo Rules", placeholder="e.g. Must have 20px clearspace. Never rotate.")
+            st.subheader("🖼️ Logo")
+            
+            # LOGO UPLOADER & DESCRIBER
+            logo_col1, logo_col2 = st.columns(2)
+            with logo_col1:
+                 wiz_logo_file = st.file_uploader("Upload Logo (Optional)", type=["png", "jpg", "jpeg"])
+            with logo_col2:
+                 wiz_logo_desc = st.text_input("Logo Description (Optional if uploaded)", placeholder="e.g. A pine tree inside a blue shield")
 
         # GENERATE BUTTON
         if st.button("✨ Generate Comprehensive Profile", type="primary"):
             if not wiz_name:
                 st.error("Brand Name is required.")
             else:
-                # Construct the Mega-Prompt
-                prompt = f"""
-                Create a comprehensive technical brand profile for "{wiz_name}".
-                
-                ### 1. STRATEGY
-                - Mission: {wiz_mission}
-                - Values: {wiz_values}
-                
-                ### 2. VOICE
-                - Archetype: {wiz_archetype}
-                - Tone Keywords: {wiz_tone_adjectives}
-                - Do's/Don'ts: {wiz_voice_dos}
-                
-                ### 3. VISUALS
-                - Primary Color: {p_col1_name} ({p_col1_hex})
-                - Secondary Palette: {s_col_list}
-                - Headline Font: {head_name} ({head_fam})
-                - Body Font: {body_name} ({body_fam})
-                - Logo Description: {wiz_logo_desc}
-                - Logo Rules: {wiz_logo_rules}
-                """
-                
-                with st.spinner("Compiling Brand Genome..."):
+                with st.spinner("Analyzing Brand DNA..."):
+                    
+                    # LOGO LOGIC: If file uploaded but no desc, ask AI to describe it
+                    final_logo_desc = wiz_logo_desc
+                    if wiz_logo_file and not wiz_logo_desc:
+                        with st.spinner("👀 Analyzing Logo Image..."):
+                            img = Image.open(wiz_logo_file)
+                            final_logo_desc = logic.describe_logo(img)
+                            st.info(f"AI Detected Logo: {final_logo_desc}")
+
+                    # Construct the Mega-Prompt
+                    prompt = f"""
+                    Create a comprehensive technical brand profile for "{wiz_name}".
+                    
+                    ### 1. STRATEGY
+                    - Mission: {wiz_mission}
+                    - Values: {wiz_values}
+                    
+                    ### 2. VOICE
+                    - Archetype: {wiz_archetype}
+                    - Tone Keywords: {wiz_tone_adjectives}
+                    - Do's/Don'ts: {wiz_voice_dos}
+                    
+                    ### 3. VISUALS
+                    - Primary Color: {p_col1_name} ({p_col1_hex})
+                    - Secondary Palette: {s_col_list}
+                    - Headline Font: {head_name} ({head_fam})
+                    - Body Font: {body_name} ({body_fam})
+                    - Logo Description: {final_logo_desc}
+                    """
+                    
                     rules = logic.generate_brand_rules(prompt)
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = rules
                     st.success(f"Profile for {wiz_name} created successfully!")
