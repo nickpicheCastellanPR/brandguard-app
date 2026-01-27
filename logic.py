@@ -137,3 +137,23 @@ class BrandGuardLogic:
         
         response = model.generate_content(grounded_prompt)
         return response.text
+        
+def describe_logo(self, image):
+        """Generates a technical description of an uploaded logo."""
+        model_name = self.get_model()
+        model = genai.GenerativeModel(model_name)
+        
+        prompt = """
+        Describe this logo in technical detail for a Brand Guideline document.
+        Focus on:
+        1. Symbols/Iconography used.
+        2. Colors observed.
+        3. Layout (Icon left of text, stacked, etc).
+        4. Vibe (Modern, Classic, Tech, Organic).
+        Keep it concise (2-3 sentences).
+        """
+        try:
+            response = model.generate_content([prompt, image])
+            return response.text
+        except Exception as e:
+            return "Logo analysis failed. Please describe manually."
