@@ -5,18 +5,16 @@ from fpdf import FPDF
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load env variables (for local testing)
+# Load env variables
 load_dotenv()
 
 class BrandGuardLogic:
     def __init__(self):
-        # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
         if self.api_key:
             genai.configure(api_key=self.api_key)
 
     def _get_api_key(self):
-        """Robust API Key Fetcher"""
         if "GOOGLE_API_KEY" in st.secrets:
             return st.secrets["GOOGLE_API_KEY"]
         elif os.getenv("GOOGLE_API_KEY"):
@@ -24,13 +22,10 @@ class BrandGuardLogic:
         return None
 
     def check_password(self, input_password):
-        """Simple Beta Gatekeeper"""
-        # Hardcoded for MVP. In production, use st.secrets or a DB.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
     def get_model(self):
-        """Silently finds the best Flash model"""
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
@@ -77,19 +72,19 @@ class BrandGuardLogic:
         ### CRITICAL INSTRUCTION ON COLORS:
         - Treat the Color Palette as a list of ALLOWED colors, not a list of REQUIRED colors.
         - A single asset (like a logo) does NOT need to use every color in the palette.
-        - FAIL only if the image uses a dominant color that is NOT in the palette (e.g., using Red when only Blue is allowed).
-        - If the image uses a subset of the allowed colors (e.g., only Blue and White), that is a PASS.
+        - FAIL only if the image uses a dominant color that is NOT in the palette.
+        - If the image uses a subset of the allowed colors, that is a PASS.
         
         ### OUTPUT FORMAT:
         **STATUS:** [PASS / FAIL]
         
-        **1. 🎨 Visual Identity:** [Pass/Fail] - [Analyze if the colors used are VALID. Do not penalize for missing colors.]
-        **2. 🔠 Typography:** [Pass/Fail] - [Analyze Fonts]
-        **3. ✍️ Quality Check:** [Pass/Fail] - [Check for typos or grammar errors in the design]
-        **4. 🗣️ Voice/Tone:** [Pass/Fail] - [Does the text match the brand voice?]
+        **1. 🎨 Visual Identity:** [Pass/Fail] - [Analyze colors, logo, and consistency]
+        **2. 🔠 Typography:** [Pass/Fail] - [Analyze Fonts against the defined styles]
+        **3. ✍️ Quality Check:** [Pass/Fail] - [Check for typos/grammar]
+        **4. 🗣️ Voice/Tone:** [Pass/Fail] - [Does the visual messaging match the strategy/archetype?]
         
         **🔧 REQUIRED FIXES:**
-        * [Actionable bullet points. Only list fixes for actual violations.]
+        * [Actionable bullet points]
         """
         response = model.generate_content([prompt, image])
         return response.text
@@ -108,37 +103,36 @@ class BrandGuardLogic:
         
         ### TASK:
         1. Correct all spelling/grammar.
-        2. Rewrite the text to strictly match the Brand Voice defined above.
+        2. Rewrite the text to strictly match the Brand Voice, Archetype, and Strategy defined above.
         
         ### OUTPUT:
         **1. 🔴 Edits Made:** [List errors]
         **2. 🟢 Polished Copy:** [ The Rewrite ]
-        **3. 💡 Strategy Note:** [Why this fits better]
+        **3. 💡 Strategy Note:** [Why this fits the brand archetype better]
         """
         response = model.generate_content(prompt)
         return response.text
 
     def generate_brand_rules(self, inputs):
-        """Inputs is a string prompt constructed in the UI"""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
-        # We wrap the user's input in a strict "Grounding System Prompt"
         grounded_prompt = f"""
         ### ROLE: Brand Strategist.
-        ### TASK: Create a brand guideline document based STRICTLY on the user's provided inputs.
+        ### TASK: Create a comprehensive brand guideline document based STRICTLY on the user's inputs.
         
         ### USER INPUTS:
         {inputs}
         
         ### CRITICAL INSTRUCTIONS:
-        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. If the brand name matches a famous company (e.g., "Starbucks" or "Pizza Planet"), IGNORE the real-world brand. Only use the attributes provided in the inputs.
-        2. **NO HALLUCINATION:** If the user did not specify a font name, do not invent one (like "SpaceAge"). Instead, prescribe a category (e.g., "Fun, thick display font").
-        3. **NO INVENTED LOGOS:** Do not describe a logo (like "Rocket Ship") unless the user explicitly described it. If not described, set the rule as "Logo must be clear and legible."
-        4. **STRICT VOCABULARY:** Do not expand on the user's adjectives. If the user says "Fun", the rule is "Fun". Do not add "Approachable" or "Engaging" unless the user wrote them.
-        
-        ### OUTPUT FORMAT:
-        Produce a standard 4-point rule block (Colors, Typography, Logo, Voice).
+        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts about real brands.
+        2. **STRICT VOCABULARY:** Use the exact Adjectives and Values provided.
+        3. **FORMAT:** Organize the output into these numbered sections:
+           1. STRATEGY (Mission, Values, Archetype)
+           2. COLOR PALETTE (Hex Codes)
+           3. TYPOGRAPHY (Headlines, Body)
+           4. LOGO RULES
+           5. VOICE & TONE
         """
         
         response = model.generate_content(grounded_prompt)
