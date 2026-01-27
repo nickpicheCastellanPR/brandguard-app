@@ -121,15 +121,33 @@ elif app_mode == "🏗️ Brand Builder":
     tab1, tab2 = st.tabs(["Wizard", "PDF Upload"])
     
     with tab1:
-        name = st.text_input("Brand Name")
-        tone = st.text_input("Tone/Voice", "Professional, Trustworthy")
-        colors = st.text_input("Key Colors", "Blue #0000FF, White #FFFFFF")
+        c1, c2 = st.columns(2)
+        with c1:
+            name = st.text_input("Brand Name")
+            colors = st.text_input("Key Colors", "Blue #0000FF, White #FFFFFF")
+            # NEW FIELD:
+            logo_desc = st.text_input("Logo Description", placeholder="e.g. A stylized castle letter C")
+        with c2:
+            tone = st.text_input("Tone/Voice", "Professional, Trustworthy")
+            # RENAMED for clarity:
+            layout_rule = st.selectbox("Layout Rule", ["Standard Clearspace", "Heavy White Space", "Compact/Tight"])
         
         if st.button("Generate from Inputs"):
-            prompt = f"Create strict brand rules for {name}. Colors: {colors}. Tone: {tone}."
-            rules = logic.generate_brand_rules(prompt)
-            st.session_state['profiles'][f"{name} (Gen)"] = rules
-            st.success(f"Created {name}!")
+            # We now include the logo description in the prompt
+            prompt = f"""
+            Create strict brand rules for a brand named "{name}".
+            - Colors: {colors}
+            - Tone: {tone}
+            - Logo Description: {logo_desc} (Enforce that the logo MUST match this description).
+            - Layout Style: {layout_rule}
+            """
+            
+            with st.spinner("Drafting Rules..."):
+                rules = logic.generate_brand_rules(prompt)
+                st.session_state['profiles'][f"{name} (Gen)"] = rules
+                st.success(f"Created {name}!")
+                with st.expander("View Generated Rules"):
+                    st.write(rules)
 
     with tab2:
         pdf = st.file_uploader("Upload Brand PDF", type="pdf")
@@ -154,4 +172,3 @@ elif app_mode == "📂 Manager":
     if st.button("Save Changes"):
         st.session_state['profiles'][target] = new_rules
         st.success("Saved!")
-
