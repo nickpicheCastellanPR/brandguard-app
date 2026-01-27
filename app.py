@@ -38,13 +38,35 @@ if 'profiles' not in st.session_state:
     }
 
 MAX_CHECKS = 50
+
+# --- EDUCATIONAL DROPDOWN OPTIONS ---
 ARCHETYPES = [
-    "The Ruler: Control, leadership (e.g. Mercedes)", "The Creator: Innovation (e.g. Apple)", 
-    "The Sage: Wisdom (e.g. Google)", "The Innocent: Optimism (e.g. Dove)", 
-    "The Outlaw: Disruption (e.g. Virgin)", "The Magician: Vision (e.g. Disney)", 
-    "The Hero: Action (e.g. Nike)", "The Lover: Intimacy (e.g. Chanel)", 
-    "The Jester: Humor (e.g. Old Spice)", "The Everyman: Belonging (e.g. IKEA)", 
-    "The Caregiver: Service (e.g. Volvo)", "The Explorer: Freedom (e.g. Jeep)"
+    "The Ruler: Control, leadership, responsibility (e.g., Mercedes-Benz)",
+    "The Creator: Innovation, imagination, expression (e.g., Apple)",
+    "The Sage: Wisdom, truth, expertise (e.g., Google, MIT)",
+    "The Innocent: Optimism, safety, simplicity (e.g., Dove)",
+    "The Outlaw: Disruption, liberation, rebellion (e.g., Virgin)",
+    "The Magician: Transformation, vision, wonder (e.g., Disney)",
+    "The Hero: Mastery, action, courage (e.g., Nike)",
+    "The Lover: Intimacy, connection, indulgence (e.g., Chanel)",
+    "The Jester: Humor, play, enjoyment (e.g., Old Spice)",
+    "The Everyman: Belonging, connection, down-to-earth (e.g., IKEA)",
+    "The Caregiver: Service, nurturing, protection (e.g., Volvo)",
+    "The Explorer: Freedom, discovery, authenticity (e.g., Jeep)"
+]
+
+FONT_HEADLINE_OPTIONS = [
+    "Sans-Serif (Modern, Clean, Minimalist) - e.g. Helvetica, Inter",
+    "Serif (Traditional, Trustworthy, Academic) - e.g. Garamond, Times",
+    "Slab Serif (Bold, Industrial, Strong) - e.g. Roboto Slab, Rockwell",
+    "Display (Unique, Stylized, Loud) - e.g. Bebas Neue, Impact",
+    "Script (Elegant, Personal, Creative) - e.g. Pacifico, Allura"
+]
+
+FONT_BODY_OPTIONS = [
+    "Sans-Serif (High Readability, Digital-First) - e.g. Open Sans, Arial",
+    "Serif (Classic Readability, Print-Like) - e.g. Georgia, Merriweather",
+    "Monospace (Technical, Code-Like, Raw) - e.g. Roboto Mono, Courier"
 ]
 
 # --- LOGIN ---
@@ -110,16 +132,15 @@ elif app_mode == "Content Generator":
                 st.session_state['check_count'] += 1
     else: st.warning("Create a profile first.")
 
-# --- 4. SOCIAL ASSISTANT (NEW) ---
+# --- 4. SOCIAL ASSISTANT ---
 elif app_mode == "📱 Social Media Assistant":
     st.subheader("Social Media Assistant")
-    st.caption("Generate platform-optimized captions and hashtags.")
     if st.session_state['profiles']:
         profile = st.selectbox("Profile", list(st.session_state['profiles'].keys()))
         c1, c2 = st.columns(2)
         with c1: platform = st.selectbox("Platform", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook"])
-        with c2: topic = st.text_input("Topic/Context", placeholder="e.g. Launching our new sustainability initiative")
-        img_file = st.file_uploader("Attach Image (Optional but recommended)", type=["jpg", "png"])
+        with c2: topic = st.text_input("Topic/Context", placeholder="e.g. Launching new initiative")
+        img_file = st.file_uploader("Attach Image (Optional)", type=["jpg", "png"])
         
         if st.button("Generate Social Content", type="primary"):
             image = Image.open(img_file) if img_file else None
@@ -133,32 +154,47 @@ elif app_mode == "Brand Architect":
     st.subheader("Brand Architect")
     tab1, tab2 = st.tabs(["Deep-Dive Wizard", "PDF Extraction"])
     with tab1:
-        with st.expander("1. Strategy", expanded=True):
+        with st.expander("1. Strategy (The Core)", expanded=True):
             wiz_name = st.text_input("Brand Name")
             c1, c2 = st.columns(2)
-            with c1: wiz_mission = st.text_area("Mission")
-            with c2: wiz_values = st.text_area("Values")
+            with c1: wiz_mission = st.text_area("Mission Statement")
+            with c2: wiz_values = st.text_area("Core Values")
         
-        with st.expander("2. Voice & Tone", expanded=False):
+        with st.expander("2. Voice & Tone (The Personality)", expanded=False):
+            # EDUCATIONAL DROPDOWN
             wiz_archetype = st.selectbox("Archetype *", ARCHETYPES, index=None, placeholder="Select Archetype...")
-            wiz_tone = st.text_input("Tone Keywords")
+            wiz_tone = st.text_input("Tone Keywords", placeholder="e.g. Professional, Direct")
             
             st.markdown("---")
             st.markdown("**Voice Calibration (Ghost-Writer)**")
             
-            # MULTI-MODAL INPUT FOR VOICE
             voice_col1, voice_col2 = st.columns([1, 1])
             with voice_col1:
                 voice_type = st.selectbox("Sample Context", ["General Brand Voice", "Internal Comms (CEO)", "Press/Formal", "Social/Casual"])
             with voice_col2:
-                voice_file = st.file_uploader("Upload Sample (PDF/Image)", type=["pdf", "png", "jpg"])
+                voice_file = st.file_uploader("Upload Sample (Screenshot/PDF)", type=["pdf", "png", "jpg"])
             
-            wiz_voice_text = st.text_area("Or Paste Text", height=100, placeholder="Paste sample text here if not uploading...")
+            wiz_voice_text = st.text_area("Or Paste Text", height=100, placeholder="Paste text here if not uploading...")
 
-        with st.expander("3. Visuals", expanded=False):
+        with st.expander("3. Visuals (The Look)", expanded=False):
+            st.markdown("**Colors**")
             c1, c2 = st.columns(2)
             with c1: p_col = st.text_input("Primary Color", "Brand Blue")
             with c2: s_col = st.text_area("Secondary Palette")
+            
+            st.divider()
+            st.markdown("**Typography**")
+            # EDUCATIONAL DROPDOWNS FOR FONTS
+            tc1, tc2 = st.columns(2)
+            with tc1:
+                head_fam = st.selectbox("Headline Style", FONT_HEADLINE_OPTIONS)
+                head_name = st.text_input("Headline Font Name", placeholder="e.g. Montserrat")
+            with tc2:
+                body_fam = st.selectbox("Body Style", FONT_BODY_OPTIONS)
+                body_name = st.text_input("Body Font Name", placeholder="e.g. Open Sans")
+            
+            st.divider()
+            st.markdown("**Logo**")
             wiz_logo_file = st.file_uploader("Upload Logo", type=["png", "jpg"])
             wiz_logo_desc = st.text_input("Or Describe Logo")
 
@@ -167,7 +203,7 @@ elif app_mode == "Brand Architect":
                 st.error("Name and Archetype required.")
             else:
                 with st.spinner("Architecting..."):
-                    # 1. Process Voice Sample
+                    # Voice Processing
                     final_voice_sample = wiz_voice_text
                     if voice_file:
                         if voice_file.type == "application/pdf":
@@ -177,7 +213,7 @@ elif app_mode == "Brand Architect":
                     
                     final_voice_input = f"CONTEXT: {voice_type}\nCONTENT: {final_voice_sample}"
 
-                    # 2. Process Logo
+                    # Logo Processing
                     final_logo_desc = wiz_logo_desc
                     if wiz_logo_file and not wiz_logo_desc:
                         final_logo_desc = logic.describe_logo(Image.open(wiz_logo_file))
@@ -187,7 +223,9 @@ elif app_mode == "Brand Architect":
                     STRATEGY: Mission: {wiz_mission}, Values: {wiz_values}
                     VOICE: Archetype: {wiz_archetype}, Tone: {wiz_tone}
                     VOICE SAMPLES: {final_voice_input}
-                    VISUALS: Primary: {p_col}, Secondary: {s_col}, Logo: {final_logo_desc}
+                    VISUALS: Primary: {p_col}, Secondary: {s_col}
+                    TYPOGRAPHY: Headline ({head_name} / {head_fam}), Body ({body_name} / {body_fam})
+                    Logo: {final_logo_desc}
                     """
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
                     st.success(f"Created {wiz_name}!")
