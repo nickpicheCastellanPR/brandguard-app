@@ -14,7 +14,7 @@ st.set_page_config(
 
 logic = SignetLogic()
 
-# --- PREMIUM CSS OVERHAUL (V2.0) ---
+# --- PREMIUM CSS OVERHAUL (V2.1 - Contrast Fix) ---
 st.markdown("""
 <style>
     /* 1. GLOBAL FONTS & THEME */
@@ -28,16 +28,19 @@ st.markdown("""
     
     /* 2. SIDEBAR STYLING */
     section[data-testid="stSidebar"] {
-        background-color: #121212;
+        background-color: #050505; /* Pure Black for high contrast */
         border-right: 1px solid #2A2A2A;
     }
     
-    /* LOGO CONTAINER FIX: Creates a light "Spotlight" behind the top image in sidebar */
-    section[data-testid="stSidebar"] .stImage {
-        background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 70%);
-        border-radius: 10px;
-        padding: 10px;
+    /* LOGO CONTAINER FIX: 
+       This targets the First Image in the Sidebar (The Logo).
+       It adds a light background so the Dark Text is visible. */
+    section[data-testid="stSidebar"] [data-testid="stImage"] {
+        background-color: #E0E0E0; /* Light Grey Background */
+        padding: 15px;
+        border-radius: 8px;
         margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
 
     /* NAVIGATION MENU STYLING */
@@ -49,28 +52,42 @@ st.markdown("""
         margin-bottom: 6px;
         border: 1px solid transparent;
         transition: all 0.2s ease;
-        color: #888;
+        color: #CCCCCC !important; /* High Contrast Grey */
         font-weight: 500;
         cursor: pointer;
-        display: block; /* Force block for full width hit area */
+        display: block; 
     }
     div[role="radiogroup"] label:hover {
         background: #1E1E1E;
-        color: #D4AF37; /* Castellan Gold on Hover */
+        color: #FFFFFF !important; /* Pure White on Hover */
         border-color: #333;
-        transform: translateX(4px); /* Subtle slide effect */
+        transform: translateX(4px); 
+    }
+    /* Active State styling */
+    div[role="radiogroup"] label[data-checked="true"] {
+        background: #1E1E1E;
+        color: #D4AF37 !important; /* Gold */
+        border-left: 3px solid #D4AF37;
     }
     
-    /* 3. INPUT FIELDS (Dark Mode) */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div {
-        background-color: #1E1E1E;
-        color: #E0E0E0;
-        border: 1px solid #333;
+    /* 3. INPUT FIELDS (Forced High Contrast) */
+    /* Force text to be white and background to be dark charcoal */
+    input[type="text"], input[type="password"], textarea {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
+        border: 1px solid #444 !important;
         border-radius: 6px;
     }
-    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-        border-color: #D4AF37;
-        box-shadow: 0 0 0 1px #D4AF37;
+    /* Focus state */
+    input:focus, textarea:focus {
+        border-color: #D4AF37 !important;
+        box-shadow: 0 0 0 1px #D4AF37 !important;
+        color: #FFFFFF !important;
+    }
+    /* Select Box / Dropdown Text */
+    div[data-baseweb="select"] > div {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
     }
 
     /* 4. BUTTONS (Castellan Gold & Blue) */
@@ -90,26 +107,22 @@ st.markdown("""
         background-color: #D4AF37; 
         color: #000;
         border-color: #D4AF37;
-        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); /* Gold Glow */
+        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); 
     }
     
-    /* 5. DASHBOARD CARDS (Glassmorphism) */
+    /* 5. DASHBOARD CARDS */
     div[data-testid="stMetric"] {
-        background-color: #1A1A1A;
+        background-color: #161616;
         border: 1px solid #333;
         padding: 15px;
         border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     [data-testid="stMetricValue"] {
         font-size: 1.8rem !important;
         color: #D4AF37 !important;
     }
-    [data-testid="stMetricLabel"] {
-        color: #888 !important;
-    }
     
-    /* 6. CUSTOM WARNING BOX (Replaces Yellow Error) */
+    /* 6. WARNING BOX */
     .custom-warning {
         background-color: #1E1E1E;
         border-left: 4px solid #D4AF37;
@@ -119,12 +132,11 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* HIDE STREAMLIT BRANDING */
+    /* UTILITIES */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* FOOTER */
     .footer {
         position: fixed;
         left: 0;
@@ -139,7 +151,6 @@ st.markdown("""
         z-index: 999;
         letter-spacing: 1px;
     }
-    /* Add padding to body so footer doesn't cover content */
     .block-container { padding-bottom: 50px; }
 </style>
 """, unsafe_allow_html=True)
@@ -160,14 +171,15 @@ if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
+        # FIX: Restrict logo width so it doesn't explode
         if os.path.exists("Signet_Logo_Color.png"): 
-            # Use a slightly different display for login
-            st.image("Signet_Logo_Color.png", use_container_width=True)
+            st.image("Signet_Logo_Color.png", width=300) 
         else: 
             st.markdown("<h1 style='text-align: center; color: #D4AF37; letter-spacing: 5px;'>SIGNET</h1>", unsafe_allow_html=True)
         
         st.markdown("<p style='text-align: center; color: #666; font-size: 0.9rem; margin-top: -10px;'>ENTERPRISE BRAND GOVERNANCE</p><br>", unsafe_allow_html=True)
         
+        # Input color fixed via CSS
         pwd = st.text_input("SECURE ACCESS CODE", type="password", label_visibility="collapsed", placeholder="Enter Access Code")
         if st.button("AUTHENTICATE"):
             if logic.check_password(pwd):
@@ -180,8 +192,7 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # LOGO HANDLING: 
-    # The CSS .stImage rule above adds a subtle radial gradient behind this to make the dark logo pop.
+    # Logo is now styled by CSS to have a light background container
     if os.path.exists("Signet_Logo_Color.png"): 
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else: 
@@ -189,7 +200,6 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # NAVIGATION
     app_mode = st.radio("MENU", [
         "Dashboard",
         "Visual Compliance", 
@@ -229,7 +239,6 @@ if app_mode == "Dashboard":
 
     # QUICK ACTIONS
     if not st.session_state['profiles']:
-        # Custom "Warning" Box
         st.markdown("""
         <div class="custom-warning">
             <strong>⚠️ No Brand Profiles Detected</strong><br>
@@ -243,8 +252,6 @@ if app_mode == "Dashboard":
                 st.subheader("🏗️ Architect New Profile")
                 st.caption("Define mission, voice, and visuals from scratch.")
                 if st.button("Launch Wizard"): 
-                    # We can't auto-nav via button in Streamlit easily without session state hacks
-                    # but we can direct them visually
                     st.info("Select 'Brand Architect' from the sidebar.")
         with c2:
              with st.container(border=True):
@@ -282,7 +289,7 @@ elif app_mode == "Visual Compliance":
             with st.spinner("Analyzing pixels & palettes..."):
                 raw_result = logic.run_visual_audit(Image.open(uploaded_file), rules)
                 st.success("Audit Complete")
-                st.markdown(logic.clean_markdown(raw_result)) # Using clean markdown utility
+                st.markdown(logic.clean_markdown(raw_result)) 
                 st.session_state['check_count'] += 1
     else: 
         st.markdown('<div class="custom-warning">⚠️ No Profiles Found. Visit Brand Architect.</div>', unsafe_allow_html=True)
@@ -376,6 +383,7 @@ elif app_mode == "Brand Architect":
             
             st.markdown("---")
             st.markdown("##### 🗣️ Voice Calibration (Ghost-Writer)")
+            st.caption("Upload 'Gold Standard' samples (PDFs/Screenshots) to train the AI on specific formats.")
             
             # STAGING AREA
             col_in1, col_in2 = st.columns([1,2])
@@ -383,7 +391,7 @@ elif app_mode == "Brand Architect":
             with col_in2: v_file = st.file_uploader("Upload File", type=["pdf","png","jpg"], key="v_up", label_visibility="collapsed")
             v_text = st.text_area("Or Paste Text", height=80, key="v_txt", placeholder="Paste text here...")
             
-            if st.button("➕ Add Sample"):
+            if st.button("➕ Add Sample to Training Set"):
                 content = v_text
                 if v_file:
                     if v_file.type == "application/pdf": content += "\n" + logic.extract_text_from_pdf(v_file)
@@ -399,19 +407,16 @@ elif app_mode == "Brand Architect":
             if st.session_state['wizard_samples']:
                 st.markdown("**Staged Samples:**")
                 for i, s in enumerate(st.session_state['wizard_samples']):
-                    c_del, c_info = st.columns([1, 8])
-                    with c_del:
-                        if st.button("X", key=f"del_{i}"):
-                            st.session_state['wizard_samples'].pop(i)
-                            st.rerun()
-                    with c_info:
-                        st.caption(f"[{s['type']}] {s['content'][:50]}...")
+                    st.text(f"• [{s['type']}] {s['content'][:50]}...")
+                    if st.button(f"Remove Sample {i+1}", key=f"del_{i}"):
+                        st.session_state['wizard_samples'].pop(i)
+                        st.rerun()
 
         with st.container(border=True):
             st.markdown("#### 3. Visual Identity")
             c1, c2 = st.columns(2)
             with c1: p_col = st.text_input("Primary Color Hex", placeholder="#000000")
-            with c2: s_col = st.text_area("Secondary Palette", height=68)
+            with c2: s_col = st.text_area("Secondary Palette", height=68, placeholder="#FFFFFF, #333333")
             
             tc1, tc2 = st.columns(2)
             with tc1: head_font = st.selectbox("Headline Style", FONT_HEAD_OPTS); head_name = st.text_input("Headline Font Name")
