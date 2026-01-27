@@ -181,15 +181,20 @@ elif app_mode == "Brand Architect":
         with st.expander("2. Voice (The Personality)", expanded=False):
             c3, c4 = st.columns(2)
             with c3:
-                wiz_archetype = st.selectbox("Archetype", ["The Ruler", "The Creator", "The Sage", "The Innocent", "The Outlaw", "The Magician", "The Hero", "The Lover", "The Jester", "The Everyman", "The Caregiver", "The Explorer"])
+                # UPDATED: No default selection, placeholder added
+                wiz_archetype = st.selectbox(
+                    "Archetype * (Required)", 
+                    ["The Ruler", "The Creator", "The Sage", "The Innocent", "The Outlaw", "The Magician", "The Hero", "The Lover", "The Jester", "The Everyman", "The Caregiver", "The Explorer"],
+                    index=None,
+                    placeholder="Select an Archetype..."
+                )
             with c4:
                 wiz_tone_adjectives = st.text_input("Tone Keywords", placeholder="Professional, Direct")
             wiz_voice_dos = st.text_area("Do's & Don'ts", placeholder="Do use active verbs...")
             
-            # --- NEW FEATURE: VOICE CALIBRATOR ---
             st.markdown("---")
             st.markdown("**Voice Calibration (Ghost-Writing Engine)**")
-            st.caption("Paste approved copy (e.g. CEO emails, blogs) to train the AI on specific sentence structure and vocabulary.")
+            st.caption("Paste 'Gold Standard' copy to calibrate **Tone and Cadence**. Note: For accurate Archetype detection, use 'About Us' or 'Mission' text.")
             wiz_voice_samples = st.text_area("Reference Content", placeholder="Paste 2-3 paragraphs of 'Gold Standard' text here...", height=150)
 
         with st.expander("3. Visuals (The Look)", expanded=False):
@@ -218,8 +223,11 @@ elif app_mode == "Brand Architect":
                 wiz_logo_desc = st.text_input("Or Describe Logo", placeholder="Blue shield icon...")
 
         if st.button("Generate System", type="primary"):
+            # UPDATED VALIDATION LOGIC
             if not wiz_name:
-                st.error("Brand Name is required.")
+                st.error("⚠️ Error: Brand Name is required.")
+            elif not wiz_archetype:
+                st.error("⚠️ Error: Please select a Brand Archetype (Step 2).")
             else:
                 with st.spinner("Architecting Brand System..."):
                     # Logo Logic
