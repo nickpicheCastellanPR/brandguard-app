@@ -6,7 +6,7 @@ from logic import SignetLogic
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Signet", 
-    page_icon="Signet_Icon_Color.png", # Uses your icon if present
+    page_icon="Signet_Icon_Color.png", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -67,7 +67,6 @@ MAX_CHECKS = 50
 if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        # Check for Logo
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=300)
         else:
@@ -186,6 +185,12 @@ elif app_mode == "Brand Architect":
             with c4:
                 wiz_tone_adjectives = st.text_input("Tone Keywords", placeholder="Professional, Direct")
             wiz_voice_dos = st.text_area("Do's & Don'ts", placeholder="Do use active verbs...")
+            
+            # --- NEW FEATURE: VOICE CALIBRATOR ---
+            st.markdown("---")
+            st.markdown("**Voice Calibration (Ghost-Writing Engine)**")
+            st.caption("Paste approved copy (e.g. CEO emails, blogs) to train the AI on specific sentence structure and vocabulary.")
+            wiz_voice_samples = st.text_area("Reference Content", placeholder="Paste 2-3 paragraphs of 'Gold Standard' text here...", height=150)
 
         with st.expander("3. Visuals (The Look)", expanded=False):
             st.markdown("**Colors**")
@@ -233,6 +238,7 @@ elif app_mode == "Brand Architect":
                     - Archetype: {wiz_archetype}
                     - Tone Keywords: {wiz_tone_adjectives}
                     - Do's/Don'ts: {wiz_voice_dos}
+                    - VOICE SAMPLES (ANALYZE THESE): "{wiz_voice_samples}"
                     ### 3. VISUALS
                     - Primary Color: {p_col1_name} ({p_col1_hex})
                     - Secondary Palette: {s_col_list}
