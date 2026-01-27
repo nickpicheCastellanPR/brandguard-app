@@ -1,9 +1,9 @@
 import streamlit as st
 from PIL import Image
-from logic import BrandGuardLogic  # Import your new brain
+from logic import BrandGuardLogic
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="BrandGuard MVP", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="BrandGuard Pro", page_icon="🛡️", layout="wide")
 
 # Initialize Logic
 logic = BrandGuardLogic()
@@ -13,6 +13,11 @@ st.markdown("""
 <style>
     .stDeployButton {display:none;}
     .block-container {padding-top: 2rem;}
+    div[data-testid="stExpander"] div[role="button"] p {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #E0E0E0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -28,6 +33,7 @@ if 'profiles' not in st.session_state:
         2. TYPOGRAPHY: Headlines: Montserrat Black. Body: Montserrat Regular. Accents: Kepler Std (Italic Display).
         3. LOGO SAFETY: Clearspace: 32% of height. Min Size: 60px.
         4. VOICE: Bold, Relevant, Authentic. No passive tone. Active verbs only.
+        5. STRATEGY: Mission: Strengthen community health centers. Values: Health Equity, Social Justice.
         """,
         "Castellan PR (Internal)": """
         1. COLOR PALETTE: Dark Charcoal (#1A1A1A), Gold Accent (#D4AF37), Castellan Blue (#24363b), White.
@@ -36,7 +42,7 @@ if 'profiles' not in st.session_state:
         """
     }
 
-# DAILY LIMIT (Hardcoded for MVP)
+# DAILY LIMIT
 MAX_CHECKS = 50
 
 # --- LOGIN SCREEN ---
@@ -51,16 +57,14 @@ if not st.session_state['authenticated']:
             st.rerun()
         else:
             st.error("Invalid Code. Try 'beta'")
-    st.stop()  # Stop app here if not logged in
+    st.stop()
 
-# --- MAIN APP (Only runs if authenticated) ---
+# --- MAIN APP ---
 
-# Sidebar
 with st.sidebar:
     st.title("BrandGuard")
     st.caption(f"Usage: {st.session_state['check_count']} / {MAX_CHECKS} checks")
     
-    # Navigation
     app_mode = st.radio("Toolbox", ["🚀 Visual Audit", "✍️ Copy Editor", "🏗️ Brand Builder", "📂 Manager"])
     
     st.divider()
@@ -68,7 +72,6 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
-# Limit Check
 if st.session_state['check_count'] >= MAX_CHECKS:
     st.error("🚫 Daily limit reached. Please upgrade or contact support.")
     st.stop()
@@ -90,11 +93,8 @@ if app_mode == "🚀 Visual Audit":
             st.image(image, width=300)
             
             with st.spinner("Analyzing..."):
-                # Call Logic
                 result = logic.run_visual_audit(image, rules)
                 st.markdown(result)
-                
-                # Increment Counter
                 st.session_state['check_count'] += 1
 
 # --- TOOL 2: COPY EDITOR ---
@@ -117,44 +117,111 @@ elif app_mode == "✍️ Copy Editor":
 
 # --- TOOL 3: BRAND BUILDER ---
 elif app_mode == "🏗️ Brand Builder":
-    st.header("🏗️ Builder")
-    tab1, tab2 = st.tabs(["Wizard", "PDF Upload"])
+    st.header("🏗️ Brand Identity Builder")
+    tab1, tab2 = st.tabs(["✨ Deep-Dive Wizard", "📄 PDF Extraction"])
     
+    # --- DEEP DIVE WIZARD ---
     with tab1:
-        c1, c2 = st.columns(2)
-        with c1:
-            name = st.text_input("Brand Name")
-            colors = st.text_input("Key Colors", "Blue #0000FF, White #FFFFFF")
-            # NEW FIELD:
-            logo_desc = st.text_input("Logo Description", placeholder="e.g. A stylized castle letter C")
-        with c2:
-            tone = st.text_input("Tone/Voice", "Professional, Trustworthy")
-            # RENAMED for clarity:
-            layout_rule = st.selectbox("Layout Rule", ["Standard Clearspace", "Heavy White Space", "Compact/Tight"])
+        st.write("Build a comprehensive brand system from scratch.")
         
-        if st.button("Generate from Inputs"):
-            # We now include the logo description in the prompt
-            prompt = f"""
-            Create strict brand rules for a brand named "{name}".
-            - Colors: {colors}
-            - Tone: {tone}
-            - Logo Description: {logo_desc} (Enforce that the logo MUST match this description).
-            - Layout Style: {layout_rule}
-            """
+        # 1. STRATEGY SECTION
+        with st.expander("1. Brand Strategy (The Core)", expanded=True):
+            wiz_name = st.text_input("Brand Name", placeholder="e.g. Northwest Regional PCA")
             
-            with st.spinner("Drafting Rules..."):
-                rules = logic.generate_brand_rules(prompt)
-                st.session_state['profiles'][f"{name} (Gen)"] = rules
-                st.success(f"Created {name}!")
-                with st.expander("View Generated Rules"):
-                    st.write(rules)
+            c1, c2 = st.columns(2)
+            with c1:
+                wiz_mission = st.text_area("Mission Statement", placeholder="e.g. To strengthen community health centers...")
+            with c2:
+                wiz_values = st.text_area("Core Values", placeholder="e.g. Social Justice, Health Equity, Collaboration...")
+        
+        # 2. VOICE SECTION
+        with st.expander("2. Voice & Tone (The Personality)", expanded=False):
+            c3, c4 = st.columns(2)
+            with c3:
+                wiz_archetype = st.selectbox("Brand Archetype", 
+                    ["The Ruler (Control, Leadership)", "The Creator (Innovation, Art)", 
+                     "The Sage (Wisdom, Truth)", "The Innocent (Safety, Optimism)", 
+                     "The Outlaw (Disruption, Liberation)", "The Magician (Vision, Transformation)", 
+                     "The Hero (Mastery, Action)", "The Lover (Intimacy, Connection)", 
+                     "The Jester (Pleasure, Humor)", "The Everyman (Belonging, Down-to-earth)", 
+                     "The Caregiver (Service, Nurturing)", "The Explorer (Freedom, Discovery)"])
+            with c4:
+                wiz_tone_adjectives = st.text_input("Tone Adjectives", placeholder="e.g. Professional, Empathetic, Authoritative")
+            
+            wiz_voice_dos = st.text_area("Voice Do's & Don'ts", placeholder="Do: Use active verbs. Don't: Use passive voice or slang.")
 
+        # 3. VISUALS SECTION
+        with st.expander("3. Visual Identity (The Look)", expanded=False):
+            st.subheader("🎨 Colors")
+            vc1, vc2 = st.columns(2)
+            with vc1:
+                st.markdown("**Primary Palette**")
+                p_col1_name = st.text_input("Primary Color 1 Name", "Brand Blue")
+                p_col1_hex = st.color_picker("Hex", "#0000FF", key="p1")
+            with vc2:
+                st.markdown("**Secondary/Accent**")
+                s_col_list = st.text_area("Additional Hex Codes (List)", placeholder="#EAA792 (Dusk Pink)\n#618DAE (Cornflower)\n#394214 (Olive)")
+
+            st.divider()
+            
+            st.subheader("🔠 Typography")
+            tc1, tc2 = st.columns(2)
+            with tc1:
+                st.markdown("**Headlines**")
+                head_fam = st.selectbox("Headline Style", ["Sans-Serif (Modern/Clean)", "Serif (Traditional/Trustworthy)", "Slab Serif (Bold/Industrial)", "Script (Personal/Elegant)", "Display (Unique/Stylized)"])
+                head_name = st.text_input("Font Name", placeholder="e.g. Montserrat")
+            with tc2:
+                st.markdown("**Body Copy**")
+                body_fam = st.selectbox("Body Style", ["Sans-Serif (High Readability)", "Serif (High Readability)", "Monospace (Tech)"])
+                body_name = st.text_input("Body Font Name", placeholder="e.g. Open Sans")
+
+            st.divider()
+            st.subheader("🖼️ Logo & Imagery")
+            wiz_logo_desc = st.text_input("Logo Description", placeholder="e.g. A pine tree inside a blue shield")
+            wiz_logo_rules = st.text_input("Logo Rules", placeholder="e.g. Must have 20px clearspace. Never rotate.")
+
+        # GENERATE BUTTON
+        if st.button("✨ Generate Comprehensive Profile", type="primary"):
+            if not wiz_name:
+                st.error("Brand Name is required.")
+            else:
+                # Construct the Mega-Prompt
+                prompt = f"""
+                Create a comprehensive technical brand profile for "{wiz_name}".
+                
+                ### 1. STRATEGY
+                - Mission: {wiz_mission}
+                - Values: {wiz_values}
+                
+                ### 2. VOICE
+                - Archetype: {wiz_archetype}
+                - Tone Keywords: {wiz_tone_adjectives}
+                - Do's/Don'ts: {wiz_voice_dos}
+                
+                ### 3. VISUALS
+                - Primary Color: {p_col1_name} ({p_col1_hex})
+                - Secondary Palette: {s_col_list}
+                - Headline Font: {head_name} ({head_fam})
+                - Body Font: {body_name} ({body_fam})
+                - Logo Description: {wiz_logo_desc}
+                - Logo Rules: {wiz_logo_rules}
+                """
+                
+                with st.spinner("Compiling Brand Genome..."):
+                    rules = logic.generate_brand_rules(prompt)
+                    st.session_state['profiles'][f"{wiz_name} (Gen)"] = rules
+                    st.success(f"Profile for {wiz_name} created successfully!")
+                    with st.expander("View Generated Rules"):
+                        st.write(rules)
+
+    # --- PDF EXTRACT TAB ---
     with tab2:
-        pdf = st.file_uploader("Upload Brand PDF", type="pdf")
+        st.write("Upload an existing PDF Brand Guide to automatically extract and encode the rules.")
+        pdf = st.file_uploader("Choose PDF", type=["pdf"])
         if pdf and st.button("Extract from PDF"):
             with st.spinner("Reading..."):
                 raw_text = logic.extract_text_from_pdf(pdf)
-                prompt = f"Extract strict rules from this text: {raw_text[:20000]}"
+                prompt = f"Extract strict rules from this text: {raw_text[:25000]}"
                 rules = logic.generate_brand_rules(prompt)
                 
                 name = pdf.name.split(".")[0]
@@ -164,11 +231,20 @@ elif app_mode == "🏗️ Brand Builder":
 # --- TOOL 4: MANAGER ---
 elif app_mode == "📂 Manager":
     st.header("Manage Profiles")
-    target = st.selectbox("Edit Profile", list(st.session_state['profiles'].keys()))
-    
-    current_rules = st.session_state['profiles'][target]
-    new_rules = st.text_area("Edit Rules", current_rules, height=300)
-    
-    if st.button("Save Changes"):
-        st.session_state['profiles'][target] = new_rules
-        st.success("Saved!")
+    if st.session_state['profiles']:
+        target = st.selectbox("Edit Profile", list(st.session_state['profiles'].keys()))
+        
+        current_rules = st.session_state['profiles'][target]
+        new_rules = st.text_area("Edit Rules", current_rules, height=600) # Made bigger for detail
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+             if st.button("🗑️ Delete"):
+                del st.session_state['profiles'][target]
+                st.rerun()
+        with col2:
+            if st.button("Save Changes"):
+                st.session_state['profiles'][target] = new_rules
+                st.success("Saved!")
+    else:
+        st.info("No profiles available.")
