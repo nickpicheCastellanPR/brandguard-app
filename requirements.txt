@@ -2,3 +2,5 @@ streamlit
 google-generativeai
 pillow
 python-dotenv
+pypdf
+fpdf
