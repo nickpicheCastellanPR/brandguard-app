@@ -118,9 +118,27 @@ class BrandGuardLogic:
         response = model.generate_content(prompt)
         return response.text
 
-    def generate_brand_rules(self, inputs):
+def generate_brand_rules(self, inputs):
         """Inputs is a string prompt constructed in the UI"""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
-        response = model.generate_content(inputs)
+        
+        # We wrap the user's input in a strict "Grounding System Prompt"
+        grounded_prompt = f"""
+        ### ROLE: Brand Strategist.
+        ### TASK: Create a brand guideline document based STRICTLY on the user's provided inputs.
+        
+        ### USER INPUTS:
+        {inputs}
+        
+        ### CRITICAL INSTRUCTIONS:
+        1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. If the brand name matches a famous company (e.g., "Starbucks" or "Pizza Planet"), IGNORE the real-world brand. Only use the attributes provided in the inputs.
+        2. **NO HALLUCINATION:** If the user did not specify a font name, do not invent one (like "SpaceAge"). Instead, prescribe a category (e.g., "Fun, thick display font").
+        3. **NO INVENTED LOGOS:** Do not describe a logo (like "Rocket Ship") unless the user explicitly described it. If not described, set the rule as "Logo must be clear and legible."
+        
+        ### OUTPUT FORMAT:
+        Produce a standard 4-point rule block (Colors, Typography, Logo, Voice).
+        """
+        
+        response = model.generate_content(grounded_prompt)
         return response.text
