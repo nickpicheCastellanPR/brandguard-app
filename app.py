@@ -14,7 +14,7 @@ st.set_page_config(
 
 logic = SignetLogic()
 
-# --- PREMIUM CSS OVERHAUL ---
+# --- PREMIUM CSS OVERHAUL (V2.0) ---
 st.markdown("""
 <style>
     /* 1. GLOBAL FONTS & THEME */
@@ -22,99 +22,125 @@ st.markdown("""
     
     html, body, [class*="css"]  {
         font-family: 'Inter', sans-serif;
-        color: #E0E0E0; /* Light text for dark mode base */
+        color: #E0E0E0;
+        background-color: #0E1117; /* Deepest Dark Blue/Black */
     }
     
-    /* 2. SIDEBAR STYLING (The Premium Nav) */
+    /* 2. SIDEBAR STYLING */
     section[data-testid="stSidebar"] {
-        background-color: #121212; /* Deep Black */
-        border-right: 1px solid #333;
+        background-color: #121212;
+        border-right: 1px solid #2A2A2A;
     }
     
-    /* Hide standard radio circles */
-    div[role="radiogroup"] > label > div:first-of-type {
-        display: None;
+    /* LOGO CONTAINER FIX: Creates a light "Spotlight" behind the top image in sidebar */
+    section[data-testid="stSidebar"] .stImage {
+        background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 70%);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 20px;
     }
-    
-    /* Style the clickable labels */
+
+    /* NAVIGATION MENU STYLING */
+    div[role="radiogroup"] > label > div:first-of-type {display: None;} /* Hide circles */
     div[role="radiogroup"] label {
         background: transparent;
         padding: 12px 15px;
         border-radius: 6px;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         border: 1px solid transparent;
         transition: all 0.2s ease;
         color: #888;
         font-weight: 500;
         cursor: pointer;
+        display: block; /* Force block for full width hit area */
     }
-    
-    /* Hover State */
     div[role="radiogroup"] label:hover {
         background: #1E1E1E;
-        color: #FFF;
+        color: #D4AF37; /* Castellan Gold on Hover */
         border-color: #333;
+        transform: translateX(4px); /* Subtle slide effect */
     }
     
-    /* Active/Selected State (We use a specific selector or rely on Streamlit's internal active class handling which is tricky via CSS alone, 
-       so we style the text heavily to look active) */
-    div[role="radiogroup"] [data-testid="stMarkdownContainer"] p {
-        font-size: 0.95rem;
+    /* 3. INPUT FIELDS (Dark Mode) */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div {
+        background-color: #1E1E1E;
+        color: #E0E0E0;
+        border: 1px solid #333;
+        border-radius: 6px;
+    }
+    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
+        border-color: #D4AF37;
+        box-shadow: 0 0 0 1px #D4AF37;
     }
 
-    /* 3. BUTTONS (Castellan Gold & Blue) */
+    /* 4. BUTTONS (Castellan Gold & Blue) */
     .stButton>button {
         background-color: #24363b; 
         color: white;
         border: 1px solid #333;
         border-radius: 4px;
-        height: 2.8em;
+        height: 3em;
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.85rem;
         letter-spacing: 0.05em;
         transition: 0.3s;
+        width: 100%;
     }
     .stButton>button:hover {
         background-color: #D4AF37; 
         color: #000;
         border-color: #D4AF37;
+        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); /* Gold Glow */
     }
     
-    /* 4. CARDS & CONTAINERS */
-    .premium-card {
+    /* 5. DASHBOARD CARDS (Glassmorphism) */
+    div[data-testid="stMetric"] {
         background-color: #1A1A1A;
-        padding: 20px;
-        border-radius: 8px;
         border: 1px solid #333;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem !important;
+        color: #D4AF37 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #888 !important;
+    }
+    
+    /* 6. CUSTOM WARNING BOX (Replaces Yellow Error) */
+    .custom-warning {
+        background-color: #1E1E1E;
+        border-left: 4px solid #D4AF37;
+        padding: 15px;
+        border-radius: 4px;
+        color: #E0E0E0;
         margin-bottom: 20px;
     }
-    
-    /* 5. METRICS */
-    [data-testid="stMetricValue"] {
-        font-size: 1.8rem;
-        color: #D4AF37;
-    }
-    
-    /* 6. HIDE STREAMLIT BRANDING */
+
+    /* HIDE STREAMLIT BRANDING */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Footer Styling */
+    /* FOOTER */
     .footer {
         position: fixed;
         left: 0;
         bottom: 0;
         width: 100%;
         background-color: #0E0E0E;
-        color: #555;
+        color: #444;
         text-align: right;
-        padding: 8px 20px;
-        font-size: 11px;
+        padding: 8px 30px;
+        font-size: 10px;
         border-top: 1px solid #222;
         z-index: 999;
+        letter-spacing: 1px;
     }
+    /* Add padding to body so footer doesn't cover content */
+    .block-container { padding-bottom: 50px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -129,12 +155,13 @@ ARCHETYPES = ["The Ruler", "The Creator", "The Sage", "The Innocent", "The Outla
 FONT_HEAD_OPTS = ["Sans-Serif (Modern)", "Serif (Traditional)", "Slab Serif (Bold)", "Display (Loud)", "Script (Creative)"]
 FONT_BODY_OPTS = ["Sans-Serif (Digital)", "Serif (Print-like)", "Monospace (Tech)"]
 
-# --- LOGIN SCREEN (Minimalist) ---
+# --- LOGIN SCREEN ---
 if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if os.path.exists("Signet_Logo_Color.png"): 
+            # Use a slightly different display for login
             st.image("Signet_Logo_Color.png", use_container_width=True)
         else: 
             st.markdown("<h1 style='text-align: center; color: #D4AF37; letter-spacing: 5px;'>SIGNET</h1>", unsafe_allow_html=True)
@@ -151,8 +178,10 @@ if not st.session_state['authenticated']:
     st.markdown('<div class="footer">CASTELLAN PR | SYSTEM LOCKED</div>', unsafe_allow_html=True)
     st.stop()
 
-# --- SIDEBAR (The Navigation) ---
+# --- SIDEBAR ---
 with st.sidebar:
+    # LOGO HANDLING: 
+    # The CSS .stImage rule above adds a subtle radial gradient behind this to make the dark logo pop.
     if os.path.exists("Signet_Logo_Color.png"): 
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else: 
@@ -160,8 +189,7 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # NAVIGATION MENU (Renamed for Clarity)
-    # Using specific icons/text to make it feel like a menu
+    # NAVIGATION
     app_mode = st.radio("MENU", [
         "Dashboard",
         "Visual Compliance", 
@@ -172,10 +200,9 @@ with st.sidebar:
         "Profile Manager"
     ], label_visibility="collapsed")
     
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.caption("SYSTEM STATUS")
-    st.progress(st.session_state['check_count'] / MAX_CHECKS)
+    st.markdown("<br>", unsafe_allow_html=True)
     st.caption(f"API Usage: {st.session_state['check_count']}/{MAX_CHECKS}")
+    st.progress(st.session_state['check_count'] / MAX_CHECKS)
     
     st.divider()
     if st.button("LOGOUT"): 
@@ -185,14 +212,14 @@ with st.sidebar:
 if st.session_state['check_count'] >= MAX_CHECKS: st.error("Daily API Limit Reached."); st.stop()
 
 # ==========================================
-# 0. DASHBOARD (The New "Zero State")
+# 0. DASHBOARD
 # ==========================================
 if app_mode == "Dashboard":
     st.title("Command Center")
-    st.markdown("Welcome to **Signet**, your AI-powered brand governance engine.")
-    st.divider()
+    st.caption("Real-time governance overview.")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # METRICS ROW
+    # METRICS
     m1, m2, m3 = st.columns(3)
     with m1: st.metric("Active Profiles", len(st.session_state['profiles']))
     with m2: st.metric("Audits Run", st.session_state['check_count'])
@@ -200,40 +227,46 @@ if app_mode == "Dashboard":
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # QUICK ACTIONS (If no profiles, show Onboarding)
+    # QUICK ACTIONS
     if not st.session_state['profiles']:
-        st.info("⚠️ No Brand Profiles Detected. System is standing by.")
+        # Custom "Warning" Box
+        st.markdown("""
+        <div class="custom-warning">
+            <strong>⚠️ No Brand Profiles Detected</strong><br>
+            The system is standing by. Please initialize a profile to begin governance.
+        </div>
+        """, unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
             with st.container(border=True):
-                st.markdown("#### 🏗️ Build Your First Profile")
-                st.caption("Use the Brand Architect to define your strategy, voice, and visuals.")
-                st.markdown("1. Define Mission & Values\n2. Calibrate Voice (Ghost-Writer)\n3. Set Visual Guidelines")
+                st.subheader("🏗️ Architect New Profile")
+                st.caption("Define mission, voice, and visuals from scratch.")
+                if st.button("Launch Wizard"): 
+                    # We can't auto-nav via button in Streamlit easily without session state hacks
+                    # but we can direct them visually
+                    st.info("Select 'Brand Architect' from the sidebar.")
         with c2:
              with st.container(border=True):
-                st.markdown("#### 📄 Import from PDF")
-                st.caption("Already have a brand book? Extract the rules automatically.")
-                st.markdown("1. Upload PDF\n2. Review Extracted Rules\n3. Save Profile")
+                st.subheader("📄 Import Guidelines")
+                st.caption("Extract rules directly from an existing PDF.")
+                if st.button("Upload PDF"):
+                    st.info("Select 'Brand Architect' -> 'PDF Extraction'.")
     else:
-        st.markdown("#### Quick Actions")
-        c1, c2, c3, c4 = st.columns(4)
+        st.subheader("Quick Actions")
+        c1, c2, c3 = st.columns(3)
         with c1:
             with st.container(border=True):
                 st.markdown("**Visual Audit**")
-                st.caption("Check logos & creatives.")
+                st.caption("Validate creative assets.")
         with c2:
             with st.container(border=True):
                 st.markdown("**Ghost Writer**")
-                st.caption("Draft executive emails.")
+                st.caption("Draft executive comms.")
         with c3:
             with st.container(border=True):
-                st.markdown("**Social Gen**")
-                st.caption("Create LinkedIn posts.")
-        with c4:
-            with st.container(border=True):
-                st.markdown("**Manage Data**")
-                st.caption("Edit/Backup profiles.")
+                st.markdown("**Social Strategy**")
+                st.caption("Generate posts.")
 
 # ==========================================
 # 1. VISUAL COMPLIANCE
@@ -246,14 +279,13 @@ elif app_mode == "Visual Compliance":
         
         if uploaded_file and st.button("RUN COMPLIANCE CHECK", type="primary"):
             rules = st.session_state['profiles'][profile]['rules']
-            with st.spinner("Analyzing colors, typography, and logo usage..."):
+            with st.spinner("Analyzing pixels & palettes..."):
                 raw_result = logic.run_visual_audit(Image.open(uploaded_file), rules)
                 st.success("Audit Complete")
-                st.markdown("---")
-                st.markdown(raw_result)
+                st.markdown(logic.clean_markdown(raw_result)) # Using clean markdown utility
                 st.session_state['check_count'] += 1
     else: 
-        st.warning("⚠️ Access Restricted: No Brand Profiles found. Please visit the **Brand Architect**.")
+        st.markdown('<div class="custom-warning">⚠️ No Profiles Found. Visit Brand Architect.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # 2. COPY EDITOR
@@ -262,16 +294,16 @@ elif app_mode == "Copy Editor":
     st.subheader("Intelligent Copy Editor")
     if st.session_state['profiles']:
         profile = st.selectbox("Select Brand Profile", list(st.session_state['profiles'].keys()))
-        text_input = st.text_area("Paste Draft Text", height=300, placeholder="Enter text to proofread against brand guidelines...")
+        text_input = st.text_area("Paste Draft Text", height=300, placeholder="Enter text to proofread...")
         
         if text_input and st.button("PROOF & POLISH", type="primary"):
             rules = st.session_state['profiles'][profile]['rules']
-            with st.spinner("Calibrating tone and checking syntax..."):
+            with st.spinner("Calibrating tone..."):
                 st.markdown("### 🛡️ Signet Report")
                 st.markdown(logic.run_copy_editor(text_input, rules))
                 st.session_state['check_count'] += 1
     else: 
-        st.warning("⚠️ Access Restricted: No Brand Profiles found.")
+        st.markdown('<div class="custom-warning">⚠️ No Profiles Found. Visit Brand Architect.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # 3. CONTENT GENERATOR
@@ -284,9 +316,9 @@ elif app_mode == "Content Generator":
         with st.container(border=True):
             c1, c2 = st.columns(2)
             with c1: format_type = st.selectbox("Asset Type", ["Press Release", "Internal Email (CEO)", "Blog Post", "Client Letter", "Speech"])
-            with c2: audience = st.text_input("Target Audience", placeholder="e.g. Investors, Gen Z, Employees")
-            topic = st.text_input("Subject / Headline", placeholder="e.g. Q4 Earnings Results")
-            key_points = st.text_area("Key Points (Bullets)", height=150, placeholder="- Revenue up 20%\n- New product launch\n- Thank the team")
+            with c2: audience = st.text_input("Target Audience", placeholder="e.g. Investors")
+            topic = st.text_input("Subject / Headline", placeholder="e.g. Q4 Earnings")
+            key_points = st.text_area("Key Points (Bullets)", height=150)
         
         if st.button("GENERATE DRAFT", type="primary"):
             p_data = st.session_state['profiles'][profile]
@@ -295,7 +327,7 @@ elif app_mode == "Content Generator":
                 st.markdown(logic.run_content_generator(topic, format_type, key_points, audience, p_data['rules'], p_data['samples']))
                 st.session_state['check_count'] += 1
     else: 
-        st.warning("⚠️ Access Restricted: No Brand Profiles found.")
+        st.markdown('<div class="custom-warning">⚠️ No Profiles Found. Visit Brand Architect.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # 4. SOCIAL ASSISTANT
@@ -308,28 +340,27 @@ elif app_mode == "Social Media Assistant":
         with st.container(border=True):
             c1, c2 = st.columns(2)
             with c1: platform = st.selectbox("Platform", ["LinkedIn (Thought Leadership)", "LinkedIn (Company News)", "Instagram", "X (Twitter)", "Facebook"])
-            with c2: topic = st.text_input("Context / Topic", placeholder="e.g. Sustainability Initiative Launch")
+            with c2: topic = st.text_input("Context / Topic", placeholder="e.g. Sustainability Launch")
             img_file = st.file_uploader("Attach Image (Optional)", type=["jpg", "png"])
         
         if st.button("GENERATE STRATEGY", type="primary"):
             rules = st.session_state['profiles'][profile]['rules']
             img = Image.open(img_file) if img_file else None
-            with st.spinner(f"Optimizing content for {platform}..."):
+            with st.spinner(f"Optimizing for {platform}..."):
                 st.markdown("### 📱 Social Strategy")
                 st.markdown(logic.run_social_assistant(platform, topic, img, rules))
                 st.session_state['check_count'] += 1
     else: 
-        st.warning("⚠️ Access Restricted: No Brand Profiles found.")
+        st.markdown('<div class="custom-warning">⚠️ No Profiles Found. Visit Brand Architect.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # 5. BRAND ARCHITECT
 # ==========================================
 elif app_mode == "Brand Architect":
     st.subheader("Brand Architect")
-    st.markdown("Define the immutable laws of your brand.")
+    st.caption("Define the immutable laws of your brand.")
     
     tab1, tab2 = st.tabs(["Deep-Dive Wizard", "PDF Extraction"])
-    
     with tab1:
         with st.container(border=True):
             st.markdown("#### 1. Core Strategy")
@@ -341,19 +372,18 @@ elif app_mode == "Brand Architect":
         with st.container(border=True):
             st.markdown("#### 2. Voice & Personality")
             wiz_archetype = st.selectbox("Brand Archetype *", ARCHETYPES, index=None, placeholder="Select Archetype...")
-            wiz_tone = st.text_input("Tone Keywords", placeholder="e.g. Professional, Direct, Witty")
+            wiz_tone = st.text_input("Tone Keywords", placeholder="e.g. Professional, Direct")
             
             st.markdown("---")
             st.markdown("##### 🗣️ Voice Calibration (Ghost-Writer)")
-            st.caption("Upload 'Gold Standard' samples (PDFs/Screenshots) to train the AI on specific formats.")
             
             # STAGING AREA
             col_in1, col_in2 = st.columns([1,2])
-            with col_in1: v_type = st.selectbox("Sample Context", ["Internal Comms", "Press/Formal", "Social/Casual", "General"], key="v_type")
+            with col_in1: v_type = st.selectbox("Context", ["Internal Comms", "Press/Formal", "Social/Casual", "General"], key="v_type")
             with col_in2: v_file = st.file_uploader("Upload File", type=["pdf","png","jpg"], key="v_up", label_visibility="collapsed")
             v_text = st.text_area("Or Paste Text", height=80, key="v_txt", placeholder="Paste text here...")
             
-            if st.button("➕ Add Sample to Training Set"):
+            if st.button("➕ Add Sample"):
                 content = v_text
                 if v_file:
                     if v_file.type == "application/pdf": content += "\n" + logic.extract_text_from_pdf(v_file)
@@ -363,22 +393,25 @@ elif app_mode == "Brand Architect":
                     st.session_state['wizard_samples'].append({"type": v_type, "content": content})
                     st.success(f"Added {v_type} sample!")
                 else:
-                    st.error("No text detected in sample.")
+                    st.error("No text detected.")
 
             # STAGED LIST
             if st.session_state['wizard_samples']:
                 st.markdown("**Staged Samples:**")
                 for i, s in enumerate(st.session_state['wizard_samples']):
-                    st.text(f"• [{s['type']}] {s['content'][:50]}...")
-                    if st.button(f"Remove Sample {i+1}", key=f"del_{i}"):
-                        st.session_state['wizard_samples'].pop(i)
-                        st.rerun()
+                    c_del, c_info = st.columns([1, 8])
+                    with c_del:
+                        if st.button("X", key=f"del_{i}"):
+                            st.session_state['wizard_samples'].pop(i)
+                            st.rerun()
+                    with c_info:
+                        st.caption(f"[{s['type']}] {s['content'][:50]}...")
 
         with st.container(border=True):
             st.markdown("#### 3. Visual Identity")
             c1, c2 = st.columns(2)
             with c1: p_col = st.text_input("Primary Color Hex", placeholder="#000000")
-            with c2: s_col = st.text_area("Secondary Palette", height=68, placeholder="#FFFFFF, #333333")
+            with c2: s_col = st.text_area("Secondary Palette", height=68)
             
             tc1, tc2 = st.columns(2)
             with tc1: head_font = st.selectbox("Headline Style", FONT_HEAD_OPTS); head_name = st.text_input("Headline Font Name")
@@ -393,32 +426,21 @@ elif app_mode == "Brand Architect":
                 st.error("Error: Brand Name and Archetype are required.")
             else:
                 with st.spinner("Architecting Brand System..."):
-                    # Process Logo
                     logo_d = wiz_logo_desc
                     if wiz_logo and not logo_d: logo_d = logic.describe_logo(Image.open(wiz_logo))
-
                     voice_dump = "\n".join([f"[{s['type']}] {s['content']}" for s in st.session_state['wizard_samples']])
-
-                    prompt = f"""
-                    Brand: {wiz_name}
-                    Strategy: {wiz_mission}, {wiz_values}
-                    Voice: {wiz_archetype}, {wiz_tone}
-                    Samples: {voice_dump}
-                    Visuals: {p_col}, {s_col}, Logo: {logo_d}
-                    Fonts: {head_name} ({head_font}), {body_name} ({body_font})
-                    """
+                    prompt = f"Brand: {wiz_name}\nStrategy: {wiz_mission}, {wiz_values}\nVoice: {wiz_archetype}, {wiz_tone}\nSamples: {voice_dump}\nVisuals: {p_col}, {s_col}, Logo: {logo_d}\nFonts: {head_name} ({head_font}), {body_name} ({body_font})"
                     
                     raw_rules = logic.generate_brand_rules(prompt)
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = {
                         "rules": logic.clean_markdown(raw_rules), 
                         "samples": st.session_state['wizard_samples']
                     }
-                    st.session_state['wizard_samples'] = [] # Clear staging
+                    st.session_state['wizard_samples'] = []
                     st.success(f"Profile for {wiz_name} Created!")
                     st.rerun()
 
     with tab2:
-        st.info("Upload an existing PDF Brand Guideline to automatically extract rules.")
         pdf = st.file_uploader("Upload PDF", type=["pdf"])
         if pdf and st.button("EXTRACT RULES", type="primary"):
             with st.spinner("Reading PDF..."):
@@ -432,7 +454,6 @@ elif app_mode == "Brand Architect":
 elif app_mode == "Profile Manager":
     st.subheader("Profile Manager")
     
-    # 1. Backup/Restore
     with st.expander("💾 System Backup & Restore", expanded=False):
         c1, c2 = st.columns(2)
         with c1:
@@ -444,49 +465,45 @@ elif app_mode == "Profile Manager":
                 try:
                     data = json.load(uploaded_json)
                     st.session_state['profiles'].update(data)
-                    st.success("Database Restored Successfully.")
+                    st.success("Database Restored.")
                     st.rerun()
                 except: st.error("Invalid File.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
 
-    # 2. Edit Profile
     if st.session_state['profiles']:
         target = st.selectbox("Select Profile to Manage", list(st.session_state['profiles'].keys()))
         p_data = st.session_state['profiles'][target]
         
         with st.container(border=True):
-            st.markdown(f"#### Editing: {target}")
-            
             c_edit, c_sample = st.columns([1, 1])
             with c_edit:
                 st.markdown("**Brand Rules**")
-                new_rules = st.text_area("Edit Rules Text", p_data['rules'], height=400, label_visibility="collapsed")
-            
+                new_rules = st.text_area("Edit Rules", p_data['rules'], height=400, label_visibility="collapsed")
             with c_sample:
                 st.markdown("**Voice Sample Bank**")
                 if p_data['samples']:
                     for i, s in enumerate(p_data['samples']):
                         with st.container(border=True):
-                            st.caption(f"**[{s['type']}]**")
-                            st.text(s['content'][:60] + "...")
-                            if st.button("Delete", key=f"m_del_{i}"):
-                                p_data['samples'].pop(i)
-                                st.rerun()
-                else:
-                    st.info("No voice samples attached.")
+                            c_a, c_b = st.columns([4,1])
+                            with c_a: st.caption(f"[{s['type']}] {s['content'][:40]}...")
+                            with c_b: 
+                                if st.button("Del", key=f"m_del_{i}"):
+                                    p_data['samples'].pop(i)
+                                    st.rerun()
+                else: st.caption("No samples attached.")
 
             c1, c2, c3 = st.columns(3)
             if c1.button("SAVE CHANGES", type="primary"): 
                 st.session_state['profiles'][target]['rules'] = new_rules
-                st.success("Profile Updated.")
+                st.success("Saved.")
             if c2.button("DOWNLOAD PDF GUIDE"): 
                 st.download_button("Download PDF", logic.create_pdf(target, new_rules), f"{target}_Guidelines.pdf")
             if c3.button("DELETE PROFILE"): 
                 del st.session_state['profiles'][target]
                 st.rerun()
     else:
-        st.info("No profiles found.")
+        st.markdown('<div class="custom-warning">⚠️ No Profiles Found.</div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
 st.markdown('<div class="footer">SIGNET v1.2 | POWERED BY CASTELLAN PR | ENTERPRISE CONFIDENTIAL</div>', unsafe_allow_html=True)
