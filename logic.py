@@ -135,6 +135,7 @@ class BrandGuardLogic:
         1. **NO OUTSIDE KNOWLEDGE:** Do not use external facts. If the brand name matches a famous company (e.g., "Starbucks" or "Pizza Planet"), IGNORE the real-world brand. Only use the attributes provided in the inputs.
         2. **NO HALLUCINATION:** If the user did not specify a font name, do not invent one (like "SpaceAge"). Instead, prescribe a category (e.g., "Fun, thick display font").
         3. **NO INVENTED LOGOS:** Do not describe a logo (like "Rocket Ship") unless the user explicitly described it. If not described, set the rule as "Logo must be clear and legible."
+        4. **STRICT VOCABULARY:** Do not expand on the user's adjectives. If the user says "Fun", the rule is "Fun". Do not add "Approachable" or "Engaging" unless the user wrote them.
         
         ### OUTPUT FORMAT:
         Produce a standard 4-point rule block (Colors, Typography, Logo, Voice).
