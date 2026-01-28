@@ -141,6 +141,12 @@ st.markdown("""
         color: var(--c-teal-deep) !important;
         border: none !important;
     }
+    
+    /* Red delete button override */
+    button[kind="secondary"] {
+        border-color: #ff5f56 !important;
+        color: #ff5f56 !important;
+    }
 
     /* 7. DASHBOARD CARDS */
     .dashboard-card {
@@ -392,7 +398,7 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
-    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"], label_visibility="collapsed")
+    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed")
     
     st.divider()
     st.markdown("<div style='text-align: center; color: #24363b; font-size: 0.6rem; letter-spacing: 0.1em; margin-bottom: 10px;'>POWERED BY CASTELLAN PR</div>", unsafe_allow_html=True)
@@ -533,20 +539,51 @@ elif app_mode == "BRAND ARCHITECT":
             if st.session_state['wiz_samples_list']: 
                 st.divider()
                 st.markdown(f"**BUFFER: {len(st.session_state['wiz_samples_list'])} SAMPLES LOADED**")
+                
+                # Iterate safely with index to allow deletion
                 for i, sample in enumerate(st.session_state['wiz_samples_list']):
-                    # Just show the first line/header of the sample
+                    col_text, col_del = st.columns([5, 1])
                     header = sample.split('\n')[0]
-                    st.caption(f"✅ {header}")
+                    with col_text:
+                        st.caption(f"✅ {header}")
+                    with col_del:
+                        if st.button("🗑️", key=f"del_sample_{i}", type="secondary"):
+                            st.session_state['wiz_samples_list'].pop(i)
+                            st.rerun()
 
         # --- SECTION 3: SOCIAL ---
         with st.expander("3. SOCIAL MEDIA"):
+            st.caption("Upload a screenshot of a high-performing post.")
+            wiz_social_platform = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"])
             wiz_social_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"])
             
         # --- SECTION 4: VISUALS ---
         with st.expander("4. VISUALS"):
-            vc1, vc2 = st.columns(2)
-            with vc1: p_col = st.color_picker("PRIMARY COLOR")
-            with vc2: wiz_logo_file = st.file_uploader("UPLOAD LOGO")
+            # Logo
+            st.markdown("##### LOGO")
+            wiz_logo_file = st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"])
+            
+            st.divider()
+            
+            # Color Palette Builder
+            st.markdown("##### COLOR PALETTE")
+            
+            st.markdown("**PRIMARY (2)**")
+            pc1, pc2 = st.columns(2)
+            with pc1: p1 = st.color_picker("Primary 1", "#24363b")
+            with pc2: p2 = st.color_picker("Primary 2", "#ab8f59")
+            
+            st.markdown("**SECONDARY (4)**")
+            sc1, sc2, sc3, sc4 = st.columns(4)
+            with sc1: s1 = st.color_picker("Sec 1", "#f5f5f0")
+            with sc2: s2 = st.color_picker("Sec 2", "#5c6b61")
+            with sc3: s3 = st.color_picker("Sec 3", "#3d3d3d")
+            with sc4: s4 = st.color_picker("Sec 4", "#1b2a2e")
+            
+            st.markdown("**ACCENT (2)**")
+            ac1, ac2 = st.columns(2)
+            with ac1: a1 = st.color_picker("Accent 1", "#ffffff")
+            with ac2: a2 = st.color_picker("Accent 2", "#000000")
             
         # GENERATE BUTTON
         if st.button("GENERATE SYSTEM", type="primary"):
@@ -554,10 +591,16 @@ elif app_mode == "BRAND ARCHITECT":
             else:
                 with st.spinner("CALIBRATING..."):
                     logo_desc = logic.describe_logo(Image.open(wiz_logo_file)) if wiz_logo_file else "None"
-                    social_desc = logic.analyze_social_post(Image.open(wiz_social_file)) if wiz_social_file else "None"
+                    
+                    # Social Logic with specific instructions
+                    social_desc = "None"
+                    if wiz_social_file:
+                        raw_social = logic.analyze_social_post(Image.open(wiz_social_file))
+                        social_desc = f"Platform: {wiz_social_platform}. Analysis: {raw_social}. (INSTRUCTION: Ignore comments/UI. Focus on image style, caption voice, and hashtags)."
                     
                     # Combine all inputs into prompt
                     all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
+                    palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
                     
                     prompt = f"""
                     Profile for {wiz_name}. 
@@ -570,7 +613,8 @@ elif app_mode == "BRAND ARCHITECT":
                     {all_samples}
                     
                     Social Analysis: {social_desc}. 
-                    Logo Analysis: {logo_desc}
+                    Logo Analysis: {logo_desc}.
+                    Defined Palette: {palette_str}
                     """
                     
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
@@ -583,9 +627,9 @@ elif app_mode == "BRAND ARCHITECT":
             st.session_state['profiles'][f"{pdf.name} (PDF)"] = logic.generate_brand_rules(f"Extract: {logic.extract_text_from_pdf(pdf)[:20000]}")
             st.success("EXTRACTED")
 
-# 6. PROFILE MANAGER
-elif app_mode == "PROFILE MANAGER":
-    st.title("PROFILE MANAGER")
+# 6. BRAND MANAGER
+elif app_mode == "BRAND MANAGER":
+    st.title("BRAND MANAGER")
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         new_rules = st.text_area("EDIT", st.session_state['profiles'][target], height=400)
