@@ -245,7 +245,8 @@ def nav_to(page_name):
     
 def activate_profile(profile_name):
     st.session_state['active_profile'] = profile_name
-    st.session_state['nav_selection'] = "BRAND ARCHITECT"
+    # CHANGE THIS: From "BRAND ARCHITECT" to "BRAND MANAGER"
+    st.session_state['nav_selection'] = "BRAND MANAGER"
     
 def calculate_calibration_score(profile_data):
     score = 0
@@ -884,7 +885,11 @@ elif app_mode == "BRAND ARCHITECT":
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     if st.session_state['profiles']:
-        target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
+        p_keys = list(st.session_state['profiles'].keys())
+        default_ix = 0
+        if st.session_state.get('active_profile') in p_keys:
+            default_ix = p_keys.index(st.session_state['active_profile'])
+        target = st.selectbox("PROFILE", p_keys, index=default_ix)
         profile_obj = st.session_state['profiles'][target]
         
         is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
@@ -963,6 +968,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
