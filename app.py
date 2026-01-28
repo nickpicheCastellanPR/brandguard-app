@@ -451,7 +451,8 @@ if app_mode == "DASHBOARD":
         st.markdown("""
         <style>
             /* BASE BUTTON STYLE (Makes them look like cards) */
-            div[data-testid="column"] .stButton button {
+            /* Using wildcard selector to catch columns in different st versions */
+            div[data-testid*="Column"] .stButton button {
                 background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important;
                 border: 1px solid #3a4b50 !important;
                 height: 250px !important;
@@ -467,13 +468,13 @@ if app_mode == "DASHBOARD":
                 position: relative !important;
                 white-space: pre-wrap !important;
             }
-            div[data-testid="column"] .stButton button:hover {
+            div[data-testid*="Column"] .stButton button:hover {
                 transform: translateY(-5px) !important;
                 border-color: #ab8f59 !important;
                 box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
                 color: #ab8f59 !important;
             }
-            div[data-testid="column"] .stButton button p {
+            div[data-testid*="Column"] .stButton button p {
                 font-size: 1rem !important;
                 font-weight: 700 !important;
                 letter-spacing: 0.1em;
@@ -482,7 +483,7 @@ if app_mode == "DASHBOARD":
             /* --- GEOMETRIC CSS ICONS (INJECTED VIA PSEUDO-ELEMENTS) --- */
             
             /* 1. BLUEPRINT ICON (Create Profile) */
-            div[data-testid="column"]:nth-of-type(1) .stButton button::before {
+            div[data-testid*="Column"]:nth-of-type(1) .stButton button::before {
                 content: '';
                 position: absolute;
                 top: 40px;
@@ -493,7 +494,7 @@ if app_mode == "DASHBOARD":
             }
 
             /* 2. DOCUMENT ICON (Upload Guide) */
-            div[data-testid="column"]:nth-of-type(2) .stButton button::before {
+            div[data-testid*="Column"]:nth-of-type(2) .stButton button::before {
                 content: '';
                 position: absolute;
                 top: 40px;
@@ -504,7 +505,7 @@ if app_mode == "DASHBOARD":
             }
 
             /* 3. GEAR ICON (Load Demo) */
-            div[data-testid="column"]:nth-of-type(3) .stButton button::before {
+            div[data-testid*="Column"]:nth-of-type(3) .stButton button::before {
                 content: '';
                 position: absolute;
                 top: 40px;
