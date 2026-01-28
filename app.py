@@ -496,23 +496,29 @@ if app_mode == "DASHBOARD":
                 with col_sub:
                     if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
                         with st.spinner("ANALYZING PDF STRUCTURE..."):
-                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
-                            parsing_prompt = f"""
-                            TASK: Analyze this Brand Guide PDF extract and restructure it into the standard Brand Profile format.
-                            
-                            SECTIONS TO EXTRACT:
-                            1. STRATEGY (Mission, Vision, Values, Archetype)
-                            2. VOICE (Tone keywords, Style instructions, Do's/Don'ts)
-                            3. VISUALS (Colors, Logo usage, Typography rules)
-                            4. GUARDRAILS (Explicit Do's and Don'ts)
-                            
-                            RAW PDF CONTENT:
-                            {raw_text}
-                            """
-                            st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
-                            st.success(f"SUCCESS: {dash_pdf.name} ingested.")
-                            st.session_state['dashboard_upload_open'] = False
-                            st.rerun()
+                            try:
+                                raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
+                                parsing_prompt = f"""
+                                TASK: Analyze this Brand Guide PDF extract and restructure it into the standard Brand Profile format.
+                                
+                                SECTIONS TO EXTRACT:
+                                1. STRATEGY (Mission, Vision, Values, Archetype)
+                                2. VOICE (Tone keywords, Style instructions, Do's/Don'ts)
+                                3. VISUALS (Colors, Logo usage, Typography rules)
+                                4. GUARDRAILS (Explicit Do's and Don'ts)
+                                
+                                RAW PDF CONTENT:
+                                {raw_text}
+                                """
+                                st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
+                                st.success(f"SUCCESS: {dash_pdf.name} ingested.")
+                                st.session_state['dashboard_upload_open'] = False
+                                st.rerun()
+                            except Exception as e:
+                                if "ResourceExhausted" in str(e):
+                                    st.error("⚠️ AI QUOTA EXCEEDED: The engine needs a break. Please wait 60 seconds and try again.")
+                                else:
+                                    st.error(f"An error occurred: {e}")
                             
                 with col_can:
                     if st.button("CANCEL"):
@@ -767,50 +773,61 @@ elif app_mode == "BRAND ARCHITECT":
             if not st.session_state.get("wiz_name") or not st.session_state.get("wiz_archetype"): st.error("NAME/ARCHETYPE REQUIRED")
             else:
                 with st.spinner("CALIBRATING..."):
-                    logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
-                    logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
-                    
-                    social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
-                    social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
-                    
-                    all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
-                    palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
-                    
-                    prompt = f"""
-                    SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
-                    
-                    1. STRATEGY
-                    - Brand: {st.session_state.wiz_name}
-                    - Archetype: {st.session_state.wiz_archetype}
-                    - Mission: {st.session_state.wiz_mission}
-                    - Values: {st.session_state.wiz_values}
-                    
-                    2. VOICE
-                    - Tone Keywords: {st.session_state.wiz_tone}
-                    - Analysis of samples: {all_samples}
-                    
-                    3. VISUALS
-                    - Palette: {palette_str}
-                    - Logo: {logo_summary}
-                    - Social Media Style: {social_summary}
-                    
-                    4. GUARDRAILS
-                    - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
-                    
-                    5. DATA (TRAINING SAMPLES)
-                    {all_samples}
-                    """
-                    st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
-                    st.session_state['wiz_samples_list'] = []
-                    st.session_state['wiz_social_list'] = []
-                    st.session_state['wiz_logo_list'] = []
-                    st.success("CALIBRATED")
-                    st.rerun()
+                    try:
+                        logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
+                        logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
+                        
+                        social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
+                        social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
+                        
+                        all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
+                        palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
+                        
+                        prompt = f"""
+                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
+                        
+                        1. STRATEGY
+                        - Brand: {st.session_state.wiz_name}
+                        - Archetype: {st.session_state.wiz_archetype}
+                        - Mission: {st.session_state.wiz_mission}
+                        - Values: {st.session_state.wiz_values}
+                        
+                        2. VOICE
+                        - Tone Keywords: {st.session_state.wiz_tone}
+                        - Analysis of samples: {all_samples}
+                        
+                        3. VISUALS
+                        - Palette: {palette_str}
+                        - Logo: {logo_summary}
+                        - Social Media Style: {social_summary}
+                        
+                        4. GUARDRAILS
+                        - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
+                        
+                        5. DATA (TRAINING SAMPLES)
+                        {all_samples}
+                        """
+                        st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
+                        # Clear buffers after generation
+                        st.session_state['wiz_samples_list'] = []
+                        st.session_state['wiz_social_list'] = []
+                        st.session_state['wiz_logo_list'] = []
+                        st.success("CALIBRATED")
+                        st.rerun()
+                    except Exception as e:
+                        if "ResourceExhausted" in str(e):
+                            st.error("⚠️ AI QUOTA EXCEEDED: The engine needs a break. Please wait 60 seconds and try again.")
+                        else:
+                            st.error(f"An error occurred: {e}")
+
     with tab2:
         pdf = st.file_uploader("UPLOAD PDF", type=["pdf"])
         if pdf and st.button("EXTRACT"):
-            st.session_state['profiles'][f"{pdf.name} (PDF)"] = logic.generate_brand_rules(f"Extract: {logic.extract_text_from_pdf(pdf)[:20000]}")
-            st.success("EXTRACTED")
+            try:
+                st.session_state['profiles'][f"{pdf.name} (PDF)"] = logic.generate_brand_rules(f"Extract: {logic.extract_text_from_pdf(pdf)[:20000]}")
+                st.success("EXTRACTED")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # 6. BRAND MANAGER (FIXED: GUARDRAILS SPLIT & HTML EXPORT)
 elif app_mode == "BRAND MANAGER":
