@@ -102,8 +102,11 @@ class SignetLogic:
         **3. VOICE & TONE:** [Pass/Fail]
         **REQUIRED FIXES:** [Bullets]
         """
-        response = model.generate_content([prompt, image])
-        return response.text
+        try:
+            response = model.generate_content([prompt, image])
+            return response.text
+        except:
+            return "Audit failed. Please try again."
 
     def run_copy_editor(self, text, rules):
         model_name = self.get_model()
