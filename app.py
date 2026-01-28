@@ -14,122 +14,130 @@ st.set_page_config(
 
 logic = SignetLogic()
 
-# --- SVG ICON LIBRARY (No External Files Needed) ---
+# --- SVG ICON LIBRARY (Color Updated to Castellan Blue for Light Sidebar) ---
 def get_svg_icon(name):
-    # Castellan Gold: #D4AF37
+    # Castellan Blue: #24363b
     icons = {
-        "dashboard": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>''',
-        "eye": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>''',
-        "pen": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>''',
-        "share": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>''',
-        "architect": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22h20"></path><path d="M12 2v20"></path><path d="M2 12h20"></path><path d="M12 2L2 22h20L12 2z"></path></svg>''',
-        "upload": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>''',
-        "manage": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'''
+        "dashboard": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>''',
+        "eye": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>''',
+        "pen": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>''',
+        "share": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>''',
+        "architect": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22h20"></path><path d="M12 2v20"></path><path d="M2 12h20"></path><path d="M12 2L2 22h20L12 2z"></path></svg>''',
+        "upload": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>''',
+        "manage": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#24363b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'''
     }
     return icons.get(name, "")
 
-# --- PREMIUM CSS OVERHAUL (V4.0 - ROOT LEVEL FORCE) ---
+# --- PREMIUM CSS OVERHAUL (V5.0 - HYBRID THEME) ---
 st.markdown("""
 <style>
-    /* 1. CRITICAL: FORCE BROWSER TO RENDER DARK PRIMITIVES */
-    :root {
-        color-scheme: dark;
-    }
-
-    /* 2. TARGET ALL STREAMLIT CONTAINERS TO FIX "ZEBRA" */
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #0E1117 !important; /* Deep Dark */
-        color: #E0E0E0 !important;
-    }
-    
-    /* 3. GLOBAL FONTS */
+    /* 1. GLOBAL FONTS */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    
     html, body, [class*="css"]  {
         font-family: 'Inter', sans-serif;
     }
-    
-    /* 4. SIDEBAR STYLING */
+
+    /* 2. SIDEBAR STYLING (The Cream Panel) */
+    /* Forces the sidebar to Castellan Cream (#f5f5f0) */
     section[data-testid="stSidebar"] {
-        background-color: #050505 !important;
-        border-right: 1px solid #2A2A2A;
+        background-color: #f5f5f0 !important;
+        border-right: 1px solid #dcdcd9;
     }
     
-    /* SIDEBAR LOGO CONTAINER (Subtle Glass Effect) */
+    /* Sidebar Text Elements - Forced to Castellan Blue (#24363b) */
+    section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] div {
+        color: #24363b !important;
+    }
+    
+    /* Logo Container - No background needed now because sidebar is light! */
     section[data-testid="stSidebar"] [data-testid="stImage"] {
-        background: rgba(255, 255, 255, 0.05); /* Very subtle light wash */
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border: 1px solid rgba(255,255,255,0.1);
+        background: transparent;
+        padding: 0px;
+        border: none;
+        box-shadow: none;
     }
 
-    /* NAVIGATION MENU CLEANUP */
+    /* NAVIGATION MENU (Hybrid Style) */
     div[role="radiogroup"] > label > div:first-of-type {display: None;}
     div[role="radiogroup"] label {
         padding: 12px 15px;
         border-radius: 6px;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         border: 1px solid transparent;
         transition: all 0.2s ease;
-        color: #888 !important;
+        color: #5c6b61 !important; /* Sage Green for inactive */
         font-weight: 500;
         cursor: pointer;
     }
     div[role="radiogroup"] label:hover {
-        background: #1A1A1A;
-        color: #FFF !important;
-        border-left: 3px solid #666;
+        background: #e6e6e1; /* Slightly darker cream */
+        color: #24363b !important; /* Blue on hover */
+        border-left: 3px solid #ab8f59; /* Gold accent */
     }
     div[role="radiogroup"] label[data-checked="true"] {
-        background: #1A1A1A;
-        color: #D4AF37 !important; /* Gold */
-        border-left: 3px solid #D4AF37;
+        background: #FFFFFF;
+        color: #24363b !important; /* Blue active */
+        border-left: 4px solid #24363b; /* Blue accent */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         font-weight: 600;
-    }
-    
-    /* 5. INPUT FIELDS (Forced High Contrast) */
-    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #1A1A1A !important;
-        color: #FFFFFF !important;
-        border: 1px solid #333 !important;
-    }
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #D4AF37 !important;
-        box-shadow: 0 0 0 1px #D4AF37 !important;
     }
 
-    /* 6. BUTTONS (Castellan Style) */
+    /* 3. MAIN APP AREA (The Dark Workspace) */
+    .stApp, [data-testid="stAppViewContainer"] {
+        background-color: #0E1117 !important; /* Deep Dark */
+        color: #E0E0E0 !important;
+    }
+    
+    /* 4. INPUT FIELD NORMALIZER (The Edge Fix) */
+    /* Aggressively targets all inputs to force Dark Mode styling */
+    input, textarea, select, div[data-baseweb="select"] > div {
+        background-color: #1A1A1A !important;
+        color: #FFFFFF !important;
+        border: 1px solid #444 !important;
+        border-radius: 6px !important;
+    }
+    /* Focus States */
+    input:focus, textarea:focus, div[data-baseweb="select"] > div:focus-within {
+        border-color: #ab8f59 !important; /* Gold Focus */
+        box-shadow: 0 0 0 1px #ab8f59 !important;
+    }
+    /* Placeholder Text */
+    ::placeholder { color: #666 !important; opacity: 1; }
+    
+    /* Fix specific Streamlit input wrappers */
+    .stTextInput > div > div { background-color: #1A1A1A !important; }
+    .stTextArea > div > div { background-color: #1A1A1A !important; }
+    
+    /* 5. CARDS & CONTAINERS (Castellan Blue) */
+    div[data-testid="stMetric"], div[data-testid="stVerticalBlock"] > [style*="border"] {
+        background-color: #24363b !important; /* Brand Blue Background */
+        border: 1px solid #354a50 !important;
+    }
+    
+    /* 6. BUTTONS (Gold Action) */
     .stButton>button {
-        background-color: #24363b; 
-        color: white;
-        border: 1px solid #333;
+        background-color: #ab8f59; /* Gold */
+        color: #000; /* Black Text */
+        border: none;
         border-radius: 4px;
         height: 3em;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         width: 100%;
     }
     .stButton>button:hover {
-        background-color: #D4AF37; 
+        background-color: #c4a76a; 
         color: #000;
-        border-color: #D4AF37;
-        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.2); 
+        box-shadow: 0px 4px 12px rgba(171, 143, 89, 0.4); 
     }
-    
-    /* 7. DASHBOARD METRICS */
-    div[data-testid="stMetric"] {
-        background-color: #141414;
-        border: 1px solid #333;
-        padding: 20px;
-        border-radius: 8px;
+    .stButton>button:active {
+        background-color: #967d4d;
+        color: #fff;
     }
-    [data-testid="stMetricValue"] {
-        color: #D4AF37 !important;
-        font-size: 2rem !important;
-    }
-    
-    /* 8. HIDE STREAMLIT BRANDING & FOOTER */
+
+    /* 7. UTILITIES */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -139,26 +147,25 @@ st.markdown("""
         left: 0;
         bottom: 0;
         width: 100%;
-        background-color: #050505;
-        color: #444;
+        background-color: #24363b; /* Blue Footer */
+        color: #ab8f59; /* Gold Text */
         text-align: right;
         padding: 10px 30px;
         font-size: 11px;
-        border-top: 1px solid #222;
+        border-top: 1px solid #354a50;
         z-index: 999;
         letter-spacing: 1px;
     }
     .block-container { padding-bottom: 80px; }
     
-    /* Custom Warning Box */
+    /* Warning Box */
     .custom-warning {
-        background-color: #1A1A1A;
-        border-left: 4px solid #D4AF37;
+        background-color: #24363b;
+        border-left: 4px solid #ab8f59;
         padding: 20px;
         border-radius: 4px;
-        color: #E0E0E0;
+        color: #fff;
         margin-bottom: 20px;
-        font-size: 0.95rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -182,9 +189,10 @@ if not st.session_state['authenticated']:
         if os.path.exists("Signet_Logo_Color.png"): 
             st.image("Signet_Logo_Color.png", width=300) 
         else: 
-            st.markdown("<h1 style='text-align: center; color: #D4AF37; letter-spacing: 5px;'>SIGNET</h1>", unsafe_allow_html=True)
+            # Fallback text needs to be visible on Dark Background
+            st.markdown("<h1 style='text-align: center; color: #ab8f59; letter-spacing: 5px;'>SIGNET</h1>", unsafe_allow_html=True)
         
-        st.markdown("<p style='text-align: center; color: #666; font-size: 0.9rem; margin-top: -10px;'>ENTERPRISE BRAND GOVERNANCE</p><br>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.9rem; margin-top: -10px;'>ENTERPRISE BRAND GOVERNANCE</p><br>", unsafe_allow_html=True)
         
         pwd = st.text_input("SECURE ACCESS CODE", type="password", label_visibility="collapsed", placeholder="Enter Access Code")
         if st.button("AUTHENTICATE"):
@@ -198,6 +206,7 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
+    # Logo sits natively on Cream background
     if os.path.exists("Signet_Logo_Color.png"): 
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else: 
@@ -217,6 +226,8 @@ with st.sidebar:
     ], label_visibility="collapsed")
     
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Progress Bar (Custom Colors needed via Streamlit Theme or just accept default)
     st.caption(f"API Usage: {st.session_state['check_count']}/{MAX_CHECKS}")
     st.progress(st.session_state['check_count'] / MAX_CHECKS)
     
@@ -255,7 +266,6 @@ if app_mode == "Dashboard":
         c1, c2 = st.columns(2)
         with c1:
             with st.container(border=True):
-                # SVG HEADER
                 st.markdown(f"{get_svg_icon('architect')} &nbsp; <strong>Architect New Profile</strong>", unsafe_allow_html=True)
                 st.caption("Define mission, voice, and visuals from scratch.")
                 if st.button("Launch Wizard"): 
