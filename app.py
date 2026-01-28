@@ -14,156 +14,185 @@ st.set_page_config(
 # Initialize Logic
 logic = SignetLogic()
 
-# --- THE CASTELLAN DESIGN SYSTEM (Branded) ---
+# --- THE CASTELLAN IDENTITY SYSTEM ---
 st.markdown("""
 <style>
-    /* 1. CASTELLAN PALETTE MAPPING */
+    /* 1. PALETTE DEFINITION */
     :root {
-        --bg-base: #0E1117;       /* Deepest Black for Main Content */
-        --bg-panel: #24363b;      /* Castellan Deep Teal (Sidebar/Cards) */
-        --bg-input: #1a2629;      /* Darker Teal for Inputs */
-        
-        --gold-primary: #ab8f59;  /* Castellan Muted Gold */
-        --gold-glow: rgba(171, 143, 89, 0.25);
-        
-        --text-cream: #f5f5f0;    /* Castellan Cream */
-        --text-grey: #a0a0a0;
-        
-        --border-subtle: #3a4b50; /* Lighter Teal for borders */
-        
-        --success: #5c6b61;       /* Castellan Sage */
-        --error: #8a3a3a;         /* Muted Red */
+        --c-teal-deep: #24363b;   /* Main Background */
+        --c-teal-dark: #1b2a2e;   /* Input Backgrounds */
+        --c-gold-muted: #ab8f59;  /* Accents & Borders */
+        --c-cream: #f5f5f0;       /* Sidebar & Text */
+        --c-sage: #5c6b61;        /* Success/Secondary */
+        --c-charcoal: #3d3d3d;    /* Sidebar Text */
     }
 
-    /* 2. TYPOGRAPHY */
-    h1, h2, h3, p, div, span {
-        font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
-        letter-spacing: 0.02em;
+    /* 2. LAYOUT & BACKGROUNDS */
+    .stApp {
+        background-color: var(--c-teal-deep);
+        color: var(--c-cream);
     }
     
+    /* THE SIDEBAR - CREAM AS REQUESTED */
+    section[data-testid="stSidebar"] {
+        background-color: var(--c-cream) !important;
+        border-right: 1px solid var(--c-gold-muted);
+    }
+    
+    /* Sidebar Text overrides - Needs to be dark to show up on cream */
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] div,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p {
+        color: var(--c-teal-deep) !important;
+    }
+    
+    /* 3. NAVIGATION (FIXING THE RADAR BUTTONS) */
+    /* Hide the radio circles */
+    div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    
+    /* Style the labels to look like a clean menu list */
+    div[role="radiogroup"] label {
+        padding: 12px 20px !important;
+        border-radius: 4px !important;
+        margin-bottom: 8px !important;
+        border: 1px solid transparent !important;
+        background-color: transparent !important;
+        transition: all 0.2s ease;
+        color: var(--c-teal-deep) !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        cursor: pointer !important;
+    }
+    
+    /* Hover State */
+    div[role="radiogroup"] label:hover {
+        background-color: rgba(171, 143, 89, 0.1) !important; /* Gold Tint */
+        border-left: 4px solid var(--c-gold-muted) !important;
+        padding-left: 16px !important; /* Shift text slightly */
+    }
+    
+    /* Active/Selected State (Inferred by background color change in Streamlit) */
+    div[role="radiogroup"] label[data-checked="true"] {
+        background-color: var(--c-teal-deep) !important;
+        color: var(--c-cream) !important; /* Invert text for active */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    /* Force text color on selected item inside sidebar */
+    div[role="radiogroup"] label[data-checked="true"] * {
+        color: var(--c-cream) !important;
+    }
+
+    /* 4. HEADERS */
     h1 {
+        font-family: 'Helvetica Neue', sans-serif;
         font-weight: 800 !important;
         text-transform: uppercase;
-        color: var(--text-cream) !important;
-        font-size: 2.2rem !important;
-        margin-bottom: 0px !important;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--border-subtle);
+        color: var(--c-cream) !important;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--c-gold-muted);
+        letter-spacing: 0.05em;
     }
     
-    h3 {
-        color: var(--gold-primary) !important;
-        font-size: 1.1rem !important;
+    h2, h3 {
+        color: var(--c-gold-muted) !important;
         text-transform: uppercase;
-        font-weight: 700 !important;
-        margin-top: 20px !important;
+        font-weight: 700;
     }
 
-    /* 3. INPUT FIELDS (The Teal Fix) */
+    /* 5. INPUTS (TEAL ON TEAL) */
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: var(--bg-input) !important;
-        border: 1px solid var(--border-subtle) !important;
-        color: var(--text-cream) !important;
-        border-radius: 4px !important;
+        background-color: var(--c-teal-dark) !important;
+        border: 1px solid var(--c-sage) !important;
+        color: var(--c-cream) !important;
+        border-radius: 2px !important;
     }
     
-    /* Focus State */
     .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: var(--gold-primary) !important;
-        box-shadow: 0 0 0 1px var(--gold-primary) !important;
+        border-color: var(--c-gold-muted) !important;
+        box-shadow: 0 0 5px rgba(171, 143, 89, 0.5) !important;
     }
-
-    /* 4. BUTTONS (Muted Gold) */
+    
+    /* 6. BUTTONS (MUTED GOLD) */
     .stButton button {
         background-color: transparent !important;
-        border: 1px solid var(--gold-primary) !important;
-        color: var(--gold-primary) !important;
+        border: 1px solid var(--c-gold-muted) !important;
+        color: var(--c-gold-muted) !important;
         border-radius: 0px !important;
         font-weight: 700 !important;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        transition: all 0.2s ease-in-out;
+        transition: all 0.2s;
     }
     
     .stButton button:hover {
-        background-color: var(--gold-glow) !important;
-        box-shadow: 0 0 15px var(--gold-glow);
-        transform: translateY(-1px);
-        color: #FFF !important;
+        background-color: var(--c-gold-muted) !important;
+        color: var(--c-teal-deep) !important;
+        box-shadow: 0 0 15px rgba(171, 143, 89, 0.3);
     }
     
-    /* Primary Buttons */
+    /* Primary (Filled) */
     button[kind="primary"] {
-        background: var(--gold-primary) !important;
-        color: #000 !important;
+        background: var(--c-gold-muted) !important;
+        color: var(--c-teal-deep) !important;
         border: none !important;
     }
 
-    /* 5. DASHBOARD CARDS (The Deep Teal HUD) */
+    /* 7. DASHBOARD CARDS (THE HUD) */
     .dashboard-card {
-        background-color: var(--bg-panel);
-        border: 1px solid var(--border-subtle);
-        border-left: 4px solid var(--gold-primary);
-        padding: 24px;
-        margin-bottom: 15px;
+        background-color: rgba(0,0,0,0.2);
+        border: 1px solid var(--c-sage);
+        border-left: 4px solid var(--c-gold-muted);
+        padding: 25px;
         border-radius: 4px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
     
-    /* The Status Rows */
     .status-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: #1a2629; /* Darker Inner */
-        border: 1px solid var(--border-subtle);
-        padding: 12px 16px;
-        margin-bottom: 8px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
-    }
-    
-    .status-label { font-weight: 700; color: var(--text-cream); font-size: 0.9rem; }
-    .status-indicator { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
-    
-    /* Status Colors */
-    .online { color: #8FBC8F; text-shadow: 0 0 8px rgba(143, 188, 143, 0.4); } /* Soft Green */
-    .offline { color: #F85149; }
-    .calibrating { color: var(--gold-primary); }
-
-    /* 6. REQUIRED ACTIONS (Replacing the Blue Box) */
-    .action-card {
-        background-color: rgba(171, 143, 89, 0.1); /* Low opacity gold */
-        border: 1px solid var(--gold-primary);
-        color: var(--gold-primary);
+        background: rgba(0,0,0,0.3);
         padding: 15px;
+        margin-bottom: 10px;
         border-radius: 4px;
-        font-weight: 600;
         display: flex;
+        justify-content: space-between;
         align-items: center;
+        border: 1px solid transparent;
     }
+    .status-row.online { border-color: var(--c-sage); }
+    .status-row.offline { border-color: #8a3a3a; }
+    
+    .status-label { font-weight: 700; font-size: 0.9rem; letter-spacing: 0.1em; color: var(--c-cream); }
+    .status-badge { font-family: monospace; font-weight: 700; color: var(--c-gold-muted); }
 
-    /* 7. SIDEBAR (The Brand Anchor) */
-    section[data-testid="stSidebar"] {
-        background-color: var(--bg-panel);
-        border-right: 1px solid var(--border-subtle);
-    }
-    
-    .sidebar-logo-text {
-        font-size: 2rem;
-        font-weight: 900;
-        color: var(--gold-primary);
-        text-align: center;
-        letter-spacing: 0.2em;
-        margin-bottom: 20px;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-    
-    /* 8. GLOBAL CLEANUP */
-    .stApp { background-color: var(--bg-base); }
+    /* 8. CLEANUP */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
+    
+    /* LOGO FIX */
+    .logo-text {
+        font-size: 2.5rem;
+        font-weight: 900;
+        color: var(--c-teal-deep);
+        text-align: center;
+        letter-spacing: 0.1em;
+        margin-bottom: 20px;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+    .logo-sub {
+        color: var(--c-sage);
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        margin-top: -10px;
+        margin-bottom: 20px;
+    }
     
 </style>
 """, unsafe_allow_html=True)
@@ -226,13 +255,14 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
+        # LOGO on Light Background or Dark? Login is usually main bg (Teal)
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=160) 
         else:
             st.markdown("<div style='text-align: center; font-size: 3rem; color: #ab8f59; font-weight: 800; letter-spacing: 0.1em;'>SIGNET</div>", unsafe_allow_html=True)
         
-        st.markdown("<p style='text-align: center; color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.2em; margin-top: -10px;'>INTELLIGENT BRAND GOVERNANCE</p>", unsafe_allow_html=True)
-        st.markdown("<hr style='border-color: #3a4b50;'>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #f5f5f0; font-size: 0.8rem; letter-spacing: 0.2em; opacity: 0.7;'>INTELLIGENT BRAND GOVERNANCE</p>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #5c6b61;'>", unsafe_allow_html=True)
         
         password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -246,10 +276,12 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
+    # Sidebar is now CREAM. Logo needs to be DARK.
     if os.path.exists("Signet_Logo_Color.png"):
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else:
-        st.markdown('<div class="sidebar-logo-text">SIGNET</div>', unsafe_allow_html=True)
+        st.markdown('<div class="logo-text">SIGNET</div>', unsafe_allow_html=True)
+        st.markdown('<div class="logo-sub">CASTELLAN PR</div>', unsafe_allow_html=True)
     
     if st.session_state['profiles']:
         active_profile = st.selectbox("ACTIVE PROFILE", list(st.session_state['profiles'].keys()))
@@ -264,6 +296,7 @@ with st.sidebar:
     st.caption("ENGINE CONFIDENCE")
     st.progress(cal_score / 100)
     
+    # Text colors forced to dark teal by CSS
     if cal_score < 60: 
         st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
     elif cal_score < 90: 
@@ -272,7 +305,9 @@ with st.sidebar:
         st.markdown("<span style='color: #5c6b61; font-weight: 700;'>✅ OPTIMIZED</span>", unsafe_allow_html=True)
 
     st.divider()
-    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"])
+    # The "Radar" buttons are now styled as a menu list
+    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"], label_visibility="collapsed")
+    
     st.divider()
     if st.button("SHUT DOWN"):
         st.session_state['authenticated'] = False
@@ -287,12 +322,12 @@ if app_mode == "DASHBOARD":
     if not active_profile:
         st.warning("NO PROFILES LOADED.")
     else:
-        # HUD Card (Deep Teal)
+        # HUD Card
         st.markdown(f"""
         <div class="dashboard-card">
             <div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div>
             <div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div>
-            <div style="color: #ab8f59; margin-top: 5px;">CALIBRATION SCORE: {cal_score}/100</div>
+            <div style="color: #ab8f59; margin-top: 5px; font-weight: 700;">CALIBRATION SCORE: {cal_score}/100</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -300,17 +335,17 @@ if app_mode == "DASHBOARD":
         with c1:
             st.subheader("ENGINE CAPABILITIES")
             st.markdown(f"""
-            <div class="status-row">
+            <div class="status-row {'online' if cal_score > 50 else 'offline'}">
                 <span class="status-label">STRATEGY ENGINE</span>
-                <span class="status-indicator {'online' if cal_score > 50 else 'offline'}">{'ONLINE' if cal_score > 50 else 'OFFLINE'}</span>
+                <span class="status-badge">{'ONLINE' if cal_score > 50 else 'OFFLINE'}</span>
             </div>
-            <div class="status-row">
+            <div class="status-row {'online' if cal_score > 70 else 'offline'}">
                 <span class="status-label">VOICE ENGINE</span>
-                <span class="status-indicator {'online' if cal_score > 70 else 'calibrating'}">{'ONLINE' if cal_score > 70 else 'CALIBRATING'}</span>
+                <span class="status-badge">{'ONLINE' if cal_score > 70 else 'CALIBRATING'}</span>
             </div>
-            <div class="status-row">
+            <div class="status-row {'online' if cal_score > 90 else 'offline'}">
                 <span class="status-label">SOCIAL ENGINE</span>
-                <span class="status-indicator {'online' if cal_score > 90 else 'offline'}">{'ONLINE' if cal_score > 90 else 'NO DATA'}</span>
+                <span class="status-badge">{'ONLINE' if cal_score > 90 else 'NO DATA'}</span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -318,15 +353,12 @@ if app_mode == "DASHBOARD":
             st.subheader("REQUIRED ACTIONS")
             if missing_items:
                 for item in missing_items: 
-                    # THE FIX: Custom HTML Action Card instead of st.info
                     st.markdown(f"""
-                    <div class="action-card">
-                        ⚠️ MISSING DATA: {item}
-                    </div>
-                    <div style="margin-top:5px; font-size: 0.8rem; color: #a0a0a0;">Navigate to BRAND ARCHITECT to upload assets.</div>
-                    """, unsafe_allow_html=True)
+                    <div style="background: rgba(171, 143, 89, 0.1); border: 1px solid #ab8f59; color: #ab8f59; padding: 12px; border-radius: 4px; margin-bottom: 8px;">
+                        ⚠️ MISSING: {item}
+                    </div>""", unsafe_allow_html=True)
             else: 
-                st.markdown("""<div class="action-card" style="border-color:#5c6b61; color:#5c6b61;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border: 1px solid #5c6b61; color: #f5f5f0; padding: 12px; border-radius: 4px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
 
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
