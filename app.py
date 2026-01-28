@@ -240,8 +240,16 @@ st.markdown("""
 # --- SESSION STATE ---
 if 'authenticated' not in st.session_state: st.session_state['authenticated'] = False
 if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
+
+# WIZARD STATE LISTS
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
-if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 # FOR RESETTING UPLOADERS
+if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] # Stores: {'platform': str, 'file': UploadedFile}
+if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     # Stores: {'file': UploadedFile}
+
+# DYNAMIC KEYS FOR UPLOADERS
+if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
+if 'social_uploader_key' not in st.session_state: st.session_state['social_uploader_key'] = 1000
+if 'logo_uploader_key' not in st.session_state: st.session_state['logo_uploader_key'] = 2000
 
 if 'profiles' not in st.session_state:
     st.session_state['profiles'] = {}
@@ -270,46 +278,62 @@ def calculate_calibration_score(profile_data):
     return score, missing
 
 def add_voice_sample_callback():
-    """Safely adds sample from state variables and resets inputs."""
-    # Retrieve values
+    """Safely adds text/file sample from state variables and resets inputs."""
     s_type = st.session_state.get('wiz_sample_type', 'Generic')
     s_text = st.session_state.get('wiz_temp_text', '')
     
-    # Dynamic uploader key
     u_key = f"uploader_{st.session_state['file_uploader_key']}"
     s_file = st.session_state.get(u_key, None)
     
     content = ""
     source = ""
 
-    # Prioritize text if both exist, or handle logic
     if s_text.strip():
         content = s_text
         source = "Text Paste"
     elif s_file:
         source = f"File ({s_file.name})"
-        # ATTEMPT EXTRACTION
         try:
             if s_file.type == "application/pdf":
                 content = logic.extract_text_from_pdf(s_file)
             elif "image" in s_file.type:
-                # Placeholder for OCR or Visual Analysis
                 content = f"[IMAGE CONTENT: {s_file.name}]" 
             else:
-                # Try UTF-8 decode for txt/md/csv
                 content = s_file.getvalue().decode("utf-8", errors='ignore')
         except Exception as e:
             content = f"[Extraction Failed: {str(e)}]"
             
     if content:
-        # Append to list
         entry = f"TYPE: {s_type} | SOURCE: {source}\nCONTENT: {content}"
         st.session_state['wiz_samples_list'].append(entry)
-        
-        # RESET INPUTS
         st.session_state['wiz_temp_text'] = ""
-        # Increment uploader key to force Streamlit to create a fresh widget
         st.session_state['file_uploader_key'] += 1
+
+def add_social_callback():
+    """Adds a social media image to the buffer."""
+    s_platform = st.session_state.get('wiz_social_platform', 'Other')
+    u_key = f"social_up_{st.session_state['social_uploader_key']}"
+    s_file = st.session_state.get(u_key, None)
+    
+    if s_file:
+        st.session_state['wiz_social_list'].append({
+            'platform': s_platform,
+            'file': s_file
+        })
+        # Reset uploader
+        st.session_state['social_uploader_key'] += 1
+
+def add_logo_callback():
+    """Adds a logo file to the buffer."""
+    u_key = f"logo_up_{st.session_state['logo_uploader_key']}"
+    s_file = st.session_state.get(u_key, None)
+    
+    if s_file:
+        st.session_state['wiz_logo_list'].append({
+            'file': s_file
+        })
+        # Reset uploader
+        st.session_state['logo_uploader_key'] += 1
 
 # --- LOGIN SCREEN (ARCHITECTURAL VIGNETTE + GRADIENT CORNERS) ---
 if not st.session_state['authenticated']:
@@ -538,7 +562,7 @@ elif app_mode == "BRAND ARCHITECT":
             # Display Buffer
             if st.session_state['wiz_samples_list']: 
                 st.divider()
-                st.markdown(f"**BUFFER: {len(st.session_state['wiz_samples_list'])} SAMPLES LOADED**")
+                st.markdown(f"**VOICE BUFFER: {len(st.session_state['wiz_samples_list'])} SAMPLES**")
                 
                 # Iterate safely with index to allow deletion
                 for i, sample in enumerate(st.session_state['wiz_samples_list']):
@@ -553,15 +577,45 @@ elif app_mode == "BRAND ARCHITECT":
 
         # --- SECTION 3: SOCIAL ---
         with st.expander("3. SOCIAL MEDIA"):
-            st.caption("Upload a screenshot of a high-performing post.")
-            wiz_social_platform = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"])
-            wiz_social_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"])
+            st.caption("Upload screenshots of high-performing posts.")
+            
+            st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
+            
+            # Dynamic Key for Uploader
+            s_key = f"social_up_{st.session_state['social_uploader_key']}"
+            st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
+            
+            st.button("➕ ADD SOCIAL SAMPLE", on_click=add_social_callback)
+            
+            if st.session_state['wiz_social_list']:
+                st.divider()
+                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} IMAGES**")
+                for i, item in enumerate(st.session_state['wiz_social_list']):
+                    c1, c2 = st.columns([5,1])
+                    with c1: st.caption(f"✅ {item['platform']} - {item['file'].name}")
+                    with c2: 
+                        if st.button("🗑️", key=f"del_social_{i}", type="secondary"):
+                            st.session_state['wiz_social_list'].pop(i)
+                            st.rerun()
             
         # --- SECTION 4: VISUALS ---
         with st.expander("4. VISUALS"):
             # Logo
             st.markdown("##### LOGO")
-            wiz_logo_file = st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"])
+            l_key = f"logo_up_{st.session_state['logo_uploader_key']}"
+            st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"], key=l_key)
+            st.button("➕ ADD LOGO", on_click=add_logo_callback)
+            
+            if st.session_state['wiz_logo_list']:
+                st.divider()
+                st.markdown(f"**LOGO BUFFER: {len(st.session_state['wiz_logo_list'])} FILES**")
+                for i, item in enumerate(st.session_state['wiz_logo_list']):
+                    c1, c2 = st.columns([5,1])
+                    with c1: st.caption(f"✅ {item['file'].name}")
+                    with c2: 
+                        if st.button("🗑️", key=f"del_logo_{i}", type="secondary"):
+                            st.session_state['wiz_logo_list'].pop(i)
+                            st.rerun()
             
             st.divider()
             
@@ -590,18 +644,30 @@ elif app_mode == "BRAND ARCHITECT":
             if not wiz_name or not wiz_archetype: st.error("NAME/ARCHETYPE REQUIRED")
             else:
                 with st.spinner("CALIBRATING..."):
-                    logo_desc = logic.describe_logo(Image.open(wiz_logo_file)) if wiz_logo_file else "None"
                     
-                    # Social Logic with specific instructions
-                    social_desc = "None"
-                    if wiz_social_file:
-                        raw_social = logic.analyze_social_post(Image.open(wiz_social_file))
-                        social_desc = f"Platform: {wiz_social_platform}. Analysis: {raw_social}. (INSTRUCTION: Ignore comments/UI. Focus on image style, caption voice, and hashtags)."
+                    # 1. PROCESS LOGOS
+                    logo_desc_list = []
+                    for item in st.session_state['wiz_logo_list']:
+                        # Logic class handles the analysis
+                        desc = logic.describe_logo(Image.open(item['file']))
+                        logo_desc_list.append(f"Logo Variant ({item['file'].name}): {desc}")
+                    logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
                     
-                    # Combine all inputs into prompt
+                    # 2. PROCESS SOCIAL
+                    social_desc_list = []
+                    for item in st.session_state['wiz_social_list']:
+                        # Logic class handles analysis
+                        raw_analysis = logic.analyze_social_post(Image.open(item['file']))
+                        social_desc_list.append(f"Platform: {item['platform']}. Analysis: {raw_analysis}. (INSTRUCTION: Ignore comments/UI. Focus on image style, caption voice, and hashtags).")
+                    social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
+                    
+                    # 3. COMBINE SAMPLES
                     all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
+                    
+                    # 4. PALETTE
                     palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
                     
+                    # 5. FINAL PROMPT
                     prompt = f"""
                     Profile for {wiz_name}. 
                     Archetype: {wiz_archetype}. 
@@ -612,13 +678,18 @@ elif app_mode == "BRAND ARCHITECT":
                     TRAINING SAMPLES:
                     {all_samples}
                     
-                    Social Analysis: {social_desc}. 
-                    Logo Analysis: {logo_desc}.
+                    Social Analysis: {social_summary}. 
+                    Logo Analysis: {logo_summary}.
                     Defined Palette: {palette_str}
                     """
                     
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
+                    
+                    # CLEAR BUFFERS
                     st.session_state['wiz_samples_list'] = []
+                    st.session_state['wiz_social_list'] = []
+                    st.session_state['wiz_logo_list'] = []
+                    
                     st.success("CALIBRATED")
                     st.rerun()
     with tab2:
