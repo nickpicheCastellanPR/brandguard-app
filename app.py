@@ -14,33 +14,66 @@ st.set_page_config(
 # Initialize Logic
 logic = SignetLogic()
 
-# --- CUSTOM CSS ---
+# --- CUSTOM CSS (RESTORED POLISH) ---
 st.markdown("""
 <style>
+    /* Global Cleanliness */
     .block-container {padding-top: 2rem;}
+    
+    /* Signet Buttons: Uppercase, Bold, Clean */
     .stButton>button {
         width: 100%; 
         border-radius: 4px; 
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.1em;
+        padding: 0.5rem 1rem;
     }
-    div[data-testid="stExpander"] div[role="button"] p {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #888888;
-    }
-    /* Clean Alert Styling */
-    .stAlert {border-radius: 4px; border: 1px solid #333;}
     
-    /* Score Card Styling */
-    .metric-card {
-        background-color: #262730;
-        padding: 20px;
-        border-radius: 10px;
+    /* Expander Headers: Clean, Grey */
+    div[data-testid="stExpander"] div[role="button"] p {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #A0A0A0;
+    }
+    
+    /* Clean Alert Styling */
+    .stAlert {
+        border-radius: 4px; 
         border-left: 5px solid #D4AF37; /* Gold Accent */
+    }
+    
+    /* Dashboard Metric Cards */
+    .metric-card {
+        background-color: #1E1E1E;
+        padding: 24px;
+        border-radius: 8px;
+        border-left: 4px solid #D4AF37; /* Gold Accent */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         margin-bottom: 20px;
     }
+    .metric-card h3 {
+        color: #888;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0;
+    }
+    .metric-card h1 {
+        color: #FFF;
+        font-size: 2.5rem;
+        margin: 10px 0;
+    }
+    .metric-card p {
+        color: #CCC;
+        font-size: 0.9rem;
+    }
+
+    /* Remove Streamlit Branding */
+    .reportview-container { margin-top: -2em; }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,7 +135,7 @@ def calculate_calibration_score(profile_data):
     else:
         missing.append("Text Samples (Voice Calibration)")
         
-    if "Social Media" in profile_data: 
+    if "SOCIAL MEDIA" in profile_data or "Social Style Signature" in profile_data: 
         score += 25
     else:
         missing.append("Social Media Screenshots")
@@ -141,20 +174,31 @@ with st.sidebar:
         st.header("SIGNET")
     
     # Calculate Active Score
-    active_profile = st.selectbox("ACTIVE PROFILE", list(st.session_state['profiles'].keys()))
-    current_rules = st.session_state['profiles'][active_profile]
-    cal_score, missing_items = calculate_calibration_score(current_rules)
+    if st.session_state['profiles']:
+        active_profile = st.selectbox("ACTIVE PROFILE", list(st.session_state['profiles'].keys()))
+        current_rules = st.session_state['profiles'][active_profile]
+        cal_score, missing_items = calculate_calibration_score(current_rules)
+    else:
+        active_profile = None
+        cal_score = 0
     
     # Sidebar Metrics
-    st.markdown(f"**Engine Confidence:**")
+    st.caption("ENGINE CONFIDENCE")
     st.progress(cal_score / 100)
     if cal_score < 80:
-        st.caption(f"⚠️ Low Confidence. Add: {', '.join(missing_items[:1])}")
+        st.caption(f"⚠️ Low. Add: {', '.join(missing_items[:1])}")
     else:
-        st.caption("✅ High Confidence")
+        st.caption("✅ Optimized")
 
     st.divider()
-    app_mode = st.radio("MODULES", ["Dashboard", "Visual Compliance", "Copy Editor", "Content Generator", "Brand Architect"])
+    app_mode = st.radio("MODULES", [
+        "Dashboard", 
+        "Visual Compliance", 
+        "Copy Editor", 
+        "Content Generator", 
+        "Brand Architect",
+        "Profile Manager"
+    ])
     st.divider()
     if st.button("Logout"):
         st.session_state['authenticated'] = False
@@ -164,30 +208,33 @@ with st.sidebar:
 if app_mode == "Dashboard":
     st.title("System Readiness")
     
-    # Score Card
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3>🛡️ {active_profile}</h3>
-        <h1>{cal_score}/100 Calibration Score</h1>
-        <p>This score represents Signet's ability to accurately mimic this brand.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("✅ Capabilities")
-        if cal_score > 50: st.success("Basic Strategy Defined")
-        if cal_score > 70: st.success("Voice Signature Calibrated")
-        if cal_score > 90: st.success("Social Media Optimized")
-        if cal_score < 50: st.warning("Profile Incomplete")
+    if not active_profile:
+        st.warning("No profiles found. Go to Brand Architect.")
+    else:
+        # Score Card
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3>🛡️ {active_profile}</h3>
+            <h1>{cal_score}/100 Calibration Score</h1>
+            <p>This score represents Signet's ability to accurately mimic this brand.</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-    with c2:
-        st.subheader("🔧 Recommended Actions")
-        if missing_items:
-            for item in missing_items:
-                st.info(f"Upload **{item}** to improve confidence.")
-        else:
-            st.write("System is fully calibrated.")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("✅ Capabilities")
+            if cal_score > 50: st.success("Basic Strategy Defined")
+            if cal_score > 70: st.success("Voice Signature Calibrated")
+            if cal_score > 90: st.success("Social Media Optimized")
+            if cal_score < 50: st.warning("Profile Incomplete")
+            
+        with c2:
+            st.subheader("🔧 Recommended Actions")
+            if missing_items:
+                for item in missing_items:
+                    st.info(f"Upload **{item}** to improve confidence.")
+            else:
+                st.write("System is fully calibrated.")
 
 # --- MODULE 2: VISUAL COMPLIANCE ---
 elif app_mode == "Visual Compliance":
@@ -268,8 +315,11 @@ elif app_mode == "Brand Architect":
 
         # 4. VISUALS
         with st.expander("4. Visuals"):
-            p_col = st.color_picker("Primary Color", "#000000")
-            wiz_logo_file = st.file_uploader("Upload Logo", type=["png", "jpg"])
+            vc1, vc2 = st.columns(2)
+            with vc1:
+                p_col = st.color_picker("Primary Color", "#000000")
+            with vc2:
+                wiz_logo_file = st.file_uploader("Upload Logo", type=["png", "jpg"])
 
         if st.button("Generate System", type="primary"):
             if not wiz_name or not wiz_archetype:
@@ -315,3 +365,27 @@ elif app_mode == "Brand Architect":
             rules = logic.generate_brand_rules(f"Extract rules: {raw[:20000]}")
             st.session_state['profiles'][f"{pdf.name} (PDF)"] = rules
             st.success("Extracted!")
+
+# --- MODULE 6: PROFILE MANAGER ---
+elif app_mode == "Profile Manager":
+    st.subheader("Profile Manager")
+    
+    if not active_profile:
+        st.warning("No profiles found.")
+    else:
+        target = st.selectbox("Select Profile", list(st.session_state['profiles'].keys()))
+        current_rules = st.session_state['profiles'][target]
+        new_rules = st.text_area("Edit Rules", current_rules, height=400)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("Save"):
+                st.session_state['profiles'][target] = new_rules
+                st.success("Saved!")
+        with c2:
+            pdf_bytes = logic.create_pdf(target, new_rules)
+            st.download_button("Download PDF", pdf_bytes, f"{target}.pdf")
+        with c3:
+            if st.button("Delete"):
+                del st.session_state['profiles'][target]
+                st.rerun()
