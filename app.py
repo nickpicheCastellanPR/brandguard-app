@@ -4,7 +4,6 @@ import os
 from logic import SignetLogic
 
 # --- PAGE CONFIG ---
-# Attempt to load icon
 icon_path = "Signet_Icon_Color.png"
 if os.path.exists(icon_path):
     page_icon = Image.open(icon_path)
@@ -101,7 +100,7 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
 
-    /* 6. BUTTONS (Geometric & Sharp) */
+    /* 6. BUTTONS */
     .stButton button {
         background-color: transparent !important;
         border: 1px solid var(--c-gold-muted) !important;
@@ -134,7 +133,7 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* 8. OVERRIDE ALERTS (The "Blue Box" Fix) */
+    /* 8. OVERRIDE ALERTS */
     div.stAlert {
         background-color: rgba(171, 143, 89, 0.1);
         border: 1px solid var(--c-gold-muted);
@@ -164,42 +163,21 @@ st.markdown("""
         box-shadow: 0 10px 30px rgba(0,0,0,0.4); 
     }
     
-    /* Icon 1: The Builder */
-    .icon-build {
-        width: 40px; height: 40px; border: 2px solid var(--c-gold-muted);
-        position: relative; margin-bottom: 20px;
-    }
-    .icon-build::after {
-        content: ''; position: absolute; top: -10px; left: 10px; width: 100%; height: 100%;
-        border: 2px solid var(--c-sage);
-    }
+    /* CSS Icons */
+    .icon-build { width: 40px; height: 40px; border: 2px solid var(--c-gold-muted); position: relative; margin-bottom: 20px; }
+    .icon-build::after { content: ''; position: absolute; top: -10px; left: 10px; width: 100%; height: 100%; border: 2px solid var(--c-sage); }
     
-    /* Icon 2: The Document */
-    .icon-doc {
-        width: 30px; height: 40px; border: 2px solid var(--c-gold-muted);
-        background: transparent; margin-bottom: 20px; position: relative;
-    }
-    .icon-doc::before {
-        content: ''; position: absolute; top: 5px; left: 5px; width: 15px; height: 2px;
-        background: var(--c-sage); box-shadow: 0 5px 0 var(--c-sage), 0 10px 0 var(--c-sage);
-    }
+    .icon-doc { width: 30px; height: 40px; border: 2px solid var(--c-gold-muted); margin-bottom: 20px; position: relative; }
+    .icon-doc::before { content: ''; position: absolute; top: 5px; left: 5px; width: 15px; height: 2px; background: var(--c-sage); box-shadow: 0 5px 0 var(--c-sage), 0 10px 0 var(--c-sage); }
 
-    /* Icon 3: The Gear */
-    .icon-gear {
-        width: 40px; height: 40px; border: 2px solid var(--c-gold-muted);
-        border-radius: 50%; margin-bottom: 20px; display: flex; justify-content: center; align-items: center;
-    }
-    .icon-gear::after {
-        content: ''; width: 10px; height: 10px; background: var(--c-sage);
-    }
+    .icon-gear { width: 40px; height: 40px; border: 2px solid var(--c-gold-muted); border-radius: 50%; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; }
+    .icon-gear::after { content: ''; width: 10px; height: 10px; background: var(--c-sage); }
 
     .hero-title { font-weight: 800; color: var(--c-cream); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.1em;}
     .hero-desc { color: #a0a0a0; font-size: 0.8rem; margin-top: 10px; font-family: monospace; }
 
     /* 10. STATUS INDICATORS */
-    .status-dot {
-        height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px;
-    }
+    .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
     .dot-green { background-color: #4cd964; box-shadow: 0 0 10px #4cd964; }
     .dot-red { background-color: #ff5f56; opacity: 0.5; }
     .dot-yellow { background-color: var(--c-gold-muted); box-shadow: 0 0 5px var(--c-gold-muted); }
@@ -272,35 +250,32 @@ def add_voice_sample():
         st.session_state['wiz_samples_list'].append(st.session_state.wiz_temp_sample)
         st.session_state.wiz_temp_sample = ""
 
-# --- LOGIN SCREEN (ARCHITECTURAL VIGNETTE) ---
+# --- LOGIN SCREEN (ARCHITECTURAL VIGNETTE + GRADIENT CORNERS) ---
 if not st.session_state['authenticated']:
-    # Injecting Specific Styles for the Login Page to create depth
     st.markdown("""
     <style>
         .stApp {
-            background-color: #f5f5f0 !important; /* Base Cream */
-            /* Blueprint Grid + Vignette */
+            background-color: #f5f5f0 !important;
+            /* Layer 1: The Blueprint Grid (Top) 
+               Layer 2: Top-Left Sage Corner (Radial)
+               Layer 3: Bottom-Right Teal Corner (Radial)
+            */
             background-image: 
-                linear-gradient(rgba(92, 107, 97, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(92, 107, 97, 0.1) 1px, transparent 1px),
-                radial-gradient(circle at center, transparent 30%, rgba(36, 54, 59, 0.15) 100%);
-            background-size: 40px 40px, 40px 40px, 100% 100%;
+                linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px),
+                
+                radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%),
+                radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
+                
+            background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
         }
         section[data-testid="stSidebar"] { display: none; }
         
-        /* Card Container for Inputs */
-        .login-card {
-            background: #ffffff;
-            padding: 40px;
-            border: 1px solid #d4af37;
-            box-shadow: 0 20px 50px rgba(36, 54, 59, 0.15);
-            text-align: center;
-        }
-        
         .stTextInput input {
-            background-color: #fcfcfc !important;
+            background-color: #ffffff !important;
             color: #24363b !important;
             border: 1px solid #c0c0c0 !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
         .stTextInput input:focus { border-color: #24363b !important; }
     </style>
@@ -309,7 +284,6 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # LOGO DISPLAY (Dark for Contrast)
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=300)
         else:
@@ -317,7 +291,6 @@ if not st.session_state['authenticated']:
         
         st.markdown("<div style='text-align: center; color: #5c6b61; font-size: 0.8rem; letter-spacing: 0.3em; font-weight: 700; margin-top: 15px; margin-bottom: 30px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
         
-        # Inputs wrapped in "Visual" card via CSS logic above
         password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
         
         if st.button("INITIALIZE SYSTEM", type="primary"):
@@ -375,36 +348,17 @@ with st.sidebar:
 # 1. DASHBOARD
 if app_mode == "DASHBOARD":
     
-    # EMPTY STATE
     if not active_profile:
         st.title("WELCOME TO SIGNET")
         st.markdown("""<p style='font-size: 1.1rem; color: #a0a0a0; margin-bottom: 40px; font-family: sans-serif;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown("""
-            <div class="hero-card">
-                <div class="icon-build"></div>
-                <div class="hero-title">Create Profile</div>
-                <div class="hero-desc">Architect a new brand identity.</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("""<div class="hero-card"><div class="icon-build"></div><div class="hero-title">Create Profile</div><div class="hero-desc">Architect a new brand identity.</div></div>""", unsafe_allow_html=True)
         with c2:
-            st.markdown("""
-            <div class="hero-card">
-                <div class="icon-doc"></div>
-                <div class="hero-title">Upload Guide</div>
-                <div class="hero-desc">Ingest existing PDF rules.</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("""<div class="hero-card"><div class="icon-doc"></div><div class="hero-title">Upload Guide</div><div class="hero-desc">Ingest existing PDF rules.</div></div>""", unsafe_allow_html=True)
         with c3:
-            st.markdown("""
-            <div class="hero-card">
-                <div class="icon-gear"></div>
-                <div class="hero-title">Load Demo</div>
-                <div class="hero-desc">Load Castellan sample data.</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("""<div class="hero-card"><div class="icon-gear"></div><div class="hero-title">Load Demo</div><div class="hero-desc">Load Castellan sample data.</div></div>""", unsafe_allow_html=True)
             
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("LOAD DEMO DATA", type="primary"):
@@ -416,23 +370,11 @@ if app_mode == "DASHBOARD":
             """
             st.rerun()
 
-        # The Fix for "Unapproved Blue" -> Now Gold/Cream
-        st.markdown("""
-        <div style="margin-top: 20px; padding: 15px; border: 1px solid #ab8f59; border-left: 4px solid #ab8f59; background: rgba(171, 143, 89, 0.1); color: #f5f5f0;">
-            👉 To start fresh, select <strong>BRAND ARCHITECT</strong> from the sidebar.
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div style="margin-top: 20px; padding: 15px; border: 1px solid #ab8f59; border-left: 4px solid #ab8f59; background: rgba(171, 143, 89, 0.1); color: #f5f5f0;">👉 To start fresh, select <strong>BRAND ARCHITECT</strong> from the sidebar.</div>""", unsafe_allow_html=True)
 
     else:
-        # ACTIVE HUD
         st.title("SYSTEM STATUS")
-        st.markdown(f"""
-        <div class="dashboard-card">
-            <div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div>
-            <div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div>
-            <div style="color: #ab8f59; margin-top: 5px; font-weight: 700;">CALIBRATION SCORE: {cal_score}/100</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div class="dashboard-card"><div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div><div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div><div style="color: #ab8f59; margin-top: 5px; font-weight: 700;">CALIBRATION SCORE: {cal_score}/100</div></div>""", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
@@ -456,11 +398,7 @@ if app_mode == "DASHBOARD":
             st.subheader("REQUIRED ACTIONS")
             if missing_items:
                 for item in missing_items: 
-                    st.markdown(f"""
-                    <div style="background: rgba(171, 143, 89, 0.1); border-left: 3px solid #ab8f59; color: #ab8f59; padding: 12px; margin-bottom: 8px;">
-                        <div style="font-weight: 700; font-size: 0.9rem;">MISSING DATA: {item}</div>
-                        <div style="font-size: 0.75rem; opacity: 0.8; color: #f5f5f0;">Navigate to Brand Architect to upload.</div>
-                    </div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background: rgba(171, 143, 89, 0.1); border-left: 3px solid #ab8f59; color: #ab8f59; padding: 12px; margin-bottom: 8px;"><div style="font-weight: 700; font-size: 0.9rem;">MISSING DATA: {item}</div><div style="font-size: 0.75rem; opacity: 0.8; color: #f5f5f0;">Navigate to Brand Architect to upload.</div></div>""", unsafe_allow_html=True)
             else: 
                 st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border-left: 3px solid #5c6b61; color: #f5f5f0; padding: 12px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
 
@@ -549,8 +487,4 @@ elif app_mode == "PROFILE MANAGER":
         if c3.button("DELETE"): del st.session_state['profiles'][target]; st.rerun()
 
 # --- FOOTER ---
-st.markdown("""
-<div class="footer">
-    POWERED BY CASTELLAN PR // INTERNAL USE ONLY
-</div>
-""", unsafe_allow_html=True)
+st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
