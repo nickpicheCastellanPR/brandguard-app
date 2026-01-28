@@ -27,23 +27,24 @@ st.markdown("""
         --text-main: #E0E0E0;
     }
 
-    /* 1. GLOBAL RESET */
+    /* 1. GLOBAL RESET & FONTS */
     .stApp {
         background-color: var(--bg-dark);
         color: var(--text-main);
     }
     
-    h1, h2, h3, h4, .stMarkdown, p {
+    h1, h2, h3, h4, .stMarkdown, p, div {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.02em;
     }
     
     h1 { 
         font-weight: 800 !important; 
         text-transform: uppercase; 
         color: var(--cream) !important; 
-        font-size: 2.5rem !important;
+        font-size: 2.2rem !important;
         margin-bottom: 0.5rem !important;
+        text-shadow: 0px 0px 15px rgba(0,0,0,0.5);
     }
     
     h2, h3 { 
@@ -52,7 +53,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* 2. THE 'GLOW UP' BUTTONS */
+    /* 2. THE 'GLOW' BUTTONS (High Specificity) */
     div.stButton > button {
         background-color: transparent !important;
         color: var(--gold) !important;
@@ -63,9 +64,10 @@ st.markdown("""
         letter-spacing: 0.12em !important;
         padding: 0.75rem 1rem !important;
         transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        box-shadow: 0 0 0 transparent; 
     }
     
-    /* Hover State */
+    /* HOVER STATE: The Glow Effect */
     div.stButton > button:hover {
         background-color: rgba(212, 175, 55, 0.15) !important;
         color: var(--cream) !important;
@@ -78,7 +80,7 @@ st.markdown("""
         transform: translateY(1px);
     }
     
-    /* Primary Action Buttons (Filled Gold) */
+    /* PRIMARY ACTION BUTTONS (Filled Gold) */
     div.stButton > button[kind="primary"] {
         background-color: var(--gold) !important;
         color: #0E1117 !important;
@@ -93,6 +95,7 @@ st.markdown("""
     }
 
     /* 3. INPUT FIELD CONTRAST FIX */
+    /* Forces lighter background on inputs so they don't disappear into the dark mode */
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
         background-color: #1c212c !important; 
         color: #FFFFFF !important;
@@ -105,7 +108,7 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
     }
     
-    /* 4. DASHBOARD CARDS (HUD STYLE) */
+    /* 4. METRIC CARDS (HUD STYLE) */
     .metric-card {
         background: linear-gradient(180deg, #1c212c 0%, #13171f 100%);
         padding: 24px;
@@ -177,6 +180,7 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
+        # LOGO CENTERING
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=160) 
         else:
