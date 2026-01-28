@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image
 import os
 import re
+import json # ADDED: For Save/Load functionality
 from logic import SignetLogic
 
 # --- PAGE CONFIG ---
@@ -251,6 +252,43 @@ def calculate_calibration_score(profile_data):
     else: missing.append("Social Screenshots")
     return score, missing
 
+# --- PERSISTENCE FUNCTIONS (NEW) ---
+DRAFT_FILE = "signet_draft.json"
+
+def save_wizard_draft():
+    """Saves current wizard state variables to a local JSON."""
+    data = {
+        "wiz_name": st.session_state.get("wiz_name", ""),
+        "wiz_archetype": st.session_state.get("wiz_archetype", ""),
+        "wiz_tone": st.session_state.get("wiz_tone", ""),
+        "wiz_mission": st.session_state.get("wiz_mission", ""),
+        "wiz_values": st.session_state.get("wiz_values", ""),
+        "wiz_guardrails": st.session_state.get("wiz_guardrails", ""),
+        "wiz_samples_list": st.session_state.get("wiz_samples_list", [])
+        # Note: We cannot easily serialize uploaded file objects (social/logo) to JSON
+        # so we only save text fields and the text-based voice samples.
+    }
+    with open(DRAFT_FILE, "w") as f:
+        json.dump(data, f)
+    st.toast("Draft Saved Locally", icon="💾")
+
+def load_wizard_draft():
+    """Loads wizard state variables from local JSON."""
+    if os.path.exists(DRAFT_FILE):
+        with open(DRAFT_FILE, "r") as f:
+            data = json.load(f)
+            st.session_state["wiz_name"] = data.get("wiz_name", "")
+            st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
+            st.session_state["wiz_tone"] = data.get("wiz_tone", "")
+            st.session_state["wiz_mission"] = data.get("wiz_mission", "")
+            st.session_state["wiz_values"] = data.get("wiz_values", "")
+            st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
+            st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
+        st.toast("Draft Loaded", icon="📂")
+        st.rerun()
+    else:
+        st.error("No draft file found.")
+
 def add_voice_sample_callback():
     """Safely adds text/file sample from state variables and resets inputs."""
     s_type = st.session_state.get('wiz_sample_type', 'Generic')
@@ -284,7 +322,6 @@ def add_voice_sample_callback():
         st.session_state['file_uploader_key'] += 1
 
 def add_social_callback():
-    """Adds a social media image to the buffer."""
     s_platform = st.session_state.get('wiz_social_platform', 'Other')
     u_key = f"social_up_{st.session_state['social_uploader_key']}"
     s_file = st.session_state.get(u_key, None)
@@ -294,11 +331,9 @@ def add_social_callback():
             'platform': s_platform,
             'file': s_file
         })
-        # Reset uploader
         st.session_state['social_uploader_key'] += 1
 
 def add_logo_callback():
-    """Adds a logo file to the buffer."""
     u_key = f"logo_up_{st.session_state['logo_uploader_key']}"
     s_file = st.session_state.get(u_key, None)
     
@@ -306,7 +341,6 @@ def add_logo_callback():
         st.session_state['wiz_logo_list'].append({
             'file': s_file
         })
-        # Reset uploader
         st.session_state['logo_uploader_key'] += 1
 
 # --- LOGIN SCREEN ---
@@ -389,7 +423,6 @@ with st.sidebar:
 
     st.divider()
     
-    # NAVIGATION HANDLER: Update state based on selection, or default
     app_mode = st.radio(
         "MODULES", 
         ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "BRAND MANAGER"], 
@@ -434,7 +467,7 @@ if app_mode == "DASHBOARD":
                             1. STRATEGY (Mission, Vision, Values, Archetype)
                             2. VOICE (Tone keywords, Style instructions, Do's/Don'ts)
                             3. VISUALS (Colors, Logo usage, Typography rules)
-                            4. GUARDRAILS (Specific Do's and Don'ts, Banned words, Legal requirements)
+                            4. GUARDRAILS (Explicit Do's and Don'ts)
                             
                             RAW PDF CONTENT:
                             {raw_text}
@@ -591,13 +624,11 @@ elif app_mode == "CONTENT GENERATOR":
     with c1: format_type = st.selectbox("TYPE", ["Press Release", "Email", "LinkedIn Post", "Article"])
     with c2: topic = st.text_input("TOPIC")
     
-    # NEW: Audience Input
     audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Gen Z, Current Customers")
     key_points = st.text_area("KEY POINTS", height=150, placeholder="- Key point 1\n- Key point 2")
     
     if st.button("GENERATE DRAFT", type="primary"):
         with st.spinner("DRAFTING..."):
-            # We append Audience to the topic prompt to ensure logic.py sees it without changing the signature
             full_prompt_topic = f"{topic} (Audience: {audience})"
             result = logic.run_content_generator(full_prompt_topic, format_type, key_points, current_rules)
             st.markdown(result)
@@ -605,17 +636,23 @@ elif app_mode == "CONTENT GENERATOR":
 # 5. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
+    
+    # --- DRAFT ACTIONS ---
+    dc1, dc2 = st.columns([1, 6])
+    with dc1: st.button("SAVE DRAFT", on_click=save_wizard_draft)
+    with dc2: st.button("LOAD DRAFT", on_click=load_wizard_draft)
+    
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
     with tab1:
         with st.expander("1. STRATEGY (CORE)", expanded=True):
-            wiz_name = st.text_input("BRAND NAME")
+            # NOTE: We bind inputs to st.session_state keys so Load works
+            st.text_input("BRAND NAME", key="wiz_name")
             c1, c2 = st.columns(2)
-            with c1: wiz_archetype = st.selectbox("ARCHETYPE *", ARCHETYPES, index=None, placeholder="SELECT...")
-            with c2: wiz_tone = st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold")
-            wiz_mission = st.text_area("MISSION STATEMENT")
-            wiz_values = st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community")
-            # --- NEW GUARDRAILS INPUT ---
-            wiz_guardrails = st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis. Always capitalize Product Names. No slang.")
+            with c1: st.selectbox("ARCHETYPE *", ARCHETYPES, index=None, placeholder="SELECT...", key="wiz_archetype")
+            with c2: st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold", key="wiz_tone")
+            st.text_area("MISSION STATEMENT", key="wiz_mission")
+            st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values")
+            st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis. Always capitalize Product Names.", key="wiz_guardrails")
             
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
@@ -688,7 +725,7 @@ elif app_mode == "BRAND ARCHITECT":
             with ac2: a2 = st.color_picker("Accent 2", "#000000")
             
         if st.button("GENERATE SYSTEM", type="primary"):
-            if not wiz_name or not wiz_archetype: st.error("NAME/ARCHETYPE REQUIRED")
+            if not st.session_state.get("wiz_name") or not st.session_state.get("wiz_archetype"): st.error("NAME/ARCHETYPE REQUIRED")
             else:
                 with st.spinner("CALIBRATING..."):
                     logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
@@ -700,18 +737,17 @@ elif app_mode == "BRAND ARCHITECT":
                     all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                     palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
                     
-                    # --- UPDATED PROMPT STRUCTURE FOR GUARDRAILS ---
                     prompt = f"""
                     SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
                     
                     1. STRATEGY
-                    - Brand: {wiz_name}
-                    - Archetype: {wiz_archetype}
-                    - Mission: {wiz_mission}
-                    - Values: {wiz_values}
+                    - Brand: {st.session_state.wiz_name}
+                    - Archetype: {st.session_state.wiz_archetype}
+                    - Mission: {st.session_state.wiz_mission}
+                    - Values: {st.session_state.wiz_values}
                     
                     2. VOICE
-                    - Tone Keywords: {wiz_tone}
+                    - Tone Keywords: {st.session_state.wiz_tone}
                     - Analysis of samples: {all_samples}
                     
                     3. VISUALS
@@ -720,12 +756,13 @@ elif app_mode == "BRAND ARCHITECT":
                     - Social Media Style: {social_summary}
                     
                     4. GUARDRAILS
-                    - Explicit Do's and Don'ts: {wiz_guardrails}
+                    - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
                     
                     5. DATA (TRAINING SAMPLES)
                     {all_samples}
                     """
-                    st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
+                    st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
+                    # Clear buffers after generation
                     st.session_state['wiz_samples_list'] = []
                     st.session_state['wiz_social_list'] = []
                     st.session_state['wiz_logo_list'] = []
@@ -744,6 +781,15 @@ elif app_mode == "BRAND MANAGER":
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         current_data = st.session_state['profiles'][target]
         
+        # ADDED: DOWNLOAD BUTTON
+        st.download_button(
+            label="DOWNLOAD BRAND KIT (MARKDOWN)",
+            data=current_data,
+            file_name=f"{target.replace(' ', '_')}_BrandKit.md",
+            mime="text/markdown"
+        )
+        st.divider()
+        
         def extract_section(full_text, start_marker, end_marker=None):
             try:
                 start = full_text.find(start_marker)
@@ -757,33 +803,24 @@ elif app_mode == "BRAND MANAGER":
             except:
                 return ""
 
-        # Update extraction to include Guardrails
         val_strat = extract_section(current_data, "1. STRATEGY", "2. VOICE")
         val_voice = extract_section(current_data, "2. VOICE", "3. VISUALS")
         val_vis = extract_section(current_data, "3. VISUALS", "4. GUARDRAILS")
         val_guard = extract_section(current_data, "4. GUARDRAILS", "5. DATA")
         
-        # New Tab Structure
         edit_tab1, edit_tab2, edit_tab3, edit_tab4, edit_tab5 = st.tabs(["STRATEGY", "VOICE", "VISUALS", "GUARDRAILS", "RAW DATA"])
         
-        with edit_tab1:
-            new_strat = st.text_area("EDIT STRATEGY", val_strat, height=300)
-        with edit_tab2:
-            new_voice = st.text_area("EDIT VOICE", val_voice, height=300)
-        with edit_tab3:
-            new_vis = st.text_area("EDIT VISUALS", val_vis, height=300)
-        with edit_tab4:
-            new_guard = st.text_area("EDIT GUARDRAILS", val_guard, height=300)
-        with edit_tab5:
-            new_raw = st.text_area("RAW FULL TEXT", current_data, height=300)
+        with edit_tab1: new_strat = st.text_area("EDIT STRATEGY", val_strat, height=300)
+        with edit_tab2: new_voice = st.text_area("EDIT VOICE", val_voice, height=300)
+        with edit_tab3: new_vis = st.text_area("EDIT VISUALS", val_vis, height=300)
+        with edit_tab4: new_guard = st.text_area("EDIT GUARDRAILS", val_guard, height=300)
+        with edit_tab5: new_raw = st.text_area("RAW FULL TEXT", current_data, height=300)
 
         c1, c2, c3 = st.columns(3)
         if c1.button("SAVE CHANGES"):
-            # If Raw was edited, prioritize that. Otherwise, stitch tabs including guardrails.
             if new_raw != current_data:
                 st.session_state['profiles'][target] = new_raw
             else:
-                # Reconstruct
                 st.session_state['profiles'][target] = f"{new_strat}\n{new_voice}\n{new_vis}\n{new_guard}"
             st.success("SAVED")
             
