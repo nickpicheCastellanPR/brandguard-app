@@ -242,7 +242,11 @@ ARCHETYPES = [
 # --- HELPER FUNCTIONS ---
 def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
-
+    
+def activate_profile(profile_name):
+    st.session_state['active_profile'] = profile_name
+    st.session_state['nav_selection'] = "BRAND ARCHITECT"
+    
 def calculate_calibration_score(profile_data):
     score = 0
     missing = []
@@ -619,11 +623,12 @@ if app_mode == "DASHBOARD":
                             """, unsafe_allow_html=True)
                             
                             # ACTION BUTTON
-                            if st.button("ACTIVATE SIGNAL", key=f"open_{p_name}", use_container_width=True):
-                                st.session_state['active_profile'] = p_name
-                                st.session_state['nav_selection'] = "BRAND ARCHITECT" # Force navigation
-                                st.rerun()
-                            
+                            st.button("ACTIVATE SIGNAL", 
+                                      key=f"open_{p_name}", 
+                                      on_click=activate_profile, 
+                                      args=(p_name,), 
+                                      use_container_width=True)
+
                             st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
@@ -958,6 +963,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
