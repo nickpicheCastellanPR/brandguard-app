@@ -262,9 +262,11 @@ def calculate_calibration_score(profile_data):
     else: missing.append("Social Screenshots")
     return score, missing
 
-# --- CLOUD-SAFE PERSISTENCE (Download/Upload) ---
-def get_current_state_json():
-    """Generates a JSON string of the current wizard state."""
+# --- PERSISTENCE FUNCTIONS (DRAFT + PROFILE) ---
+DRAFT_FILE = "signet_draft.json"
+
+def save_wizard_draft():
+    """Saves current wizard state variables to a local JSON."""
     data = {
         "wiz_name": st.session_state.get("wiz_name", ""),
         "wiz_archetype": st.session_state.get("wiz_archetype", ""),
@@ -277,25 +279,45 @@ def get_current_state_json():
         "palette_secondary": st.session_state.get("palette_secondary", []),
         "palette_accent": st.session_state.get("palette_accent", [])
     }
-    return json.dumps(data, indent=2)
+    with open(DRAFT_FILE, "w") as f:
+        json.dump(data, f)
+    st.toast("Draft Saved Locally", icon="💾")
 
-def load_state_from_uploaded_file(uploaded_file):
-    """Parses uploaded JSON and updates session state."""
+def load_wizard_draft():
+    """Loads wizard state variables from local JSON."""
+    if os.path.exists(DRAFT_FILE):
+        with open(DRAFT_FILE, "r") as f:
+            data = json.load(f)
+            st.session_state["wiz_name"] = data.get("wiz_name", "")
+            st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
+            st.session_state["wiz_tone"] = data.get("wiz_tone", "")
+            st.session_state["wiz_mission"] = data.get("wiz_mission", "")
+            st.session_state["wiz_values"] = data.get("wiz_values", "")
+            st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
+            st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
+            st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
+            st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
+            st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
+        st.toast("Draft Loaded", icon="📂")
+        st.rerun()
+    else:
+        st.error("No draft file found.")
+
+# --- NEW: COMPLETED PROFILE PERSISTENCE ---
+def load_completed_profile(uploaded_file):
+    """Parses an uploaded completed profile JSON and adds it to the session."""
     try:
         data = json.load(uploaded_file)
-        st.session_state["wiz_name"] = data.get("wiz_name", "")
-        st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
-        st.session_state["wiz_tone"] = data.get("wiz_tone", "")
-        st.session_state["wiz_mission"] = data.get("wiz_mission", "")
-        st.session_state["wiz_values"] = data.get("wiz_values", "")
-        st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
-        st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
-        st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
-        st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
-        st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
-        st.toast("Draft Loaded Successfully", icon="✅")
+        # Validations
+        if "inputs" in data and "final_text" in data:
+            name = data['inputs'].get('wiz_name', 'Imported Profile')
+            key_name = f"{name} (Imported)"
+            st.session_state['profiles'][key_name] = data
+            st.toast(f"Profile '{name}' Loaded!", icon="✅")
+        else:
+            st.error("Invalid Profile File: Missing core data.")
     except Exception as e:
-        st.error(f"Failed to load draft: {e}")
+        st.error(f"Failed to load profile: {e}")
 
 # --- EXPORT TO HTML FUNCTION (Polished) ---
 def convert_to_html_brand_card(brand_name, content):
@@ -587,7 +609,7 @@ elif app_mode == "BRAND ARCHITECT":
         uploaded_draft = st.file_uploader("LOAD DRAFT", type=["json"], label_visibility="collapsed")
         if uploaded_draft is not None:
             # We process immediately upon upload
-            load_state_from_uploaded_file(uploaded_draft)
+            load_wizard_draft()
             st.rerun()
     
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
@@ -767,6 +789,22 @@ elif app_mode == "BRAND ARCHITECT":
 # 6. BRAND MANAGER (FIXED: FORM-BASED EDITING)
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
+    
+    # --- IMPORT/EXPORT COMPLETED PROFILES ---
+    # Top Bar: Add ability to Load Profile from JSON
+    with st.expander("📂 IMPORT / EXPORT PROFILE", expanded=False):
+        c_imp, c_exp = st.columns([1, 1])
+        with c_imp:
+            uploaded_profile = st.file_uploader("Load Profile JSON", type=["json"], key="profile_loader")
+            if uploaded_profile is not None:
+                if st.button("IMPORT PROFILE"):
+                    load_completed_profile(uploaded_profile)
+                    st.rerun()
+        with c_exp:
+            st.info("Select a profile below to see export options.")
+
+    st.divider()
+
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         profile_obj = st.session_state['profiles'][target]
@@ -774,8 +812,22 @@ elif app_mode == "BRAND MANAGER":
         is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
         final_text_view = profile_obj['final_text'] if is_structured else profile_obj
         
-        html_data = convert_to_html_brand_card(target, final_text_view)
-        st.download_button(label="DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html")
+        # --- EXPORT BUTTONS ROW ---
+        col_html, col_json = st.columns([1, 1])
+        
+        # 1. HTML Brand Kit (Human Readable)
+        with col_html:
+            html_data = convert_to_html_brand_card(target, final_text_view)
+            st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", use_container_width=True)
+        
+        # 2. JSON Save File (Machine Readable / Re-Uploadable)
+        with col_json:
+            if is_structured:
+                json_data = json.dumps(profile_obj, indent=2)
+                st.download_button(label="💾 SAVE PROFILE TO FILE (JSON)", data=json_data, file_name=f"{target.replace(' ', '_')}_Profile.json", mime="application/json", use_container_width=True)
+            else:
+                st.warning("Save to File unavailable for legacy profiles.")
+
         st.divider()
         
         if is_structured:
