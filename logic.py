@@ -16,7 +16,6 @@ class SignetLogic:
             genai.configure(api_key=self.api_key)
 
     def _get_api_key(self):
-        """Robust API Key Fetcher"""
         if "GOOGLE_API_KEY" in st.secrets:
             return st.secrets["GOOGLE_API_KEY"]
         elif os.getenv("GOOGLE_API_KEY"):
@@ -24,13 +23,10 @@ class SignetLogic:
         return None
 
     def check_password(self, input_password):
-        """Simple Beta Gatekeeper"""
-        # Hardcoded for MVP.
         CORRECT_PASSWORD = "beta" 
         return input_password == CORRECT_PASSWORD
 
     def get_model(self):
-        """Silently finds the best Flash model"""
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
@@ -138,40 +134,11 @@ class SignetLogic:
         response = model.generate_content(prompt)
         return response.text
 
-    def run_content_generator(self, topic, format_type, key_points, rules):
-        """Generates new content based on bullets and brand rules."""
-        model_name = self.get_model()
-        model = genai.GenerativeModel(model_name)
-        
-        prompt = f"""
-        ### ROLE: Executive Ghost Writer & Brand Strategist.
-        ### BRAND RULES:
-        {rules}
-        
-        ### TASK:
-        Write a {format_type} about "{topic}".
-        
-        ### KEY DETAILS TO INCLUDE (Bullet Points):
-        {key_points}
-        
-        ### INSTRUCTIONS:
-        1. **VOICE ALIGNMENT:** Strictly adhere to the Brand Voice, Archetype, and Style Signature defined in the rules. 
-        2. **FORMATTING:** Use standard formatting for a {format_type} (e.g., Subject Line for emails, Headline/Dateline for Press Releases).
-        3. **EXPANSION:** Expand the bullet points into full, flowing prose. Do not just list them.
-        4. **NO FLUFF:** Keep it high-impact and professional.
-        
-        ### OUTPUT:
-        [Generate the full text here]
-        """
-        response = model.generate_content(prompt)
-        return response.text
-
     def generate_brand_rules(self, inputs):
         """Inputs is a string prompt constructed in the UI"""
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
-        # Updated Prompt to handle "Voice Samples"
         grounded_prompt = f"""
         ### ROLE: Brand Strategist & Linguistic Analyst.
         ### TASK: Create a comprehensive brand guideline document based STRICTLY on the user's provided inputs.
