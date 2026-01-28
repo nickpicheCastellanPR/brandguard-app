@@ -244,78 +244,76 @@ def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
 
 def calculate_calibration_score(profile_data):
-    # 1. Normalize Input
-    if isinstance(profile_data, dict):
-        text_data = profile_data.get('final_text', '')
-        # Check inputs to see if they are just defaults (optional robustness)
-    else:
-        text_data = str(profile_data)
-    
     score = 0
-    foundations_found = 0
-    missing_core = []
+    missing = []
     
-    # 2. STRICT Foundation Check (Max 50 pts)
-    # We now check if the section has CONTENT, not just a header.
-    # We look for the header, then grab the text until the next newline or header
-    
-    # Map of Header -> Minimum Word Count to count as "Real"
-    core_requirements = {
-        "STRATEGY": 15,    # Must have a real mission/values statement
-        "VOICE": 10,       # Must have tone keywords/desc
-        "VISUALS": 5,      # Palette codes count as words
-        "LOGO": 0,         # Logo section might be image refs, keep lenient
-        "TYPOGRAPHY": 0
-    }
-
-    for section, min_words in core_requirements.items():
-        # Find section and simple word count check
-        # This regex looks for "1. STRATEGY" or just "STRATEGY" followed by text
-        match = re.search(f"{section}.*?:(.*?)(?=\n[0-9]|\n[A-Z]|$)", text_data, re.DOTALL | re.IGNORECASE)
-        if match:
-            content = match.group(1).strip()
-            if len(content.split()) >= min_words:
-                foundations_found += 1
-            else:
-                missing_core.append(f"{section.title()} (Too Short)")
-        else:
-            missing_core.append(section.title())
+    # CASE A: STRUCTURED DATA (Created via Wizard)
+    # We check what the USER actually entered, ignoring AI filler text.
+    if isinstance(profile_data, dict) and 'inputs' in profile_data:
+        inputs = profile_data['inputs']
+        
+        # 1. STRATEGY (40 pts)
+        # Name & Archetype are required to exist, so we give small points for them
+        if inputs.get('wiz_mission'): score += 15
+        else: missing.append("Mission Statement")
             
-    score += (foundations_found * 10)
+        if inputs.get('wiz_values'): score += 15
+        else: missing.append("Core Values")
+        
+        if inputs.get('wiz_guardrails'): score += 10
+        else: missing.append("Guardrails")
 
-    # 3. STRICT Confidence Check (Max 50 pts)
-    # Regex to grab text between headers to count words
-    style_match = re.search(r'Style Signature(.*?)(SOCIAL MEDIA|$)', text_data, re.DOTALL | re.IGNORECASE)
-    social_match = re.search(r'SOCIAL MEDIA(.*?)$', text_data, re.DOTALL | re.IGNORECASE)
-    
-    style_count = len(style_match.group(1).split()) if style_match else 0
-    social_count = len(social_match.group(1).split()) if social_match else 0
-    
-    # Scaled harder: You need 50 words just to get on the board for style
-    if style_count > 300: score += 25
-    elif style_count > 100: score += 15
-    elif style_count > 20: score += 5
-    
-    if social_count > 150: score += 25
-    elif social_count > 50: score += 15
-    elif social_count > 10: score += 5
+        # 2. VOICE (30 pts)
+        # We check the wizard sample list length if available, otherwise check input text length
+        # (Session state might be cleared, so we check the 'wiz_tone' and text content implied)
+        if inputs.get('wiz_tone'): score += 10
+        else: missing.append("Tone Keywords")
+        
+        # We need to detect if samples were actually added. 
+        # Since 'inputs' stores raw strings, we check if the AI text contains the "Analysis:" marker 
+        # which implies samples were processed.
+        final_text = profile_data.get('final_text', '')
+        if "Analysis: TYPE:" in final_text or "Analysis: File" in final_text:
+            score += 20
+        else:
+             missing.append("Writing Samples")
 
-    # 4. Status & Color Logic
-    if score < 40: # Lowered threshold for "Foundation"
+        # 3. VISUALS (30 pts)
+        # Check if palettes are not default
+        p_prim = inputs.get('palette_primary', [])
+        if p_prim and p_prim != ["#24363b"]: score += 10
+        
+        if "Logo Variant" in final_text: score += 10
+        if "Platform:" in final_text and "Analysis:" in final_text: score += 10
+
+    # CASE B: UNSTRUCTURED (Uploaded PDF)
+    # We fall back to text parsing
+    else:
+        text_data = str(profile_data.get('final_text', '') if isinstance(profile_data, dict) else profile_data)
+        
+        # Simple keywords aren't enough, check for length
+        if len(text_data) > 1000: score += 50 # Volume check
+        if "STRATEGY" in text_data: score += 10
+        if "VOICE" in text_data: score += 10
+        if "VISUALS" in text_data: score += 10
+        if "social" in text_data.lower(): score += 20
+
+    # STATUS LOGIC
+    if score < 40:
         status_label = "Foundation"
         color = "#3d3d3d" 
-        msg = f"⚠️ <b>Low Data.</b> {missing_core[0] if missing_core else 'Add Strategy'} to unlock capabilities."
-    elif score < 75: # Harder to get out of "Developing"
+        msg = "⚠️ <b>Low Data.</b> Add Mission, Values, and Samples to train the engine."
+    elif score < 80:
         status_label = "Developing"
         color = "#ab8f59" 
-        msg = "💡 <b>Refinement:</b> Signet needs more writing samples (Voice) to act on your behalf."
+        msg = "💡 <b>Refinement:</b> Engine needs more Writing Samples to capture nuance."
     else:
         status_label = "Calibrated"
         color = "#4E8065" 
         msg = "✅ <b>Ready:</b> Signet is calibrated to your brand voice."
 
     return {
-        "score": score,
+        "score": min(score, 100), # Cap at 100
         "status_label": status_label,
         "color": color,
         "message": msg
@@ -446,32 +444,25 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # 1. LOGO AS HOME BUTTON
+    # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
-        # If they click the image, it acts as a "Home" button
-        if st.button("🏠 DASHBOARD", use_container_width=True):
-            st.session_state['nav_selection'] = "DASHBOARD"
-            st.rerun()
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
     st.caption(f"LOGGED IN AS: {st.session_state.get('username', 'User').upper()}")
     
-    # Refresh Profiles from DB logic if needed, but session state usually holds it
+    # 2. ACTIVE PROFILE CALIBRATION
     profile_names = list(st.session_state['profiles'].keys())
     
     if profile_names:
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
         current_rules = st.session_state['profiles'][active_profile]
         
-        # Calculate Metrics
         metrics = calculate_calibration_score(current_rules)
         
-        # --- REPLACEMENT: CASTELLAN SIDEBAR METER ---
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # We use a slightly more compact CSS for the sidebar width
+        # CASTELLAN SIDEBAR METER
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 10px; }}
@@ -490,15 +481,17 @@ with st.sidebar:
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        # ---------------------------------------------
     else:
         active_profile = None
-        cal_score = 0
         current_rules = ""
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
+    
+    # 3. NAVIGATION
+    # This is the primary way to get back to the Dashboard
     app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed", key="nav_selection")
+    
     st.divider()
     if st.button("LOGOUT"):
         st.session_state['authenticated'] = False
@@ -965,6 +958,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
