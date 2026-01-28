@@ -14,55 +14,71 @@ st.set_page_config(
 
 logic = SignetLogic()
 
-# --- PREMIUM CSS OVERHAUL (V3.0 - FORCED DARK MODE) ---
+# --- SVG ICON LIBRARY (No External Files Needed) ---
+def get_svg_icon(name):
+    # Castellan Gold: #D4AF37
+    icons = {
+        "dashboard": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>''',
+        "eye": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>''',
+        "pen": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>''',
+        "share": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>''',
+        "architect": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22h20"></path><path d="M12 2v20"></path><path d="M2 12h20"></path><path d="M12 2L2 22h20L12 2z"></path></svg>''',
+        "upload": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>''',
+        "manage": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'''
+    }
+    return icons.get(name, "")
+
+# --- PREMIUM CSS OVERHAUL (V4.0 - ROOT LEVEL FORCE) ---
 st.markdown("""
 <style>
-    /* 1. FORCE DARK MODE (Overrides Browser Light Mode) */
-    [data-testid="stAppViewContainer"], .stApp {
-        background-color: #0E1117 !important; /* Deepest Dark Blue/Black */
+    /* 1. CRITICAL: FORCE BROWSER TO RENDER DARK PRIMITIVES */
+    :root {
+        color-scheme: dark;
+    }
+
+    /* 2. TARGET ALL STREAMLIT CONTAINERS TO FIX "ZEBRA" */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0E1117 !important; /* Deep Dark */
         color: #E0E0E0 !important;
     }
     
-    /* 2. GLOBAL FONTS */
+    /* 3. GLOBAL FONTS */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     html, body, [class*="css"]  {
         font-family: 'Inter', sans-serif;
     }
     
-    /* 3. SIDEBAR STYLING */
+    /* 4. SIDEBAR STYLING */
     section[data-testid="stSidebar"] {
-        background-color: #050505 !important; /* Pure Black */
+        background-color: #050505 !important;
         border-right: 1px solid #2A2A2A;
     }
     
-    /* LOGO CONTAINER (Light Box Effect) */
+    /* SIDEBAR LOGO CONTAINER (Subtle Glass Effect) */
     section[data-testid="stSidebar"] [data-testid="stImage"] {
-        background-color: #E0E0E0; 
-        padding: 15px;
+        background: rgba(255, 255, 255, 0.05); /* Very subtle light wash */
+        padding: 20px;
         border-radius: 8px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        border: 1px solid rgba(255,255,255,0.1);
     }
 
-    /* NAVIGATION MENU */
+    /* NAVIGATION MENU CLEANUP */
     div[role="radiogroup"] > label > div:first-of-type {display: None;}
     div[role="radiogroup"] label {
-        background: transparent;
         padding: 12px 15px;
         border-radius: 6px;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         border: 1px solid transparent;
         transition: all 0.2s ease;
-        color: #999 !important;
+        color: #888 !important;
         font-weight: 500;
         cursor: pointer;
-        display: block; 
     }
     div[role="radiogroup"] label:hover {
-        background: #1E1E1E;
+        background: #1A1A1A;
         color: #FFF !important;
-        border-color: #333;
-        transform: translateX(4px); 
+        border-left: 3px solid #666;
     }
     div[role="radiogroup"] label[data-checked="true"] {
         background: #1A1A1A;
@@ -71,8 +87,7 @@ st.markdown("""
         font-weight: 600;
     }
     
-    /* 4. INPUT FIELDS (Forced Dark Mode High Contrast) */
-    /* We target the specific input classes to override Light Mode defaults */
+    /* 5. INPUT FIELDS (Forced High Contrast) */
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
         background-color: #1A1A1A !important;
         color: #FFFFFF !important;
@@ -82,13 +97,8 @@ st.markdown("""
         border-color: #D4AF37 !important;
         box-shadow: 0 0 0 1px #D4AF37 !important;
     }
-    /* Placeholder text color fix */
-    ::placeholder {
-        color: #666 !important;
-        opacity: 1;
-    }
 
-    /* 5. BUTTONS (Castellan Gold & Blue) */
+    /* 6. BUTTONS (Castellan Style) */
     .stButton>button {
         background-color: #24363b; 
         color: white;
@@ -98,38 +108,28 @@ st.markdown("""
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        transition: 0.3s;
-        width: 100%; /* Force Full Width */
+        width: 100%;
     }
     .stButton>button:hover {
         background-color: #D4AF37; 
         color: #000;
         border-color: #D4AF37;
-        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); 
+        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.2); 
     }
     
-    /* 6. DASHBOARD CARDS & METRICS */
+    /* 7. DASHBOARD METRICS */
     div[data-testid="stMetric"] {
         background-color: #141414;
         border: 1px solid #333;
         padding: 20px;
         border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     [data-testid="stMetricValue"] {
         color: #D4AF37 !important;
         font-size: 2rem !important;
     }
-    [data-testid="stMetricLabel"] {
-        color: #888 !important;
-    }
     
-    /* Container styling for Dashboard Cards */
-    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {
-        background-color: transparent;
-    }
-
-    /* 7. UTILITIES & FOOTER */
+    /* 8. HIDE STREAMLIT BRANDING & FOOTER */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -148,7 +148,6 @@ st.markdown("""
         z-index: 999;
         letter-spacing: 1px;
     }
-    /* Add padding to bottom so content isn't hidden by footer */
     .block-container { padding-bottom: 80px; }
     
     /* Custom Warning Box */
@@ -180,7 +179,6 @@ if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
-        # Logo sizing fix
         if os.path.exists("Signet_Logo_Color.png"): 
             st.image("Signet_Logo_Color.png", width=300) 
         else: 
@@ -200,7 +198,6 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # Logo container is styled by CSS
     if os.path.exists("Signet_Logo_Color.png"): 
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else: 
@@ -208,6 +205,7 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
+    # NAVIGATION
     app_mode = st.radio("MENU", [
         "Dashboard",
         "Visual Compliance", 
@@ -257,13 +255,14 @@ if app_mode == "Dashboard":
         c1, c2 = st.columns(2)
         with c1:
             with st.container(border=True):
-                st.subheader("🏗️ Architect New Profile")
+                # SVG HEADER
+                st.markdown(f"{get_svg_icon('architect')} &nbsp; <strong>Architect New Profile</strong>", unsafe_allow_html=True)
                 st.caption("Define mission, voice, and visuals from scratch.")
                 if st.button("Launch Wizard"): 
                     st.info("Select 'Brand Architect' from the sidebar.")
         with c2:
              with st.container(border=True):
-                st.subheader("📄 Import Guidelines")
+                st.markdown(f"{get_svg_icon('upload')} &nbsp; <strong>Import Guidelines</strong>", unsafe_allow_html=True)
                 st.caption("Extract rules directly from an existing PDF.")
                 if st.button("Upload PDF"):
                     st.info("Select 'Brand Architect' -> 'PDF Extraction'.")
@@ -272,16 +271,15 @@ if app_mode == "Dashboard":
         c1, c2, c3 = st.columns(3)
         with c1:
             with st.container(border=True):
-                st.markdown("**🎨 Visual Audit**")
+                st.markdown(f"{get_svg_icon('eye')} &nbsp; <strong>Visual Audit</strong>", unsafe_allow_html=True)
                 st.caption("Validate creative assets.")
-                # We can add navigation logic or just visual buttons
         with c2:
             with st.container(border=True):
-                st.markdown("**✍️ Ghost Writer**")
+                st.markdown(f"{get_svg_icon('pen')} &nbsp; <strong>Ghost Writer</strong>", unsafe_allow_html=True)
                 st.caption("Draft executive comms.")
         with c3:
             with st.container(border=True):
-                st.markdown("**📱 Social Strategy**")
+                st.markdown(f"{get_svg_icon('share')} &nbsp; <strong>Social Strategy</strong>", unsafe_allow_html=True)
                 st.caption("Generate posts.")
 
 # ==========================================
@@ -393,7 +391,6 @@ elif app_mode == "Brand Architect":
             st.markdown("---")
             st.markdown("##### 🗣️ Voice Calibration (Ghost-Writer)")
             
-            # STAGING AREA
             col_in1, col_in2 = st.columns([1,2])
             with col_in1: v_type = st.selectbox("Context", ["Internal Comms", "Press/Formal", "Social/Casual", "General"], key="v_type")
             with col_in2: v_file = st.file_uploader("Upload File", type=["pdf","png","jpg"], key="v_up", label_visibility="collapsed")
@@ -411,7 +408,6 @@ elif app_mode == "Brand Architect":
                 else:
                     st.error("No text detected.")
 
-            # STAGED LIST
             if st.session_state['wizard_samples']:
                 st.markdown("**Staged Samples:**")
                 for i, s in enumerate(st.session_state['wizard_samples']):
