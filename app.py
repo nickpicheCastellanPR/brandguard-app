@@ -688,8 +688,8 @@ if app_mode == "DASHBOARD":
                                 st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
-    else:
-        st.title("SYSTEM STATUS")
+        else:
+            st.title("SYSTEM STATUS")
         
         # Calculate metrics for the active profile display too
         metrics = calculate_calibration_score(current_rules)
@@ -1026,6 +1026,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
