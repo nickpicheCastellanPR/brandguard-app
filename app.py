@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 import os
+import re
 from logic import SignetLogic
 
 # --- PAGE CONFIG ---
@@ -207,11 +208,14 @@ st.markdown("""
 if 'authenticated' not in st.session_state: st.session_state['authenticated'] = False
 if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
 
+# NAV STATE
+if 'nav_selection' not in st.session_state: st.session_state['nav_selection'] = "DASHBOARD"
+
 # WIZARD STATE LISTS
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
-if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] # Stores: {'platform': str, 'file': UploadedFile}
-if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     # Stores: {'file': UploadedFile}
-if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False # For Dashboard Toggle
+if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] 
+if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     
+if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False 
 
 # DYNAMIC KEYS FOR UPLOADERS
 if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
@@ -230,6 +234,9 @@ ARCHETYPES = [
 ]
 
 # --- HELPER FUNCTIONS ---
+def nav_to(page_name):
+    st.session_state['nav_selection'] = page_name
+
 def calculate_calibration_score(profile_data):
     score = 0
     missing = []
@@ -302,33 +309,25 @@ def add_logo_callback():
         # Reset uploader
         st.session_state['logo_uploader_key'] += 1
 
-# --- LOGIN SCREEN (ARCHITECTURAL VIGNETTE + GRADIENT CORNERS) ---
+# --- LOGIN SCREEN ---
 if not st.session_state['authenticated']:
     st.markdown("""
     <style>
         .stApp {
             background-color: #f5f5f0 !important;
-            /* Layer 1: The Blueprint Grid (Top) 
-               Layer 2: Top-Left Sage Corner (Radial)
-               Layer 3: Bottom-Right Teal Corner (Radial)
-            */
             background-image: 
                 linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px),
-                
                 radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%),
                 radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
-                
             background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
         }
         section[data-testid="stSidebar"] { display: none; }
-        
         .stTextInput input {
             background-color: #ffffff !important;
             color: #24363b !important;
             border: 1px solid #c0c0c0 !important;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            /* Reset dark mode override for login screen specifically */
             -webkit-text-fill-color: #24363b !important;
         }
         .stTextInput input:focus { border-color: #24363b !important; }
@@ -389,7 +388,14 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
-    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed")
+    
+    # NAVIGATION HANDLER: Update state based on selection, or default
+    app_mode = st.radio(
+        "MODULES", 
+        ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "BRAND MANAGER"], 
+        label_visibility="collapsed",
+        key="nav_selection"
+    )
     
     st.divider()
     st.markdown("<div style='text-align: center; color: #24363b; font-size: 0.6rem; letter-spacing: 0.1em; margin-bottom: 10px;'>POWERED BY CASTELLAN PR</div>", unsafe_allow_html=True)
@@ -420,10 +426,7 @@ if app_mode == "DASHBOARD":
                 with col_sub:
                     if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
                         with st.spinner("ANALYZING PDF STRUCTURE..."):
-                            # Extraction Logic
-                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000] # Limit char count
-                            
-                            # Structured Prompt
+                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
                             parsing_prompt = f"""
                             TASK: Analyze this Brand Guide PDF extract and restructure it into the standard Brand Profile format.
                             
@@ -435,7 +438,6 @@ if app_mode == "DASHBOARD":
                             RAW PDF CONTENT:
                             {raw_text}
                             """
-                            
                             st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
                             st.success(f"SUCCESS: {dash_pdf.name} ingested.")
                             st.session_state['dashboard_upload_open'] = False
@@ -450,8 +452,6 @@ if app_mode == "DASHBOARD":
         # --- HERO CARDS (CLICKABLE BUTTONS WITH CSS ICONS) ---
         st.markdown("""
         <style>
-            /* BASE BUTTON STYLE (Makes them look like cards) */
-            /* Using wildcard selector to catch columns in different st versions */
             div[data-testid*="Column"] .stButton button {
                 background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important;
                 border: 1px solid #3a4b50 !important;
@@ -464,7 +464,7 @@ if app_mode == "DASHBOARD":
                 color: #f5f5f0 !important;
                 border-radius: 0px !important;
                 box-shadow: none !important;
-                padding-top: 50px !important; /* Space for the icon */
+                padding-top: 50px !important; 
                 position: relative !important;
                 white-space: pre-wrap !important;
             }
@@ -479,50 +479,31 @@ if app_mode == "DASHBOARD":
                 font-weight: 700 !important;
                 letter-spacing: 0.1em;
             }
-
-            /* --- GEOMETRIC CSS ICONS (INJECTED VIA PSEUDO-ELEMENTS) --- */
-            
-            /* 1. BLUEPRINT ICON (Create Profile) */
+            /* 1. BLUEPRINT ICON */
             div[data-testid*="Column"]:nth-of-type(1) .stButton button::before {
-                content: '';
-                position: absolute;
-                top: 40px;
-                width: 40px;
-                height: 40px;
-                border: 2px solid #ab8f59;
-                box-shadow: 5px 5px 0px #5c6b61;
+                content: ''; position: absolute; top: 40px; width: 40px; height: 40px;
+                border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61;
             }
-
-            /* 2. DOCUMENT ICON (Upload Guide) */
+            /* 2. DOCUMENT ICON */
             div[data-testid*="Column"]:nth-of-type(2) .stButton button::before {
-                content: '';
-                position: absolute;
-                top: 40px;
-                width: 30px;
-                height: 40px;
+                content: ''; position: absolute; top: 40px; width: 30px; height: 40px;
                 border: 2px solid #ab8f59;
                 background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%);
             }
-
-            /* 3. GEAR ICON (Load Demo) */
+            /* 3. GEAR ICON */
             div[data-testid*="Column"]:nth-of-type(3) .stButton button::before {
-                content: '';
-                position: absolute;
-                top: 40px;
-                width: 40px;
-                height: 40px;
-                border: 2px solid #ab8f59;
-                border-radius: 50%;
+                content: ''; position: absolute; top: 40px; width: 40px; height: 40px;
+                border: 2px solid #ab8f59; border-radius: 50%;
                 background: radial-gradient(circle, #5c6b61 20%, transparent 21%);
             }
-
         </style>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
             if st.button("\nCREATE PROFILE\nArchitect a new brand identity"):
-                st.info("Select 'BRAND ARCHITECT' in the sidebar to begin.")
+                nav_to("BRAND ARCHITECT")
+                st.rerun()
         with c2:
             if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
                 st.session_state['dashboard_upload_open'] = True
@@ -537,15 +518,14 @@ if app_mode == "DASHBOARD":
                 """
                  st.rerun()
         
-        # --- ABOUT / DESCRIPTIVE TEXT ---
+        # --- ABOUT ---
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
         <div style="background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;">
             <h3 style="color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;">INTELLIGENT BRAND GOVERNANCE</h3>
             <p style="color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;">
                 Signet is a proprietary engine designed to enforce strategic, visual, and tonal consistency across all communications. 
-                By digitizing your brand's core DNA—from mission statements to visual palettes—Signet ensures that every asset generated or audited 
-                aligns perfectly with your established identity.
+                By digitizing your brand's core DNA...
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -611,10 +591,16 @@ elif app_mode == "CONTENT GENERATOR":
     c1, c2 = st.columns(2)
     with c1: format_type = st.selectbox("TYPE", ["Press Release", "Email", "LinkedIn Post", "Article"])
     with c2: topic = st.text_input("TOPIC")
+    
+    # NEW: Audience Input
+    audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Gen Z, Current Customers")
     key_points = st.text_area("KEY POINTS", height=150, placeholder="- Key point 1\n- Key point 2")
+    
     if st.button("GENERATE DRAFT", type="primary"):
         with st.spinner("DRAFTING..."):
-            result = logic.run_content_generator(topic, format_type, key_points, current_rules)
+            # We append Audience to the topic prompt to ensure logic.py sees it without changing the signature
+            full_prompt_topic = f"{topic} (Audience: {audience})"
+            result = logic.run_content_generator(full_prompt_topic, format_type, key_points, current_rules)
             st.markdown(result)
 
 # 5. BRAND ARCHITECT
@@ -622,7 +608,6 @@ elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
     with tab1:
-        # --- SECTION 1: STRATEGY ---
         with st.expander("1. STRATEGY (CORE)", expanded=True):
             wiz_name = st.text_input("BRAND NAME")
             c1, c2 = st.columns(2)
@@ -631,53 +616,33 @@ elif app_mode == "BRAND ARCHITECT":
             wiz_mission = st.text_area("MISSION STATEMENT")
             wiz_values = st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community")
             
-        # --- SECTION 2: VOICE & CALIBRATION (UPGRADED) ---
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
-            
-            # Type Selector
             st.selectbox("CONTENT TYPE", ["Internal Email", "Executive Memo", "Press Release", "Article/Blog", "Social Post", "Website Copy", "Other"], key="wiz_sample_type")
-            
-            # Input Methods
             v_tab1, v_tab2 = st.tabs(["PASTE TEXT", "UPLOAD FILE"])
-            with v_tab1:
-                st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150)
+            with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150)
             with v_tab2:
-                # Dynamic key ensures the uploader clears after 'Add' is clicked
                 u_key = f"uploader_{st.session_state['file_uploader_key']}"
                 st.file_uploader("UPLOAD (PDF, DOCX, TXT, IMG)", type=["pdf", "docx", "txt", "png", "jpg"], key=u_key)
-            
-            # Add Button with Callback (Fixes the Error)
             st.button("ADD SAMPLE", on_click=add_voice_sample_callback)
             
-            # Display Buffer
             if st.session_state['wiz_samples_list']: 
                 st.divider()
                 st.markdown(f"**VOICE BUFFER: {len(st.session_state['wiz_samples_list'])} SAMPLES**")
-                
-                # Iterate safely with index to allow deletion
                 for i, sample in enumerate(st.session_state['wiz_samples_list']):
                     col_text, col_del = st.columns([4, 1])
-                    header = sample.split('\n')[0]
-                    with col_text:
-                        st.caption(f"> {header}")
+                    with col_text: st.caption(f"> {sample.splitlines()[0]}")
                     with col_del:
                         if st.button("REMOVE", key=f"del_sample_{i}", type="secondary"):
                             st.session_state['wiz_samples_list'].pop(i)
                             st.rerun()
 
-        # --- SECTION 3: SOCIAL ---
         with st.expander("3. SOCIAL MEDIA"):
             st.caption("Upload screenshots of high-performing posts.")
-            
             st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
-            
-            # Dynamic Key for Uploader
             s_key = f"social_up_{st.session_state['social_uploader_key']}"
             st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
-            
             st.button("ADD SOCIAL SAMPLE", on_click=add_social_callback)
-            
             if st.session_state['wiz_social_list']:
                 st.divider()
                 st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} IMAGES**")
@@ -689,14 +654,11 @@ elif app_mode == "BRAND ARCHITECT":
                             st.session_state['wiz_social_list'].pop(i)
                             st.rerun()
             
-        # --- SECTION 4: VISUALS ---
         with st.expander("4. VISUALS"):
-            # Logo
             st.markdown("##### LOGO")
             l_key = f"logo_up_{st.session_state['logo_uploader_key']}"
             st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"], key=l_key)
             st.button("ADD LOGO", on_click=add_logo_callback)
-            
             if st.session_state['wiz_logo_list']:
                 st.divider()
                 st.markdown(f"**LOGO BUFFER: {len(st.session_state['wiz_logo_list'])} FILES**")
@@ -707,80 +669,46 @@ elif app_mode == "BRAND ARCHITECT":
                         if st.button("REMOVE", key=f"del_logo_{i}", type="secondary"):
                             st.session_state['wiz_logo_list'].pop(i)
                             st.rerun()
-            
             st.divider()
-            
-            # Color Palette Builder
             st.markdown("##### COLOR PALETTE")
-            
             st.markdown("**PRIMARY (2)**")
             pc1, pc2 = st.columns(2)
             with pc1: p1 = st.color_picker("Primary 1", "#24363b")
             with pc2: p2 = st.color_picker("Primary 2", "#ab8f59")
-            
             st.markdown("**SECONDARY (4)**")
             sc1, sc2, sc3, sc4 = st.columns(4)
             with sc1: s1 = st.color_picker("Sec 1", "#f5f5f0")
             with sc2: s2 = st.color_picker("Sec 2", "#5c6b61")
             with sc3: s3 = st.color_picker("Sec 3", "#3d3d3d")
             with sc4: s4 = st.color_picker("Sec 4", "#1b2a2e")
-            
             st.markdown("**ACCENT (2)**")
             ac1, ac2 = st.columns(2)
             with ac1: a1 = st.color_picker("Accent 1", "#ffffff")
             with ac2: a2 = st.color_picker("Accent 2", "#000000")
             
-        # GENERATE BUTTON
         if st.button("GENERATE SYSTEM", type="primary"):
             if not wiz_name or not wiz_archetype: st.error("NAME/ARCHETYPE REQUIRED")
             else:
                 with st.spinner("CALIBRATING..."):
-                    
-                    # 1. PROCESS LOGOS
-                    logo_desc_list = []
-                    for item in st.session_state['wiz_logo_list']:
-                        # Logic class handles the analysis
-                        desc = logic.describe_logo(Image.open(item['file']))
-                        logo_desc_list.append(f"Logo Variant ({item['file'].name}): {desc}")
+                    logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
                     logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
                     
-                    # 2. PROCESS SOCIAL
-                    social_desc_list = []
-                    for item in st.session_state['wiz_social_list']:
-                        # Logic class handles analysis
-                        raw_analysis = logic.analyze_social_post(Image.open(item['file']))
-                        social_desc_list.append(f"Platform: {item['platform']}. Analysis: {raw_analysis}. (INSTRUCTION: Ignore comments/UI. Focus on image style, caption voice, and hashtags).")
+                    social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
                     social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
                     
-                    # 3. COMBINE SAMPLES
                     all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
-                    
-                    # 4. PALETTE
                     palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
                     
-                    # 5. FINAL PROMPT
                     prompt = f"""
-                    Profile for {wiz_name}. 
-                    Archetype: {wiz_archetype}. 
-                    Mission: {wiz_mission}. 
-                    Values: {wiz_values}.
-                    Tone Keywords: {wiz_tone}.
-                    
-                    TRAINING SAMPLES:
-                    {all_samples}
-                    
-                    Social Analysis: {social_summary}. 
-                    Logo Analysis: {logo_summary}.
-                    Defined Palette: {palette_str}
+                    Profile for {wiz_name}. Archetype: {wiz_archetype}. 
+                    Mission: {wiz_mission}. Values: {wiz_values}. Tone Keywords: {wiz_tone}.
+                    TRAINING SAMPLES: {all_samples}
+                    Social Analysis: {social_summary}. Logo Analysis: {logo_summary}. Defined Palette: {palette_str}
                     """
-                    
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
-                    
-                    # CLEAR BUFFERS
                     st.session_state['wiz_samples_list'] = []
                     st.session_state['wiz_social_list'] = []
                     st.session_state['wiz_logo_list'] = []
-                    
                     st.success("CALIBRATED")
                     st.rerun()
     with tab2:
@@ -789,15 +717,58 @@ elif app_mode == "BRAND ARCHITECT":
             st.session_state['profiles'][f"{pdf.name} (PDF)"] = logic.generate_brand_rules(f"Extract: {logic.extract_text_from_pdf(pdf)[:20000]}")
             st.success("EXTRACTED")
 
-# 6. BRAND MANAGER
+# 6. BRAND MANAGER (FIXED: SPLIT TABS)
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
-        new_rules = st.text_area("EDIT", st.session_state['profiles'][target], height=400)
+        current_data = st.session_state['profiles'][target]
+        
+        # Simple extraction logic to split the massive string into editable sections
+        # We look for the standard headers we generated in 'logic.py' or 'wizard'
+        def extract_section(full_text, start_marker, end_marker=None):
+            try:
+                start = full_text.find(start_marker)
+                if start == -1: return ""
+                if end_marker:
+                    end = full_text.find(end_marker)
+                    if end == -1: return full_text[start:]
+                    return full_text[start:end]
+                else:
+                    return full_text[start:]
+            except:
+                return ""
+
+        # Attempt to split
+        val_strat = extract_section(current_data, "1. STRATEGY", "2. VOICE")
+        val_voice = extract_section(current_data, "2. VOICE", "3. VISUALS")
+        val_vis = extract_section(current_data, "3. VISUALS", "4. DATA")
+        
+        # Tabs for editing
+        edit_tab1, edit_tab2, edit_tab3, edit_tab4 = st.tabs(["STRATEGY", "VOICE", "VISUALS", "RAW DATA"])
+        
+        with edit_tab1:
+            new_strat = st.text_area("EDIT STRATEGY", val_strat, height=300)
+        with edit_tab2:
+            new_voice = st.text_area("EDIT VOICE", val_voice, height=300)
+        with edit_tab3:
+            new_vis = st.text_area("EDIT VISUALS", val_vis, height=300)
+        with edit_tab4:
+            new_raw = st.text_area("RAW FULL TEXT", current_data, height=300)
+
         c1, c2, c3 = st.columns(3)
-        if c1.button("SAVE"): st.session_state['profiles'][target] = new_rules; st.success("SAVED")
-        if c3.button("DELETE"): del st.session_state['profiles'][target]; st.rerun()
+        if c1.button("SAVE CHANGES"):
+            # If Raw was edited, prioritize that. Otherwise, stitch tabs.
+            if new_raw != current_data:
+                st.session_state['profiles'][target] = new_raw
+            else:
+                # Reconstruct
+                st.session_state['profiles'][target] = f"{new_strat}\n{new_voice}\n{new_vis}"
+            st.success("SAVED")
+            
+        if c3.button("DELETE PROFILE"): 
+            del st.session_state['profiles'][target]
+            st.rerun()
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
