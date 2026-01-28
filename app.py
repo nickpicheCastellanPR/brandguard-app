@@ -6,7 +6,7 @@ from logic import SignetLogic
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Signet", 
-    page_icon="Signet_Icon_Color.png", 
+    page_icon="👑", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -14,7 +14,7 @@ st.set_page_config(
 # Initialize Logic
 logic = SignetLogic()
 
-# --- THE CASTELLAN IDENTITY SYSTEM ---
+# --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
 st.markdown("""
 <style>
     /* 1. PALETTE DEFINITION */
@@ -33,61 +33,40 @@ st.markdown("""
         color: var(--c-cream);
     }
     
-    /* THE SIDEBAR - CREAM AS REQUESTED */
+    /* THE SIDEBAR - CREAM */
     section[data-testid="stSidebar"] {
         background-color: var(--c-cream) !important;
         border-right: 1px solid var(--c-gold-muted);
     }
     
-    /* Sidebar Text overrides - Needs to be dark to show up on cream */
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3, 
-    section[data-testid="stSidebar"] span, 
-    section[data-testid="stSidebar"] div,
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] p {
+    /* Sidebar Text Overrides (Dark on Cream) */
+    section[data-testid="stSidebar"] * {
         color: var(--c-teal-deep) !important;
     }
     
-    /* 3. NAVIGATION (FIXING THE RADAR BUTTONS) */
-    /* Hide the radio circles */
-    div[role="radiogroup"] label > div:first-child {
-        display: none !important;
-    }
-    
-    /* Style the labels to look like a clean menu list */
+    /* 3. NAVIGATION MENU (Clean List) */
+    div[role="radiogroup"] label > div:first-child { display: none !important; }
     div[role="radiogroup"] label {
         padding: 12px 20px !important;
         border-radius: 4px !important;
         margin-bottom: 8px !important;
         border: 1px solid transparent !important;
-        background-color: transparent !important;
         transition: all 0.2s ease;
-        color: var(--c-teal-deep) !important;
         font-weight: 600 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
-        cursor: pointer !important;
     }
-    
-    /* Hover State */
     div[role="radiogroup"] label:hover {
-        background-color: rgba(171, 143, 89, 0.1) !important; /* Gold Tint */
+        background-color: rgba(171, 143, 89, 0.1) !important;
         border-left: 4px solid var(--c-gold-muted) !important;
-        padding-left: 16px !important; /* Shift text slightly */
+        padding-left: 16px !important;
     }
-    
-    /* Active/Selected State (Inferred by background color change in Streamlit) */
     div[role="radiogroup"] label[data-checked="true"] {
         background-color: var(--c-teal-deep) !important;
-        color: var(--c-cream) !important; /* Invert text for active */
+        color: var(--c-cream) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    /* Force text color on selected item inside sidebar */
-    div[role="radiogroup"] label[data-checked="true"] * {
-        color: var(--c-cream) !important;
-    }
+    div[role="radiogroup"] label[data-checked="true"] * { color: var(--c-cream) !important; }
 
     /* 4. HEADERS */
     h1 {
@@ -100,26 +79,20 @@ st.markdown("""
         letter-spacing: 0.05em;
     }
     
-    h2, h3 {
-        color: var(--c-gold-muted) !important;
-        text-transform: uppercase;
-        font-weight: 700;
-    }
+    h2, h3 { color: var(--c-gold-muted) !important; text-transform: uppercase; font-weight: 700; }
 
-    /* 5. INPUTS (TEAL ON TEAL) */
+    /* 5. INPUTS (Teal on Teal) */
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
         background-color: var(--c-teal-dark) !important;
         border: 1px solid var(--c-sage) !important;
         color: var(--c-cream) !important;
-        border-radius: 2px !important;
     }
-    
     .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: var(--c-gold-muted) !important;
         box-shadow: 0 0 5px rgba(171, 143, 89, 0.5) !important;
     }
-    
-    /* 6. BUTTONS (MUTED GOLD) */
+
+    /* 6. BUTTONS */
     .stButton button {
         background-color: transparent !important;
         border: 1px solid var(--c-gold-muted) !important;
@@ -130,29 +103,40 @@ st.markdown("""
         letter-spacing: 0.1em;
         transition: all 0.2s;
     }
-    
     .stButton button:hover {
         background-color: var(--c-gold-muted) !important;
         color: var(--c-teal-deep) !important;
         box-shadow: 0 0 15px rgba(171, 143, 89, 0.3);
     }
-    
-    /* Primary (Filled) */
     button[kind="primary"] {
         background: var(--c-gold-muted) !important;
         color: var(--c-teal-deep) !important;
         border: none !important;
     }
 
-    /* 7. DASHBOARD CARDS (THE HUD) */
+    /* 7. DASHBOARD CARDS & HERO */
     .dashboard-card {
         background-color: rgba(0,0,0,0.2);
         border: 1px solid var(--c-sage);
         border-left: 4px solid var(--c-gold-muted);
         padding: 25px;
         border-radius: 4px;
+        margin-bottom: 20px;
     }
-    
+    .hero-card {
+        background: linear-gradient(135deg, var(--c-teal-dark) 0%, #111 100%);
+        border: 1px solid var(--c-gold-muted);
+        padding: 30px;
+        text-align: center;
+        border-radius: 8px;
+        margin: 10px;
+        transition: transform 0.2s;
+    }
+    .hero-card:hover { transform: translateY(-5px); border-color: var(--c-sage); }
+    .hero-icon { font-size: 3rem; margin-bottom: 10px; }
+    .hero-title { font-weight: 800; color: var(--c-gold-muted); font-size: 1.2rem; text-transform: uppercase; }
+    .hero-desc { color: #a0a0a0; font-size: 0.9rem; margin-bottom: 15px; }
+
     .status-row {
         background: rgba(0,0,0,0.3);
         padding: 15px;
@@ -174,24 +158,15 @@ st.markdown("""
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
     
-    /* LOGO FIX */
-    .logo-text {
-        font-size: 2.5rem;
+    /* PURE CSS LOGO */
+    .signet-logo {
+        font-family: 'Times New Roman', serif;
         font-weight: 900;
-        color: var(--c-teal-deep);
+        font-size: 4rem;
+        color: var(--c-gold-muted);
         text-align: center;
-        letter-spacing: 0.1em;
-        margin-bottom: 20px;
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-    .logo-sub {
-        color: var(--c-sage);
-        text-align: center;
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.2em;
-        margin-top: -10px;
-        margin-bottom: 20px;
+        letter-spacing: -0.05em;
+        text-shadow: 2px 2px 0px #1a2629;
     }
     
 </style>
@@ -203,13 +178,14 @@ if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
 if 'wiz_temp_sample' not in st.session_state: st.session_state['wiz_temp_sample'] = ""
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
 
+# Default Profiles (Empty to test Onboarding)
 if 'profiles' not in st.session_state:
     st.session_state['profiles'] = {
-        "Apple (Creator)": """
-        1. STRATEGY: Mission: Best user experience... Archetype: The Creator.
-        2. VOICE: Innovative, Minimalist. Style Signature: Short sentences. High impact.
-        3. VISUALS: Black, White, Grey. Sans-Serif fonts.
-        4. DATA DEPTH: High (Social Samples, Press Samples included).
+        "Castellan PR (Demo)": """
+        1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
+        2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
+        3. VISUALS: Deep Teal, Muted Gold, Cream.
+        4. DATA DEPTH: High.
         """
     }
 
@@ -255,14 +231,16 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # LOGO on Light Background or Dark? Login is usually main bg (Teal)
-        if os.path.exists("Signet_Logo_Color.png"):
-            st.image("Signet_Logo_Color.png", width=160) 
-        else:
-            st.markdown("<div style='text-align: center; font-size: 3rem; color: #ab8f59; font-weight: 800; letter-spacing: 0.1em;'>SIGNET</div>", unsafe_allow_html=True)
+        # PURE CSS LOGO (No Image Dependency)
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 5rem; color: #ab8f59; line-height: 1;">♔</div>
+            <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 800; font-size: 3rem; color: #f5f5f0; letter-spacing: 0.2em;">SIGNET</div>
+            <div style="font-size: 0.8rem; color: #5c6b61; letter-spacing: 0.4em; margin-top: 10px;">BRAND GOVERNANCE SYSTEM</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.markdown("<p style='text-align: center; color: #f5f5f0; font-size: 0.8rem; letter-spacing: 0.2em; opacity: 0.7;'>INTELLIGENT BRAND GOVERNANCE</p>", unsafe_allow_html=True)
-        st.markdown("<hr style='border-color: #5c6b61;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #5c6b61; opacity: 0.3;'>", unsafe_allow_html=True)
         
         password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -276,27 +254,30 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # Sidebar is now CREAM. Logo needs to be DARK.
-    if os.path.exists("Signet_Logo_Color.png"):
-        st.image("Signet_Logo_Color.png", use_container_width=True)
-    else:
-        st.markdown('<div class="logo-text">SIGNET</div>', unsafe_allow_html=True)
-        st.markdown('<div class="logo-sub">CASTELLAN PR</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 30px; margin-top: 20px;">
+        <div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em;">SIGNET</div>
+        <div style="font-size: 0.7rem; color: #ab8f59; letter-spacing: 0.2em; font-weight: 700;">CASTELLAN PR</div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    if st.session_state['profiles']:
-        active_profile = st.selectbox("ACTIVE PROFILE", list(st.session_state['profiles'].keys()))
+    # Profile Selector
+    profile_names = list(st.session_state['profiles'].keys())
+    
+    if profile_names:
+        active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
         current_rules = st.session_state['profiles'][active_profile]
         cal_score, missing_items = calculate_calibration_score(current_rules)
     else:
         active_profile = None
         cal_score = 0
         current_rules = ""
+        missing_items = []
     
     st.markdown("<br>", unsafe_allow_html=True)
     st.caption("ENGINE CONFIDENCE")
     st.progress(cal_score / 100)
     
-    # Text colors forced to dark teal by CSS
     if cal_score < 60: 
         st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
     elif cal_score < 90: 
@@ -305,7 +286,6 @@ with st.sidebar:
         st.markdown("<span style='color: #5c6b61; font-weight: 700;'>✅ OPTIMIZED</span>", unsafe_allow_html=True)
 
     st.divider()
-    # The "Radar" buttons are now styled as a menu list
     app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"], label_visibility="collapsed")
     
     st.divider()
@@ -315,13 +295,47 @@ with st.sidebar:
 
 # --- MODULES ---
 
-# 1. DASHBOARD
+# 1. DASHBOARD (The Command Center)
 if app_mode == "DASHBOARD":
-    st.title("SYSTEM STATUS")
     
+    # HERO SECTION (Empty State Handling)
     if not active_profile:
-        st.warning("NO PROFILES LOADED.")
+        st.title("WELCOME TO SIGNET")
+        st.markdown("""<p style='font-size: 1.2rem; color: #a0a0a0;'>Initialize a brand profile to begin governance.</p>""", unsafe_allow_html=True)
+        
+        # 3-Column Quick Start
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown("""
+            <div class="hero-card">
+                <div class="hero-icon">🏗️</div>
+                <div class="hero-title">Create Profile</div>
+                <div class="hero-desc">Build a new brand identity from scratch.</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with c2:
+            st.markdown("""
+            <div class="hero-card">
+                <div class="hero-icon">📄</div>
+                <div class="hero-title">Upload Guide</div>
+                <div class="hero-desc">Extract rules from an existing PDF.</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with c3:
+            st.markdown("""
+            <div class="hero-card">
+                <div class="hero-icon">⚙️</div>
+                <div class="hero-title">Load Demo</div>
+                <div class="hero-desc">Load the Castellan sample data.</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        st.info("Navigate to **BRAND ARCHITECT** in the sidebar to begin.")
+
     else:
+        # ACTIVE STATE HUD
+        st.title("SYSTEM STATUS")
+        
         # HUD Card
         st.markdown(f"""
         <div class="dashboard-card">
@@ -354,8 +368,12 @@ if app_mode == "DASHBOARD":
             if missing_items:
                 for item in missing_items: 
                     st.markdown(f"""
-                    <div style="background: rgba(171, 143, 89, 0.1); border: 1px solid #ab8f59; color: #ab8f59; padding: 12px; border-radius: 4px; margin-bottom: 8px;">
-                        ⚠️ MISSING: {item}
+                    <div style="background: rgba(171, 143, 89, 0.1); border: 1px solid #ab8f59; color: #ab8f59; padding: 12px; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center;">
+                        <span style="font-size: 1.2rem; margin-right: 10px;">⚠️</span>
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.9rem;">MISSING: {item}</div>
+                            <div style="font-size: 0.75rem; opacity: 0.8;">Go to Brand Architect to upload.</div>
+                        </div>
                     </div>""", unsafe_allow_html=True)
             else: 
                 st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border: 1px solid #5c6b61; color: #f5f5f0; padding: 12px; border-radius: 4px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
