@@ -460,18 +460,32 @@ with st.sidebar:
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
         current_rules = st.session_state['profiles'][active_profile]
         
-        # Use the NEW dictionary-based return for the sidebar as well
+        # Calculate Metrics
         metrics = calculate_calibration_score(current_rules)
-        cal_score = metrics['score']
         
+        # --- REPLACEMENT: CASTELLAN SIDEBAR METER ---
         st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("ENGINE CONFIDENCE")
-        st.progress(cal_score / 100)
         
-        # Using the same status logic
-        if cal_score < 50: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>⚠️ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
-        elif cal_score < 80: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>⚠️ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
-        else: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>✅ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
+        # We use a slightly more compact CSS for the sidebar width
+        st.markdown(f"""
+            <style>
+                .sb-container {{ margin-bottom: 10px; }}
+                .sb-label {{ font-size: 0.7rem; font-weight: 700; color: #5c6b61; letter-spacing: 1px; margin-bottom: 4px; display: block; }}
+                .sb-track {{ width: 100%; height: 6px; background: #dcdcd9; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }}
+                .sb-fill {{ height: 100%; width: {metrics['score']}%; background: {metrics['color']}; border-radius: 999px; transition: width 0.8s ease; }}
+                .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {metrics['color']}; }}
+            </style>
+            <div class="sb-container">
+                <span class="sb-label">ENGINE CONFIDENCE</span>
+                <div class="sb-track">
+                    <div class="sb-fill"></div>
+                </div>
+                <div class="sb-status">
+                     {metrics['status_label'].upper()} ({metrics['score']}%)
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        # ---------------------------------------------
     else:
         active_profile = None
         cal_score = 0
@@ -944,3 +958,4 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
