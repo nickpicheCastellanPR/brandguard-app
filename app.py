@@ -53,8 +53,9 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* 2. THE 'GLOW' BUTTONS (High Specificity) */
-    div.stButton > button {
+    /* 2. THE 'GLOW' BUTTONS (ROBUST SELECTOR) */
+    /* Changed from 'div.stButton > button' to '.stButton button' to handle nesting */
+    .stButton button {
         background-color: transparent !important;
         color: var(--gold) !important;
         border: 1px solid var(--gold) !important;
@@ -68,7 +69,7 @@ st.markdown("""
     }
     
     /* HOVER STATE: The Glow Effect */
-    div.stButton > button:hover {
+    .stButton button:hover {
         background-color: rgba(212, 175, 55, 0.15) !important;
         color: var(--cream) !important;
         border-color: var(--cream) !important;
@@ -76,18 +77,19 @@ st.markdown("""
         transform: translateY(-2px);
     }
     
-    div.stButton > button:active {
+    .stButton button:active {
         transform: translateY(1px);
     }
     
     /* PRIMARY ACTION BUTTONS (Filled Gold) */
-    div.stButton > button[kind="primary"] {
+    /* Targeting specific kind used by Streamlit primary buttons */
+    button[kind="primary"] {
         background-color: var(--gold) !important;
         color: #0E1117 !important;
         border: 1px solid var(--gold) !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
     }
-    div.stButton > button[kind="primary"]:hover {
+    button[kind="primary"]:hover {
         background-color: var(--cream) !important;
         border-color: var(--cream) !important;
         color: #000 !important;
@@ -95,17 +97,22 @@ st.markdown("""
     }
 
     /* 3. INPUT FIELD CONTRAST FIX */
-    /* Forces lighter background on inputs so they don't disappear into the dark mode */
-    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #1c212c !important; 
-        color: #FFFFFF !important;
+    /* Target via data-baseweb to find the actual input container */
+    div[data-baseweb="input"] {
+        background-color: #1c212c !important;
         border: 1px solid #444 !important;
-        border-radius: 2px !important;
+        border-radius: 2px !important; 
     }
     
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: var(--gold) !important;
-        box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
+    div[data-baseweb="input"] > div {
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #1c212c !important;
+        border: 1px solid #444 !important;
+        color: #FFFFFF !important;
     }
     
     /* 4. METRIC CARDS (HUD STYLE) */
