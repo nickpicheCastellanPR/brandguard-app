@@ -4,7 +4,7 @@ import os
 import re
 import json
 from logic import SignetLogic
-import database as db # IMPORT THE NEW DB HANDLER
+import database as db
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -27,7 +27,6 @@ if 'db_init' not in st.session_state:
     st.session_state['db_init'] = True
 
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
-# (KEEP YOUR EXISTING CSS BLOCK HERE - IT IS PERFECT)
 st.markdown("""
 <style>
     /* 1. PALETTE DEFINITION */
@@ -219,7 +218,7 @@ if 'username' not in st.session_state: st.session_state['username'] = None
 def init_wizard_state():
     if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
     if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] 
-    if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     
+    if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []      
     if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False 
     if 'palette_primary' not in st.session_state: st.session_state['palette_primary'] = ["#24363b"]
     if 'palette_secondary' not in st.session_state: st.session_state['palette_secondary'] = ["#f5f5f0", "#5c6b61"]
@@ -243,25 +242,6 @@ ARCHETYPES = [
 # --- HELPER FUNCTIONS ---
 def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
-
-def calculate_calibration_score(profile_data):
-    if isinstance(profile_data, dict):
-        text_data = profile_data.get('final_text', '')
-    else:
-        text_data = profile_data
-    score = 0
-    missing = []
-    if "STRATEGY" in text_data: score += 10
-    if "VOICE" in text_data: score += 10
-    if "VISUALS" in text_data: score += 10
-    if "LOGO RULES" in text_data: score += 10
-    if "TYPOGRAPHY" in text_data: score += 10
-    if "Style Signature" in text_data: score += 25
-    else: missing.append("Voice Samples")
-    if "SOCIAL MEDIA" in text_data: score += 25
-    else: missing.append("Social Screenshots")
-    return score, missing
-import re
 
 def calculate_calibration_score(profile_data):
     # 1. Normalize Input
@@ -340,6 +320,7 @@ def calculate_calibration_score(profile_data):
         "color": color,
         "message": msg
     }
+
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -478,19 +459,23 @@ with st.sidebar:
     if profile_names:
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
         current_rules = st.session_state['profiles'][active_profile]
-        cal_score, missing_items = calculate_calibration_score(current_rules)
+        
+        # Use the NEW dictionary-based return for the sidebar as well
+        metrics = calculate_calibration_score(current_rules)
+        cal_score = metrics['score']
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption("ENGINE CONFIDENCE")
         st.progress(cal_score / 100)
-        if cal_score < 60: st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
-        elif cal_score < 90: st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
-        else: st.markdown("<span style='color: #5c6b61; font-weight: 700;'>✅ OPTIMIZED</span>", unsafe_allow_html=True)
+        
+        # Using the same status logic
+        if cal_score < 50: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>⚠️ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
+        elif cal_score < 80: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>⚠️ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
+        else: st.markdown(f"<span style='color: {metrics['color']}; font-weight: 700;'>✅ {metrics['status_label'].upper()}</span>", unsafe_allow_html=True)
     else:
         active_profile = None
         cal_score = 0
         current_rules = ""
-        missing_items = []
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
@@ -568,10 +553,66 @@ if app_mode == "DASHBOARD":
                  db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
                  st.rerun()
         
+        # --- EXISTING BRAND SIGNALS (TIERED METER) ---
+        st.divider()
+        st.markdown("### EXISTING BRAND SIGNALS")
+        
+        profiles = db.get_profiles(st.session_state['user_id'])
+        
+        if not profiles:
+            st.info("No active signals found. Initialize a profile above.")
+        else:
+            profile_names = list(profiles.keys())
+            for i in range(0, len(profile_names), 3):
+                cols = st.columns(3)
+                for j in range(3):
+                    if i + j < len(profile_names):
+                        p_name = profile_names[i+j]
+                        p_data = profiles[p_name]
+                        
+                        with cols[j]:
+                            with st.container():
+                                st.markdown(f"<div class='dashboard-card'>", unsafe_allow_html=True)
+                                st.markdown(f"#### {p_name}")
+                                
+                                metrics = calculate_calibration_score(p_data)
+                                
+                                st.markdown(f"""
+                                    <style>
+                                        .metric-container {{ font-family: 'Source Sans Pro', sans-serif; margin-bottom: 15px; }}
+                                        .metric-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }}
+                                        .metric-label {{ font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #5c6b61; }}
+                                        .metric-value {{ font-size: 0.85rem; font-weight: 800; color: {metrics['color']}; }}
+                                        .progress-track {{ width: 100%; height: 5px; background-color: #dcdcd9; border-radius: 999px; overflow: hidden; }}
+                                        .progress-fill {{ height: 100%; width: {metrics['score']}%; background-color: {metrics['color']}; border-radius: 999px; transition: width 0.8s ease; }}
+                                        .metric-hint {{ font-size: 0.75rem; color: #5c6b61; margin-top: 6px; font-style: italic; opacity: 0.9; min-height: 2.4em; }}
+                                    </style>
+                                    <div class="metric-container">
+                                        <div class="metric-header">
+                                            <span class="metric-label">{metrics['status_label']}</span>
+                                            <span class="metric-value">{metrics['score']}%</span>
+                                        </div>
+                                        <div class="progress-track">
+                                            <div class="progress-fill"></div>
+                                        </div>
+                                        <div class="metric-hint">{metrics['message']}</div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                
+                                if st.button("ACTIVATE SIGNAL", key=f"open_{p_name}", use_container_width=True):
+                                    st.session_state['active_profile'] = p_name
+                                    st.session_state['app_mode'] = "BRAND ARCHITECT"
+                                    st.rerun()
+                                st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
     else:
         st.title("SYSTEM STATUS")
-        st.markdown(f"""<div class="dashboard-card"><div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div><div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div><div style="color: #ab8f59; margin-top: 5px; font-weight: 700;">CALIBRATION SCORE: {cal_score}/100</div></div>""", unsafe_allow_html=True)
+        
+        # Calculate metrics for the active profile display too
+        metrics = calculate_calibration_score(current_rules)
+        
+        st.markdown(f"""<div class="dashboard-card"><div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div><div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div><div style="color: {metrics['color']}; margin-top: 5px; font-weight: 700;">STATUS: {metrics['status_label'].upper()} ({metrics['score']}%)</div></div>""", unsafe_allow_html=True)
 
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
@@ -903,6 +944,3 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
-
-
-
