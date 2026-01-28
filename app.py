@@ -265,8 +265,9 @@ def calculate_calibration_score(profile_data):
 # --- PERSISTENCE FUNCTIONS (DRAFT + PROFILE) ---
 DRAFT_FILE = "signet_draft.json"
 
-def save_wizard_draft():
-    """Saves current wizard state variables to a local JSON."""
+# MISSING FUNCTION ADDED HERE:
+def get_current_state_json():
+    """Generates a JSON string of the current wizard state."""
     data = {
         "wiz_name": st.session_state.get("wiz_name", ""),
         "wiz_archetype": st.session_state.get("wiz_archetype", ""),
@@ -279,15 +280,13 @@ def save_wizard_draft():
         "palette_secondary": st.session_state.get("palette_secondary", []),
         "palette_accent": st.session_state.get("palette_accent", [])
     }
-    with open(DRAFT_FILE, "w") as f:
-        json.dump(data, f)
-    st.toast("Draft Saved Locally", icon="💾")
+    return json.dumps(data, indent=2)
 
-def load_wizard_draft():
-    """Loads wizard state variables from local JSON."""
-    if os.path.exists(DRAFT_FILE):
-        with open(DRAFT_FILE, "r") as f:
-            data = json.load(f)
+def load_wizard_draft(uploaded_file):
+    """Parses uploaded JSON and updates session state."""
+    if uploaded_file is not None:
+        try:
+            data = json.load(uploaded_file)
             st.session_state["wiz_name"] = data.get("wiz_name", "")
             st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
             st.session_state["wiz_tone"] = data.get("wiz_tone", "")
@@ -298,10 +297,9 @@ def load_wizard_draft():
             st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
             st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
             st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
-        st.toast("Draft Loaded", icon="📂")
-        st.rerun()
-    else:
-        st.error("No draft file found.")
+            st.toast("Draft Loaded Successfully", icon="✅")
+        except Exception as e:
+            st.error(f"Failed to load draft: {e}")
 
 # --- NEW: COMPLETED PROFILE PERSISTENCE ---
 def load_completed_profile(uploaded_file):
@@ -608,8 +606,7 @@ elif app_mode == "BRAND ARCHITECT":
     with dc2:
         uploaded_draft = st.file_uploader("LOAD DRAFT", type=["json"], label_visibility="collapsed")
         if uploaded_draft is not None:
-            # We process immediately upon upload
-            load_wizard_draft()
+            load_wizard_draft(uploaded_draft)
             st.rerun()
     
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
@@ -791,7 +788,6 @@ elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     
     # --- IMPORT/EXPORT COMPLETED PROFILES ---
-    # Top Bar: Add ability to Load Profile from JSON
     with st.expander("📂 IMPORT / EXPORT PROFILE", expanded=False):
         c_imp, c_exp = st.columns([1, 1])
         with c_imp:
