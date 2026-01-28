@@ -14,7 +14,7 @@ st.set_page_config(
 # Initialize Logic
 logic = SignetLogic()
 
-# --- THE "CASTELLAN PREMIUM" CSS ---
+# --- THE CASTELLAN DESIGN SYSTEM (CSS) ---
 st.markdown("""
 <style>
     /* VARIABLES */
@@ -25,17 +25,19 @@ st.markdown("""
         --gold-dim: #8a7020;
         --cream: #F0EAD6;
         --text-main: #E0E0E0;
-        --success: #2ea043;
-        --error: #da3633;
+        --success-bg: rgba(46, 160, 67, 0.2);
+        --success-border: #2ea043;
+        --error-bg: rgba(218, 54, 51, 0.2);
+        --error-border: #f85149;
     }
 
-    /* 1. GLOBAL TEXT & BACKGROUND */
+    /* 1. GLOBAL RESET */
     .stApp {
         background-color: var(--bg-dark);
         color: var(--text-main);
     }
     
-    h1, h2, h3, h4, .stMarkdown {
+    h1, h2, h3, h4, .stMarkdown, p {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
         letter-spacing: 0.03em;
     }
@@ -44,115 +46,129 @@ st.markdown("""
         font-weight: 800 !important; 
         text-transform: uppercase; 
         color: var(--cream) !important; 
-        text-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+        font-size: 3rem !important;
+        margin-bottom: 0.5rem !important;
     }
     
     h2, h3 { 
         color: var(--gold) !important; 
         text-transform: uppercase;
+        font-weight: 600 !important;
     }
-
-    /* 2. THE GLOW-UP BUTTONS */
+    
+    /* 2. THE 'GLOW UP' BUTTONS */
+    /* Target the button element directly */
     div.stButton > button {
         background-color: transparent !important;
         color: var(--gold) !important;
         border: 1px solid var(--gold) !important;
-        border-radius: 4px !important;
-        font-weight: 600 !important;
+        border-radius: 2px !important; /* Sharp but slight soften */
+        font-weight: 700 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.1em !important;
-        padding: 0.6rem 1rem !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 0 5px rgba(0,0,0,0);
+        letter-spacing: 0.12em !important;
+        padding: 0.75rem 1rem !important;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        box-shadow: 0 0 0 transparent;
     }
     
-    /* HOVER STATE: THE GLOW */
+    /* Hover State */
     div.stButton > button:hover {
-        background-color: rgba(212, 175, 55, 0.1) !important;
+        background-color: rgba(212, 175, 55, 0.15) !important;
         color: var(--cream) !important;
         border-color: var(--cream) !important;
-        box-shadow: 0 0 15px var(--gold), inset 0 0 5px var(--gold) !important;
-        transform: translateY(-1px);
+        box-shadow: 0 0 15px rgba(212, 175, 55, 0.5), inset 0 0 5px rgba(212, 175, 55, 0.2) !important;
+        transform: translateY(-2px);
     }
     
     div.stButton > button:active {
         transform: translateY(1px);
     }
     
-    /* PRIMARY BUTTONS (FILLED) */
+    /* Primary Action Buttons (Filled Gold) */
     div.stButton > button[kind="primary"] {
         background-color: var(--gold) !important;
-        color: #000 !important;
-        box-shadow: 0 0 10px var(--gold-dim) !important;
+        color: #0E1117 !important;
+        border: 1px solid var(--gold) !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
     }
     div.stButton > button[kind="primary"]:hover {
         background-color: var(--cream) !important;
+        border-color: var(--cream) !important;
         color: #000 !important;
         box-shadow: 0 0 20px var(--gold) !important;
     }
 
-    /* 3. INPUT FIELDS (Dark on Dark Fix) */
-    .stTextInput > div > div > input, 
-    .stTextArea > div > div > textarea, 
-    .stSelectbox > div > div > div {
-        background-color: var(--bg-panel) !important;
-        color: #FFF !important;
-        border: 1px solid #333 !important;
-        border-radius: 4px !important;
+    /* 3. INPUT FIELD CONTRAST FIX */
+    /* Forces lighter background on inputs so they don't disappear */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #1c212c !important; 
+        color: #FFFFFF !important;
+        border: 1px solid #444 !important;
+        border-radius: 2px !important;
     }
-    .stTextInput > div > div > input:focus, 
-    .stTextArea > div > div > textarea:focus {
+    
+    /* Focus State for Inputs */
+    .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: var(--gold) !important;
-        box-shadow: 0 0 5px var(--gold-dim) !important;
+        box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
     }
-
-    /* 4. DASHBOARD CARDS (HUD STYLE) */
+    
+    /* 4. DASHBOARD HUD ELEMENTS (Custom HTML) */
     .metric-card {
-        background: linear-gradient(180deg, var(--bg-panel) 0%, #0d1117 100%);
+        background: linear-gradient(180deg, #1c212c 0%, #13171f 100%);
         padding: 24px;
         border: 1px solid #30363d;
-        border-left: 4px solid var(--gold);
-        border-radius: 6px;
-        margin-bottom: 16px;
-    }
-    .metric-card h4 { color: #8b949e !important; font-size: 0.75rem !important; margin: 0; letter-spacing: 0.1em;}
-    .metric-card h1 { color: var(--cream) !important; font-size: 2.5rem !important; margin: 8px 0; }
-    
-    /* 5. CUSTOM STATUS BARS (Replacing st.success/st.error) */
-    .status-bar {
-        padding: 12px 16px;
+        border-left: 5px solid var(--gold);
         border-radius: 4px;
-        margin-bottom: 8px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        letter-spacing: 0.05em;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .metric-card h4 { color: #8b949e !important; font-size: 0.85rem !important; margin: 0; letter-spacing: 0.15em; font-weight: 600;}
+    .metric-card h1 { color: var(--cream) !important; font-size: 2.8rem !important; margin: 10px 0; letter-spacing: 0.05em; }
+    .metric-card p { color: #8b949e !important; font-size: 0.9rem; margin: 0; }
+    
+    /* Custom Status Bars */
+    .status-row {
         display: flex;
         align-items: center;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        border-radius: 4px;
         border: 1px solid transparent;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        font-size: 0.85rem;
+        text-transform: uppercase;
     }
     .status-online {
-        background-color: rgba(46, 160, 67, 0.15);
-        border-color: rgba(46, 160, 67, 0.4);
-        color: #3fb950;
+        background-color: var(--success-bg);
+        border-color: var(--success-border);
+        color: #4cd964;
     }
     .status-offline {
-        background-color: rgba(218, 54, 51, 0.15);
-        border-color: rgba(218, 54, 51, 0.4);
-        color: #f85149;
+        background-color: var(--error-bg);
+        border-color: var(--error-border);
+        color: #ff5f56;
     }
     .status-warning {
-        background-color: rgba(210, 153, 34, 0.15);
-        border-color: rgba(210, 153, 34, 0.4);
-        color: #e3b341;
+        background-color: rgba(212, 175, 55, 0.15);
+        border-color: var(--gold);
+        color: var(--gold);
     }
-
-    /* 6. SIDEBAR */
+    
+    /* 5. SIDEBAR & LAYOUT */
     section[data-testid="stSidebar"] {
         background-color: var(--bg-panel);
         border-right: 1px solid #30363d;
     }
     
-    /* REMOVE BLOAT */
+    .stExpander {
+        border: 1px solid #30363d !important;
+        border-radius: 4px !important;
+        background-color: #1c212c !important;
+    }
+    
+    /* 6. CLEANUP */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
@@ -227,21 +243,26 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
+        # LOGO FIX: Centered and constrained width
         if os.path.exists("Signet_Logo_Color.png"):
-            st.image("Signet_Logo_Color.png", use_container_width=True) 
+            st.image("Signet_Logo_Color.png", width=160) 
         else:
             st.markdown("<h1 style='text-align: center; color: #D4AF37;'>SIGNET</h1>", unsafe_allow_html=True)
             
-        st.markdown("<p style='text-align: center; color: #888;'>RESTRICTED ACCESS // CASTELLAN PR</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.8rem; letter-spacing: 0.2em;'>RESTRICTED ACCESS // CASTELLAN PR</p>", unsafe_allow_html=True)
         st.markdown("---")
         
-        password = st.text_input("ACCESS CODE", type="password", placeholder="ENTER KEY")
-        if st.button("AUTHENTICATE"):
+        password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
+        
+        # Spacer
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("AUTHENTICATE SYSTEM"):
             if logic.check_password(password):
                 st.session_state['authenticated'] = True
                 st.rerun()
             else:
-                st.error("ACCESS DENIED")
+                st.error("⛔ ACCESS DENIED")
     st.stop()
 
 # --- SIDEBAR ---
@@ -261,19 +282,19 @@ with st.sidebar:
         current_rules = ""
     
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("ENGINE CONFIDENCE")
+    st.markdown("<p style='color: #888; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 5px;'>ENGINE CONFIDENCE</p>", unsafe_allow_html=True)
     st.progress(cal_score / 100)
     
     if cal_score < 60:
-        st.markdown("<span style='color: #e3b341; font-size: 0.8rem;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color: #e3b341; font-size: 0.75rem; font-weight: 600;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
     elif cal_score < 90:
-        st.markdown("<span style='color: #e3b341; font-size: 0.8rem;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color: #e3b341; font-size: 0.75rem; font-weight: 600;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
     else:
-        st.markdown("<span style='color: #3fb950; font-size: 0.8rem;'>✅ FULLY OPTIMIZED</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color: #4cd964; font-size: 0.75rem; font-weight: 600;'>✅ FULLY OPTIMIZED</span>", unsafe_allow_html=True)
 
     st.divider()
     
-    app_mode = st.radio("MODULES", [
+    app_mode = st.radio("MODULE SELECTION", [
         "DASHBOARD", 
         "VISUAL COMPLIANCE", 
         "COPY EDITOR", 
@@ -307,21 +328,21 @@ if app_mode == "DASHBOARD":
         with c1:
             st.markdown("### CAPABILITIES")
             
-            # CUSTOM HTML STATUS BARS (The Fix for the ugly green bars)
+            # CUSTOM STATUS BARS (Replaces standard st.success)
             if cal_score > 50: 
-                st.markdown('<div class="status-bar status-online">STRATEGY ENGINE: ONLINE</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-online">Strategy Engine: ONLINE</div>', unsafe_allow_html=True)
             else: 
-                st.markdown('<div class="status-bar status-offline">STRATEGY ENGINE: OFFLINE</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-offline">Strategy Engine: OFFLINE</div>', unsafe_allow_html=True)
             
             if cal_score > 70: 
-                st.markdown('<div class="status-bar status-online">VOICE ENGINE: ONLINE</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-online">Voice Engine: ONLINE</div>', unsafe_allow_html=True)
             else: 
-                st.markdown('<div class="status-bar status-warning">VOICE ENGINE: CALIBRATING...</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-warning">Voice Engine: CALIBRATING...</div>', unsafe_allow_html=True)
             
             if cal_score > 90: 
-                st.markdown('<div class="status-bar status-online">SOCIAL ENGINE: ONLINE</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-online">Social Engine: ONLINE</div>', unsafe_allow_html=True)
             else: 
-                st.markdown('<div class="status-bar status-offline">SOCIAL ENGINE: NO DATA</div>', unsafe_allow_html=True)
+                st.markdown('<div class="status-row status-offline">Social Engine: NO DATA</div>', unsafe_allow_html=True)
             
         with c2:
             st.markdown("### REQUIRED ACTIONS")
