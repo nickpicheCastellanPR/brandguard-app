@@ -262,10 +262,9 @@ def calculate_calibration_score(profile_data):
     else: missing.append("Social Screenshots")
     return score, missing
 
-# --- PERSISTENCE FUNCTIONS (DRAFT + PROFILE) ---
+# --- PERSISTENCE FUNCTIONS ---
 DRAFT_FILE = "signet_draft.json"
 
-# MISSING FUNCTION ADDED HERE:
 def get_current_state_json():
     """Generates a JSON string of the current wizard state."""
     data = {
@@ -301,12 +300,9 @@ def load_wizard_draft(uploaded_file):
         except Exception as e:
             st.error(f"Failed to load draft: {e}")
 
-# --- NEW: COMPLETED PROFILE PERSISTENCE ---
 def load_completed_profile(uploaded_file):
-    """Parses an uploaded completed profile JSON and adds it to the session."""
     try:
         data = json.load(uploaded_file)
-        # Validations
         if "inputs" in data and "final_text" in data:
             name = data['inputs'].get('wiz_name', 'Imported Profile')
             key_name = f"{name} (Imported)"
@@ -317,7 +313,7 @@ def load_completed_profile(uploaded_file):
     except Exception as e:
         st.error(f"Failed to load profile: {e}")
 
-# --- EXPORT TO HTML FUNCTION (Polished) ---
+# --- EXPORT TO HTML FUNCTION ---
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -393,7 +389,6 @@ def add_logo_callback():
         st.session_state['wiz_logo_list'].append({'file': s_file})
         st.session_state['logo_uploader_key'] += 1
 
-# Palette Management Callbacks
 def add_palette_color(key):
     st.session_state[key].append("#ffffff")
 
@@ -471,7 +466,7 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
-    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed", key="nav_selection")
+    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed", key="nav_selection")
     st.divider()
     st.markdown("<div style='text-align: center; color: #24363b; font-size: 0.6rem; letter-spacing: 0.1em; margin-bottom: 10px;'>POWERED BY CASTELLAN PR</div>", unsafe_allow_html=True)
     if st.button("SHUT DOWN"):
@@ -556,18 +551,39 @@ elif app_mode == "VISUAL COMPLIANCE":
                 result = logic.run_visual_audit(Image.open(uploaded_file), prof_text)
                 st.markdown(result)
 
-# 3. COPY EDITOR
+# 3. COPY EDITOR (IMPROVED)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     if not active_profile: st.warning("NO PROFILE SELECTED.")
     else:
         c1, c2 = st.columns([2, 1])
-        with c1: text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
+        with c1: 
+            text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
+            
+            # --- NEW CONTEXT INPUTS ---
+            cc1, cc2, cc3 = st.columns(3)
+            with cc1: content_type = st.selectbox("CONTENT TYPE", ["Internal Email", "Press Release", "Blog Post", "Executive Memo", "Website Copy"])
+            with cc2: sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
+            with cc3: audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Employees")
+            
         with c2: st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{active_profile}</h3></div>""", unsafe_allow_html=True)
+        
         if text_input and st.button("ANALYZE & REWRITE", type="primary"):
             with st.spinner("REWRITING..."):
                 prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                result = logic.run_copy_editor(text_input, prof_text)
+                
+                # We wrap the new context into a single string for the logic engine
+                context_wrapper = f"""
+                CONTEXT:
+                - Type: {content_type}
+                - Sender: {sender}
+                - Audience: {audience}
+                
+                DRAFT CONTENT:
+                {text_input}
+                """
+                
+                result = logic.run_copy_editor(context_wrapper, prof_text)
                 st.markdown(result)
 
 # 4. CONTENT GENERATOR
@@ -585,7 +601,47 @@ elif app_mode == "CONTENT GENERATOR":
             result = logic.run_content_generator(full_prompt_topic, format_type, key_points, prof_text)
             st.markdown(result)
 
-# 5. BRAND ARCHITECT
+# 5. SOCIAL MEDIA ASSISTANT (NEW MODULE)
+elif app_mode == "SOCIAL MEDIA ASSISTANT":
+    st.title("SOCIAL MEDIA ASSISTANT")
+    if not active_profile: st.warning("NO PROFILE SELECTED.")
+    else:
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            platform = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "TikTok", "Facebook"])
+            topic_social = st.text_area("TOPIC / CAPTION INTENT", height=100, placeholder="What is this post about?")
+        with c2:
+            social_img = st.file_uploader("UPLOAD VISUAL (Optional)", type=["jpg", "png"])
+            
+        if st.button("GENERATE POST", type="primary"):
+            with st.spinner("ANALYZING & DRAFTING..."):
+                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
+                
+                # 1. Analyze Image if present
+                img_context = ""
+                if social_img:
+                    # reusing the logic engine's vision capability
+                    desc = logic.analyze_social_post(Image.open(social_img))
+                    img_context = f"IMAGE CONTEXT: The post includes an image described as: {desc}"
+                
+                # 2. Construct Prompt for Social
+                social_prompt = f"""
+                TASK: Write a social media post for {platform}.
+                TOPIC: {topic_social}
+                {img_context}
+                
+                INSTRUCTIONS:
+                1. Apply the 'Social Media' rules from the Brand Profile.
+                2. Use the 'High Performing Posts' in the profile as a benchmark for tone/length.
+                3. Adhere to platform best practices for {platform} (hashtags, emoji usage, length).
+                4. Provide a 'Rationale' section explaining why you chose this angle.
+                """
+                
+                # We reuse the content generator logic as it handles the LLM call nicely
+                result = logic.run_content_generator(social_prompt, f"{platform} Post", "See prompt", prof_text)
+                st.markdown(result)
+
+# 6. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
@@ -783,7 +839,7 @@ elif app_mode == "BRAND ARCHITECT":
                 st.success("EXTRACTED")
             except Exception as e: st.error(f"Error: {e}")
 
-# 6. BRAND MANAGER (FIXED: FORM-BASED EDITING)
+# 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     
@@ -811,12 +867,10 @@ elif app_mode == "BRAND MANAGER":
         # --- EXPORT BUTTONS ROW ---
         col_html, col_json = st.columns([1, 1])
         
-        # 1. HTML Brand Kit (Human Readable)
         with col_html:
             html_data = convert_to_html_brand_card(target, final_text_view)
             st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", use_container_width=True)
         
-        # 2. JSON Save File (Machine Readable / Re-Uploadable)
         with col_json:
             if is_structured:
                 json_data = json.dumps(profile_obj, indent=2)
