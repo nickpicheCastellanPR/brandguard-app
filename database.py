@@ -64,11 +64,33 @@ def verify_user(username, password):
 # --- UPDATED PROFILE FUNCTIONS ---
 
 def save_profile(username, profile_name, profile_data):
-    """Saves a profile (renamed from create_profile to match your app)."""
+    """Saves a profile (Smart version: handles Objects, Strings, and Dicts)."""
+    
+    # --- ROBUSTNESS LAYER: NORMALIZE DATA TO DICT ---
+    # This fixes the issues with 'profile_obj' and 'new_raw' from Brand Manager
+    if not isinstance(profile_data, dict):
+        if hasattr(profile_data, 'dict') and callable(profile_data.dict):
+            # Pydantic models
+            profile_data = profile_data.dict()
+        elif hasattr(profile_data, '__dict__'):
+            # Standard Python objects
+            profile_data = profile_data.__dict__
+        elif isinstance(profile_data, str):
+            try:
+                # Try to parse string as JSON
+                profile_data = json.loads(profile_data)
+            except ValueError:
+                # If it's just raw text, wrap it so it doesn't break
+                profile_data = {"raw_content": profile_data}
+        else:
+            # Fallback for lists or other types
+            profile_data = {"data": profile_data}
+    # ------------------------------------------------
+
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
-    # Convert the Python dictionary (profile_data) into a JSON string
+    # Convert the NOW NORMALIZED dictionary into a JSON string
     json_content = json.dumps(profile_data)
     
     # Check if profile already exists for this user
@@ -85,7 +107,6 @@ def save_profile(username, profile_name, profile_data):
     conn.commit()
     conn.close()
     return True
-
 def get_profiles(username):
     """Returns a DICTIONARY of {name: data}."""
     conn = sqlite3.connect(DB_NAME)
