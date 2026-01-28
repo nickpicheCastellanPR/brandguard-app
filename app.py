@@ -21,7 +21,6 @@ st.set_page_config(
 logic = SignetLogic()
 
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
-# NOTE: Added 'setup_custom_styling' logic directly here for the specific checkerboard & text fix
 st.markdown("""
 <style>
     /* 1. PALETTE DEFINITION */
@@ -34,22 +33,9 @@ st.markdown("""
         --c-charcoal: #3d3d3d;    /* Sidebar Text */
     }
 
-    /* 2. LAYOUT & BACKGROUNDS (UPDATED: Diagonal Checkerboard) */
+    /* 2. LAYOUT & BACKGROUNDS */
     .stApp {
-        /* Base background color (The 'empty' squares) */
-        background-color: var(--c-teal-deep); 
-        
-        /* The Checkerboard Pattern: Top-Right & Bottom-Left Only */
-        background-image: conic-gradient(
-            from 0deg,
-            #1b2a2e 0deg 90deg,       /* Top-Right: Darker Teal */
-            transparent 90deg 180deg, /* Bottom-Right: Transparent */
-            #1b2a2e 180deg 270deg,    /* Bottom-Left: Darker Teal */
-            transparent 270deg        /* Top-Left: Transparent */
-        );
-        
-        /* Size of the grid squares */
-        background-size: 100px 100px;
+        background-color: var(--c-teal-deep);
         color: var(--c-cream);
     }
     
@@ -102,14 +88,14 @@ st.markdown("""
     
     h2, h3 { color: var(--c-gold-muted) !important; text-transform: uppercase; font-weight: 700; }
 
-    /* 5. INPUTS (UPDATED: Force White Text Visibility) */
+    /* 5. INPUTS (FIXED VISIBILITY) */
     .stTextInput input, 
     .stTextArea textarea, 
     .stSelectbox div[data-baseweb="select"] > div,
     .stSelectbox div[data-baseweb="select"] span {
         background-color: var(--c-teal-dark) !important;
         border: 1px solid var(--c-sage) !important;
-        color: #FFFFFF !important;  /* FORCE WHITE TEXT */
+        color: #FFFFFF !important;       /* FORCE WHITE TEXT */
         caret-color: #FFFFFF !important; /* FORCE WHITE CURSOR */
         -webkit-text-fill-color: #FFFFFF !important;
         border-radius: 0px !important;
