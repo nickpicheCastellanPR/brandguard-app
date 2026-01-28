@@ -43,7 +43,7 @@ def create_user(username, password):
     finally:
         conn.close()
 
-def authenticate_user(username, password):
+def verify_user(username, password):
     """Checks if username/password match."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
