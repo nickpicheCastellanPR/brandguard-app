@@ -14,86 +14,149 @@ st.set_page_config(
 # Initialize Logic
 logic = SignetLogic()
 
-# --- NUCLEAR OPTION CSS (THE AGENCY LOOK) ---
+# --- THE "CASTELLAN PREMIUM" CSS ---
 st.markdown("""
 <style>
-    /* 1. FORCE DARK BACKGROUND */
+    /* VARIABLES */
+    :root {
+        --bg-dark: #0E1117;
+        --bg-panel: #161A22;
+        --gold: #D4AF37;
+        --gold-dim: #8a7020;
+        --cream: #F0EAD6;
+        --text-main: #E0E0E0;
+        --success: #2ea043;
+        --error: #da3633;
+    }
+
+    /* 1. GLOBAL TEXT & BACKGROUND */
     .stApp {
-        background-color: #0E1117;
+        background-color: var(--bg-dark);
+        color: var(--text-main);
     }
     
-    /* 2. TYPOGRAPHY & HEADERS */
     h1, h2, h3, h4, .stMarkdown {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-        color: #E0E0E0 !important;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
     }
-    h1 { font-weight: 800 !important; text-transform: uppercase; letter-spacing: 0.1em !important; }
-    h2 { font-weight: 700 !important; text-transform: uppercase; font-size: 1.5rem !important; }
-    h3 { font-weight: 600 !important; color: #D4AF37 !important; font-size: 1.1rem !important; text-transform: uppercase;}
     
-    /* 3. SIGNET BUTTONS (SHARP, GOLD, UPPERCASE) */
+    h1 { 
+        font-weight: 800 !important; 
+        text-transform: uppercase; 
+        color: var(--cream) !important; 
+        text-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+    }
+    
+    h2, h3 { 
+        color: var(--gold) !important; 
+        text-transform: uppercase;
+    }
+
+    /* 2. THE GLOW-UP BUTTONS */
     div.stButton > button {
-        background-color: #1E1E1E !important;
-        color: #D4AF37 !important; /* Gold Text */
-        border: 1px solid #D4AF37 !important;
-        border-radius: 0px !important; /* Sharp Edges */
-        font-weight: 700 !important;
+        background-color: transparent !important;
+        color: var(--gold) !important;
+        border: 1px solid var(--gold) !important;
+        border-radius: 4px !important;
+        font-weight: 600 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.15em !important;
+        letter-spacing: 0.1em !important;
         padding: 0.6rem 1rem !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-    div.stButton > button:hover {
-        background-color: #D4AF37 !important;
-        color: #000000 !important;
-        box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
-    }
-    div.stButton > button:active {
-        background-color: #FFF !important;
-        color: #000 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 0 5px rgba(0,0,0,0);
     }
     
-    /* 4. INPUT FIELDS (FLAT, DARK) */
-    .stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div > div {
-        background-color: #161A22 !important;
+    /* HOVER STATE: THE GLOW */
+    div.stButton > button:hover {
+        background-color: rgba(212, 175, 55, 0.1) !important;
+        color: var(--cream) !important;
+        border-color: var(--cream) !important;
+        box-shadow: 0 0 15px var(--gold), inset 0 0 5px var(--gold) !important;
+        transform: translateY(-1px);
+    }
+    
+    div.stButton > button:active {
+        transform: translateY(1px);
+    }
+    
+    /* PRIMARY BUTTONS (FILLED) */
+    div.stButton > button[kind="primary"] {
+        background-color: var(--gold) !important;
+        color: #000 !important;
+        box-shadow: 0 0 10px var(--gold-dim) !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background-color: var(--cream) !important;
+        color: #000 !important;
+        box-shadow: 0 0 20px var(--gold) !important;
+    }
+
+    /* 3. INPUT FIELDS (Dark on Dark Fix) */
+    .stTextInput > div > div > input, 
+    .stTextArea > div > div > textarea, 
+    .stSelectbox > div > div > div {
+        background-color: var(--bg-panel) !important;
         color: #FFF !important;
         border: 1px solid #333 !important;
-        border-radius: 0px !important;
+        border-radius: 4px !important;
     }
-    .stTextInput > div > div > input:focus {
-        border-color: #D4AF37 !important;
+    .stTextInput > div > div > input:focus, 
+    .stTextArea > div > div > textarea:focus {
+        border-color: var(--gold) !important;
+        box-shadow: 0 0 5px var(--gold-dim) !important;
     }
-    
-    /* 5. DASHBOARD CARDS (CUSTOM HTML) */
+
+    /* 4. DASHBOARD CARDS (HUD STYLE) */
     .metric-card {
-        background: #161A22;
+        background: linear-gradient(180deg, var(--bg-panel) 0%, #0d1117 100%);
         padding: 24px;
-        border-left: 4px solid #D4AF37;
+        border: 1px solid #30363d;
+        border-left: 4px solid var(--gold);
+        border-radius: 6px;
         margin-bottom: 16px;
     }
-    .metric-card h4 { color: #888 !important; font-size: 0.75rem !important; margin: 0; letter-spacing: 0.1em;}
-    .metric-card h1 { color: #FFF !important; font-size: 2.5rem !important; margin: 8px 0; }
-    .metric-card p { color: #AAA !important; font-size: 0.9rem; margin: 0; }
+    .metric-card h4 { color: #8b949e !important; font-size: 0.75rem !important; margin: 0; letter-spacing: 0.1em;}
+    .metric-card h1 { color: var(--cream) !important; font-size: 2.5rem !important; margin: 8px 0; }
     
-    /* 6. EXPANDERS */
-    .streamlit-expanderHeader {
-        background-color: #161A22 !important;
-        border: 1px solid #333 !important;
-        border-radius: 0px !important;
-        color: #FFF !important;
+    /* 5. CUSTOM STATUS BARS (Replacing st.success/st.error) */
+    .status-bar {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        border: 1px solid transparent;
+    }
+    .status-online {
+        background-color: rgba(46, 160, 67, 0.15);
+        border-color: rgba(46, 160, 67, 0.4);
+        color: #3fb950;
+    }
+    .status-offline {
+        background-color: rgba(218, 54, 51, 0.15);
+        border-color: rgba(218, 54, 51, 0.4);
+        color: #f85149;
+    }
+    .status-warning {
+        background-color: rgba(210, 153, 34, 0.15);
+        border-color: rgba(210, 153, 34, 0.4);
+        color: #e3b341;
+    }
+
+    /* 6. SIDEBAR */
+    section[data-testid="stSidebar"] {
+        background-color: var(--bg-panel);
+        border-right: 1px solid #30363d;
     }
     
-    /* 7. PROGRESS BAR */
-    .stProgress > div > div > div > div {
-        background-color: #D4AF37 !important;
-    }
-    
-    /* 8. CLEANUP */
+    /* REMOVE BLOAT */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
-    .stFileUploader {border-radius: 0px !important;}
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,8 +165,6 @@ if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 if 'check_count' not in st.session_state:
     st.session_state['check_count'] = 0
-    
-# Wizard State (Resetting Text Box)
 if 'wiz_temp_sample' not in st.session_state:
     st.session_state['wiz_temp_sample'] = ""
 if 'wiz_samples_list' not in st.session_state:
@@ -141,13 +202,11 @@ ARCHETYPES = [
 def calculate_calibration_score(profile_data):
     score = 0
     missing = []
-    # Basic Strategy
     if "STRATEGY" in profile_data: score += 10
     if "VOICE" in profile_data: score += 10
     if "VISUALS" in profile_data: score += 10
     if "LOGO RULES" in profile_data: score += 10
     if "TYPOGRAPHY" in profile_data: score += 10
-    # Advanced Calibration
     if "Style Signature" in profile_data: 
         score += 25
     else:
@@ -159,28 +218,25 @@ def calculate_calibration_score(profile_data):
     return score, missing
 
 def add_voice_sample():
-    """Callback to append text and clear input"""
     if st.session_state.wiz_temp_sample:
         st.session_state['wiz_samples_list'].append(st.session_state.wiz_temp_sample)
         st.session_state.wiz_temp_sample = ""
 
 # --- LOGIN SCREEN ---
 if not st.session_state['authenticated']:
-    # Vertical spacer
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # 1. FIXED ICON SIZE (Centered & Modest)
         if os.path.exists("Signet_Logo_Color.png"):
-            st.image("Signet_Logo_Color.png", width=180) 
+            st.image("Signet_Logo_Color.png", use_container_width=True) 
         else:
-            st.title("SIGNET")
+            st.markdown("<h1 style='text-align: center; color: #D4AF37;'>SIGNET</h1>", unsafe_allow_html=True)
             
-        st.markdown("### AUTHORIZED ACCESS ONLY")
+        st.markdown("<p style='text-align: center; color: #888;'>RESTRICTED ACCESS // CASTELLAN PR</p>", unsafe_allow_html=True)
         st.markdown("---")
         
-        password = st.text_input("ACCESS CODE", type="password")
-        if st.button("ENTER SYSTEM"):
+        password = st.text_input("ACCESS CODE", type="password", placeholder="ENTER KEY")
+        if st.button("AUTHENTICATE"):
             if logic.check_password(password):
                 st.session_state['authenticated'] = True
                 st.rerun()
@@ -195,7 +251,6 @@ with st.sidebar:
     else:
         st.header("SIGNET")
     
-    # Active Profile Logic
     if st.session_state['profiles']:
         active_profile = st.selectbox("ACTIVE PROFILE", list(st.session_state['profiles'].keys()))
         current_rules = st.session_state['profiles'][active_profile]
@@ -205,21 +260,20 @@ with st.sidebar:
         cal_score = 0
         current_rules = ""
     
-    # Engine Confidence Widget
     st.markdown("<br>", unsafe_allow_html=True)
     st.caption("ENGINE CONFIDENCE")
     st.progress(cal_score / 100)
     
     if cal_score < 60:
-        st.caption("⚠️ LOW CALIBRATION")
+        st.markdown("<span style='color: #e3b341; font-size: 0.8rem;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
     elif cal_score < 90:
-        st.caption("⚠️ PARTIAL CALIBRATION")
+        st.markdown("<span style='color: #e3b341; font-size: 0.8rem;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
     else:
-        st.caption("✅ FULLY OPTIMIZED")
+        st.markdown("<span style='color: #3fb950; font-size: 0.8rem;'>✅ FULLY OPTIMIZED</span>", unsafe_allow_html=True)
 
     st.divider()
     
-    app_mode = st.radio("MODULE SELECTION", [
+    app_mode = st.radio("MODULES", [
         "DASHBOARD", 
         "VISUAL COMPLIANCE", 
         "COPY EDITOR", 
@@ -233,14 +287,14 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
-# --- MODULE 1: DASHBOARD (Command Center) ---
+# --- MODULE 1: DASHBOARD ---
 if app_mode == "DASHBOARD":
     st.title("SYSTEM STATUS")
     
     if not active_profile:
         st.warning("NO PROFILES LOADED. NAVIGATE TO BRAND ARCHITECT.")
     else:
-        # Custom HTML Card
+        # HUD CARD
         st.markdown(f"""
         <div class="metric-card">
             <h4>ACTIVE BRAND PROFILE</h4>
@@ -252,14 +306,22 @@ if app_mode == "DASHBOARD":
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("### CAPABILITIES")
-            if cal_score > 50: st.success("STRATEGY ENGINE: ONLINE")
-            else: st.error("STRATEGY ENGINE: OFFLINE")
             
-            if cal_score > 70: st.success("VOICE ENGINE: ONLINE")
-            else: st.warning("VOICE ENGINE: CALIBRATING...")
+            # CUSTOM HTML STATUS BARS (The Fix for the ugly green bars)
+            if cal_score > 50: 
+                st.markdown('<div class="status-bar status-online">STRATEGY ENGINE: ONLINE</div>', unsafe_allow_html=True)
+            else: 
+                st.markdown('<div class="status-bar status-offline">STRATEGY ENGINE: OFFLINE</div>', unsafe_allow_html=True)
             
-            if cal_score > 90: st.success("SOCIAL ENGINE: ONLINE")
-            else: st.error("SOCIAL ENGINE: NO DATA")
+            if cal_score > 70: 
+                st.markdown('<div class="status-bar status-online">VOICE ENGINE: ONLINE</div>', unsafe_allow_html=True)
+            else: 
+                st.markdown('<div class="status-bar status-warning">VOICE ENGINE: CALIBRATING...</div>', unsafe_allow_html=True)
+            
+            if cal_score > 90: 
+                st.markdown('<div class="status-bar status-online">SOCIAL ENGINE: ONLINE</div>', unsafe_allow_html=True)
+            else: 
+                st.markdown('<div class="status-bar status-offline">SOCIAL ENGINE: NO DATA</div>', unsafe_allow_html=True)
             
         with c2:
             st.markdown("### REQUIRED ACTIONS")
@@ -276,7 +338,7 @@ elif app_mode == "VISUAL COMPLIANCE":
     
     uploaded_file = st.file_uploader("UPLOAD ASSET", type=["jpg", "png", "jpeg"])
     
-    if uploaded_file and st.button("RUN AUDIT"):
+    if uploaded_file and st.button("RUN AUDIT", type="primary"):
         image = Image.open(uploaded_file)
         c1, c2 = st.columns([1, 2])
         with c1:
@@ -293,7 +355,7 @@ elif app_mode == "COPY EDITOR":
     
     c1, c2 = st.columns([2, 1])
     with c1:
-        text_input = st.text_area("DRAFT TEXT", height=300)
+        text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
     with c2:
         st.markdown(f"""
         <div class="metric-card">
@@ -302,7 +364,7 @@ elif app_mode == "COPY EDITOR":
         </div>
         """, unsafe_allow_html=True)
     
-    if text_input and st.button("ANALYZE & REWRITE"):
+    if text_input and st.button("ANALYZE & REWRITE", type="primary"):
         with st.spinner("EVALUATING SYNTAX AND TONE..."):
             result = logic.run_copy_editor(text_input, current_rules)
             st.markdown(result)
@@ -322,7 +384,7 @@ elif app_mode == "CONTENT GENERATOR":
         
     key_points = st.text_area("KEY POINTS / BULLETS", height=200, placeholder="- Record revenue\n- New expansion")
     
-    if st.button("GENERATE DRAFT"):
+    if st.button("GENERATE DRAFT", type="primary"):
         if not key_points or not topic:
             st.error("MISSING INPUTS")
         else:
@@ -344,11 +406,11 @@ elif app_mode == "BRAND ARCHITECT":
             wiz_archetype = st.selectbox("ARCHETYPE *", ARCHETYPES, index=None, placeholder="SELECT ARCHETYPE...")
             wiz_mission = st.text_area("MISSION STATEMENT")
 
-        # 2. VOICE (WITH RESETTING WIDGET)
+        # 2. VOICE
         with st.expander("2. VOICE & CALIBRATION", expanded=True):
             st.info("UPLOAD SAMPLES TO TRAIN THE ENGINE. 5+ SAMPLES RECOMMENDED.")
             
-            # The Resetting Widget
+            # Resetting Widget
             st.text_area("PASTE SAMPLE TEXT (PRESS ADD TO SAVE)", key="wiz_temp_sample", height=100)
             if st.button("➕ ADD SAMPLE"):
                 add_voice_sample()
@@ -357,7 +419,7 @@ elif app_mode == "BRAND ARCHITECT":
             if st.session_state['wiz_samples_list']:
                 st.caption(f"READY TO PROCESS {len(st.session_state['wiz_samples_list'])} SAMPLES.")
 
-        # 3. SOCIAL MEDIA
+        # 3. SOCIAL
         with st.expander("3. SOCIAL MEDIA (OPTIMIZATION)", expanded=False):
             st.markdown("Upload screenshots of high-performing posts.")
             wiz_social_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"])
@@ -370,7 +432,7 @@ elif app_mode == "BRAND ARCHITECT":
             with vc2:
                 wiz_logo_file = st.file_uploader("UPLOAD LOGO", type=["png", "jpg"])
 
-        if st.button("GENERATE SYSTEM"):
+        if st.button("GENERATE SYSTEM", type="primary"):
             if not wiz_name or not wiz_archetype:
                 st.error("NAME AND ARCHETYPE REQUIRED.")
             else:
