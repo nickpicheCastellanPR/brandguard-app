@@ -218,7 +218,7 @@ if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'
 if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     
 if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False 
 
-# DYNAMIC COLOR PALETTES (NEW)
+# DYNAMIC COLOR PALETTES
 if 'palette_primary' not in st.session_state: st.session_state['palette_primary'] = ["#24363b"]
 if 'palette_secondary' not in st.session_state: st.session_state['palette_secondary'] = ["#f5f5f0", "#5c6b61"]
 if 'palette_accent' not in st.session_state: st.session_state['palette_accent'] = ["#ab8f59"]
@@ -244,7 +244,6 @@ def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
 
 def calculate_calibration_score(profile_data):
-    # Backward compatibility: handle dict vs string
     if isinstance(profile_data, dict):
         text_data = profile_data.get('final_text', '')
     else:
@@ -263,11 +262,9 @@ def calculate_calibration_score(profile_data):
     else: missing.append("Social Screenshots")
     return score, missing
 
-# --- PERSISTENCE FUNCTIONS ---
-DRAFT_FILE = "signet_draft.json"
-
-def save_wizard_draft():
-    """Saves current wizard state variables to a local JSON."""
+# --- CLOUD-SAFE PERSISTENCE (Download/Upload) ---
+def get_current_state_json():
+    """Generates a JSON string of the current wizard state."""
     data = {
         "wiz_name": st.session_state.get("wiz_name", ""),
         "wiz_archetype": st.session_state.get("wiz_archetype", ""),
@@ -280,45 +277,31 @@ def save_wizard_draft():
         "palette_secondary": st.session_state.get("palette_secondary", []),
         "palette_accent": st.session_state.get("palette_accent", [])
     }
-    with open(DRAFT_FILE, "w") as f:
-        json.dump(data, f)
-    st.toast("Draft Saved Locally", icon="💾")
+    return json.dumps(data, indent=2)
 
-def load_wizard_draft():
-    """Loads wizard state variables from local JSON."""
-    if os.path.exists(DRAFT_FILE):
-        with open(DRAFT_FILE, "r") as f:
-            data = json.load(f)
-            st.session_state["wiz_name"] = data.get("wiz_name", "")
-            st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
-            st.session_state["wiz_tone"] = data.get("wiz_tone", "")
-            st.session_state["wiz_mission"] = data.get("wiz_mission", "")
-            st.session_state["wiz_values"] = data.get("wiz_values", "")
-            st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
-            st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
-            st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
-            st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
-            st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
-        st.toast("Draft Loaded", icon="📂")
-        st.rerun()
-    else:
-        st.error("No draft file found.")
+def load_state_from_uploaded_file(uploaded_file):
+    """Parses uploaded JSON and updates session state."""
+    try:
+        data = json.load(uploaded_file)
+        st.session_state["wiz_name"] = data.get("wiz_name", "")
+        st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
+        st.session_state["wiz_tone"] = data.get("wiz_tone", "")
+        st.session_state["wiz_mission"] = data.get("wiz_mission", "")
+        st.session_state["wiz_values"] = data.get("wiz_values", "")
+        st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
+        st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
+        st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
+        st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
+        st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
+        st.toast("Draft Loaded Successfully", icon="✅")
+    except Exception as e:
+        st.error(f"Failed to load draft: {e}")
 
-# --- EXPORT TO HTML FUNCTION ---
+# --- EXPORT TO HTML FUNCTION (Polished) ---
 def convert_to_html_brand_card(brand_name, content):
-    """
-    Advanced converter that handles Bold, Headers, and Lists
-    to create a client-ready HTML document.
-    """
-    # 1. Escape HTML special characters first (safety)
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    
-    # 2. Convert Markdown artifacts to HTML
-    # Bold (**text**)
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
-    # Headers (### Text) - Converts any number of # to an <h3> for simplicity
     content = re.sub(r'^#+\s*(.*)', r'<h3 style="color: #ab8f59; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 20px;">\1</h3>', content, flags=re.MULTILINE)
-    # Bullet points (* Text) -> Simple visual cleanup
     content = re.sub(r'^\*\s*(.*)', r'<div style="margin-left: 20px; margin-bottom: 5px;">• \1</div>', content, flags=re.MULTILINE)
     
     html_template = f"""
@@ -332,7 +315,6 @@ def convert_to_html_brand_card(brand_name, content):
             .subtitle {{ font-size: 1.2em; color: #ab8f59; font-weight: bold; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 40px; }}
             strong {{ color: #1b2a2e; font-weight: 700; }}
             .footer {{ margin-top: 60px; font-size: 0.7rem; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 20px; letter-spacing: 0.1em; }}
-            /* Use a div instead of pre to allow our custom HTML tags to render */
             .content {{ white-space: pre-wrap; font-family: inherit; }}
         </style>
     </head>
@@ -341,12 +323,13 @@ def convert_to_html_brand_card(brand_name, content):
             <h1>{brand_name}</h1>
             <div class="subtitle">Brand Governance Profile</div>
             <div class="content">{content}</div>
-            <div class="footer">GENERATED BY SIGNET // INTERNAL USE ONLY</div>
+            <div class="footer">GENERATED BY SIGNET // INTELLIGENT BRAND GOVERNANCE</div>
         </div>
     </body>
     </html>
     """
     return html_template
+
 # --- CALLBACKS ---
 def add_voice_sample_callback():
     s_type = st.session_state.get('wiz_sample_type', 'Generic')
@@ -494,7 +477,6 @@ if app_mode == "DASHBOARD":
                             try:
                                 raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
                                 parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
-                                # Save as basic string for now since PDFs don't map to our wizard form easily
                                 st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
                                 st.success(f"SUCCESS: {dash_pdf.name} ingested.")
                                 st.session_state['dashboard_upload_open'] = False
@@ -527,13 +509,12 @@ if app_mode == "DASHBOARD":
                 st.rerun()
         with c3:
             if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
-                 # Save demo as structured dict
                  st.session_state['profiles']["Castellan PR (Demo)"] = {
                      "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
                      "inputs": {
                          "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
                          "wiz_mission": "Architecting narratives.", "wiz_values": "Precision, Power.",
-                         "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"]
+                         "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"], "palette_accent": ["#f5f5f0"]
                      }
                  }
                  st.rerun()
@@ -542,7 +523,6 @@ if app_mode == "DASHBOARD":
     else:
         st.title("SYSTEM STATUS")
         st.markdown(f"""<div class="dashboard-card"><div style="color: #a0a0a0; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 5px;">ACTIVE PROFILE</div><div style="font-size: 2.5rem; color: #f5f5f0; font-weight: 800;">{active_profile}</div><div style="color: #ab8f59; margin-top: 5px; font-weight: 700;">CALIBRATION SCORE: {cal_score}/100</div></div>""", unsafe_allow_html=True)
-        # ... (Status rows logic remains)
 
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
@@ -552,7 +532,6 @@ elif app_mode == "VISUAL COMPLIANCE":
         uploaded_file = st.file_uploader("UPLOAD ASSET", type=["jpg", "png"])
         if uploaded_file and st.button("RUN AUDIT", type="primary"):
             with st.spinner("ANALYZING PIXELS..."):
-                # Handle Dict or String profile
                 prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
                 result = logic.run_visual_audit(Image.open(uploaded_file), prof_text)
                 st.markdown(result)
@@ -589,9 +568,27 @@ elif app_mode == "CONTENT GENERATOR":
 # 5. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
+    
+    # --- DRAFT ACTIONS ---
     dc1, dc2 = st.columns([1, 6])
-    with dc1: st.button("SAVE DRAFT", on_click=save_wizard_draft)
-    with dc2: st.button("LOAD DRAFT", on_click=load_wizard_draft)
+    
+    # SAVE AS DOWNLOAD
+    current_json = get_current_state_json()
+    with dc1:
+        st.download_button(
+            label="SAVE DRAFT",
+            data=current_json,
+            file_name="signet_draft.json",
+            mime="application/json"
+        )
+        
+    # LOAD FROM UPLOAD
+    with dc2:
+        uploaded_draft = st.file_uploader("LOAD DRAFT", type=["json"], label_visibility="collapsed")
+        if uploaded_draft is not None:
+            # We process immediately upon upload
+            load_state_from_uploaded_file(uploaded_draft)
+            st.rerun()
     
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
     with tab1:
@@ -709,16 +706,32 @@ elif app_mode == "BRAND ARCHITECT":
                         all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                         
                         prompt = f"""
-                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile.
-                        1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
-                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
-                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social: {social_summary}
-                        4. GUARDRAILS: {st.session_state.wiz_guardrails}
+                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
+                        
+                        1. STRATEGY
+                        - Brand: {st.session_state.wiz_name}
+                        - Archetype: {st.session_state.wiz_archetype}
+                        - Mission: {st.session_state.wiz_mission}
+                        - Values: {st.session_state.wiz_values}
+                        
+                        2. VOICE
+                        - Tone Keywords: {st.session_state.wiz_tone}
+                        - Analysis of samples: {all_samples}
+                        
+                        3. VISUALS
+                        - Palette: {palette_str}
+                        - Logo: {logo_summary}
+                        - Social Media Style: {social_summary}
+                        
+                        4. GUARDRAILS
+                        - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
+                        
+                        5. DATA (TRAINING SAMPLES)
+                        {all_samples}
                         """
                         
                         final_text_out = logic.generate_brand_rules(prompt)
                         
-                        # --- THE FIX: STORE AS STRUCTURED DICT ---
                         st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = {
                             "final_text": final_text_out,
                             "inputs": {
@@ -758,10 +771,7 @@ elif app_mode == "BRAND MANAGER":
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         profile_obj = st.session_state['profiles'][target]
         
-        # Determine if it's a "Structured" profile or "Legacy/Raw"
         is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
-        
-        # Helper to get current text for export/viewing
         final_text_view = profile_obj['final_text'] if is_structured else profile_obj
         
         html_data = convert_to_html_brand_card(target, final_text_view)
@@ -769,12 +779,12 @@ elif app_mode == "BRAND MANAGER":
         st.divider()
         
         if is_structured:
-            # --- FORM-BASED EDITOR ---
             inputs = profile_obj['inputs']
             
             with st.expander("1. STRATEGY", expanded=True):
                 new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
-                new_arch = st.selectbox("ARCHETYPE", ARCHETYPES, index=ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0)
+                idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
+                new_arch = st.selectbox("ARCHETYPE", ARCHETYPES, index=idx)
                 new_mission = st.text_area("MISSION", inputs['wiz_mission'])
                 new_values = st.text_area("VALUES", inputs['wiz_values'])
             
@@ -784,12 +794,7 @@ elif app_mode == "BRAND MANAGER":
             with st.expander("3. GUARDRAILS"):
                 new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
             
-            # Simple Palette Display for now (Editing dynamic lists inside Manager is complex, keeping it read-only-ish or simple)
-            # For MVP, we allow simple text editing of palette or full re-generation.
-            # To avoid complexity, we rely on re-generating text from these inputs.
-            
             if st.button("SAVE CHANGES & REGENERATE PROFILE"):
-                # Update the Inputs
                 profile_obj['inputs']['wiz_name'] = new_name
                 profile_obj['inputs']['wiz_archetype'] = new_arch
                 profile_obj['inputs']['wiz_mission'] = new_mission
@@ -797,8 +802,6 @@ elif app_mode == "BRAND MANAGER":
                 profile_obj['inputs']['wiz_tone'] = new_tone
                 profile_obj['inputs']['wiz_guardrails'] = new_guard
                 
-                # Reconstruct the Text String (Cheaper than calling AI again)
-                # We reuse the palette data from storage since we didn't edit it here yet
                 p_p = ", ".join(inputs['palette_primary'])
                 p_s = ", ".join(inputs['palette_secondary'])
                 
@@ -825,7 +828,6 @@ elif app_mode == "BRAND MANAGER":
                 st.rerun()
 
         else:
-            # --- FALLBACK RAW EDITOR (For PDFs) ---
             st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
             new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
             if st.button("SAVE RAW CHANGES"):
@@ -838,4 +840,3 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
-
