@@ -118,7 +118,7 @@ st.markdown("""
         background-color: var(--c-teal-dark) !important;
     }
 
-    /* 6. BUTTONS */
+    /* 6. BUTTONS (GLOBAL) */
     .stButton button {
         background-color: transparent !important;
         border: 1px solid var(--c-gold-muted) !important;
@@ -129,10 +129,6 @@ st.markdown("""
         letter-spacing: 0.15em;
         transition: all 0.2s;
         padding: 0.6rem 1.2rem;
-        /* UPDATED: Allow multi-line buttons for Hero Cards */
-        white-space: pre-wrap !important; 
-        height: auto !important;
-        min-height: 50px;
     }
     .stButton button:hover {
         background-color: var(--c-gold-muted) !important;
@@ -152,7 +148,7 @@ st.markdown("""
         color: #ff5f56 !important;
     }
 
-    /* 7. DASHBOARD CARDS */
+    /* 7. DASHBOARD CARDS (Static) */
     .dashboard-card {
         background-color: rgba(27, 42, 46, 0.6);
         border: 1px solid var(--c-sage);
@@ -451,17 +447,46 @@ if app_mode == "DASHBOARD":
                         st.rerun()
             st.divider()
 
-        # --- HERO BUTTONS (REPLACING CARDS) ---
+        # --- HERO CARDS (BUTTONS WITH CSS OVERRIDE) ---
+        # INJECT HERO CSS ONLY FOR DASHBOARD MODE
+        st.markdown("""
+        <style>
+            /* Target ALL buttons in the columns below to look like cards */
+            div[data-testid="column"] button {
+                background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important;
+                border: 1px solid #3a4b50 !important;
+                height: 220px !important;
+                width: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                white-space: pre-wrap !important;
+                transition: transform 0.2s !important;
+                color: #f5f5f0 !important;
+            }
+            div[data-testid="column"] button:hover {
+                transform: translateY(-5px) !important;
+                border-color: #ab8f59 !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+                color: #ab8f59 !important;
+            }
+            div[data-testid="column"] button p {
+                font-size: 1rem !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("🛠️\nCREATE PROFILE\nArchitect a new brand identity", use_container_width=True):
+            if st.button("🛠️\n\nCREATE PROFILE\nArchitect a new brand identity"):
                 st.info("Select 'BRAND ARCHITECT' in the sidebar to begin.")
         with c2:
-            if st.button("📄\nUPLOAD GUIDE\nIngest existing PDF rules", use_container_width=True):
+            if st.button("📄\n\nUPLOAD GUIDE\nIngest existing PDF rules"):
                 st.session_state['dashboard_upload_open'] = True
                 st.rerun()
         with c3:
-            if st.button("⚙️\nLOAD DEMO\nLoad Castellan sample data", use_container_width=True):
+            if st.button("⚙️\n\nLOAD DEMO\nLoad Castellan sample data"):
                  st.session_state['profiles']["Castellan PR (Demo)"] = """
                 1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
                 2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
