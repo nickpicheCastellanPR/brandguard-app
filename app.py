@@ -42,7 +42,7 @@ st.markdown("""
         font-weight: 800 !important; 
         text-transform: uppercase; 
         color: var(--cream) !important; 
-        font-size: 2.2rem !important;
+        font-size: 2.5rem !important;
         text-shadow: 0px 0px 15px rgba(0,0,0,0.5);
     }
     
@@ -73,9 +73,16 @@ st.markdown("""
         box-shadow: 0 0 15px rgba(212, 175, 55, 0.5), inset 0 0 5px rgba(212, 175, 55, 0.2) !important;
         transform: translateY(-2px);
     }
+    
+    /* Primary Action Buttons */
+    button[kind="primary"] {
+        background-color: var(--gold) !important;
+        color: #0E1117 !important;
+        border: 1px solid var(--gold) !important;
+    }
 
-    /* 3. INPUTS (Contrast Fix) */
-    /* Targeting the input container to give it a lighter background */
+    /* 3. INPUTS (Contrast Fix - Targeting the Container) */
+    /* This makes the input box visible against the dark background */
     div[data-baseweb="input"] {
         background-color: #1c212c !important;
         border: 1px solid #444 !important;
@@ -103,12 +110,12 @@ st.markdown("""
     .metric-card h4 { color: #8b949e !important; font-size: 0.85rem !important; margin: 0; letter-spacing: 0.15em; font-weight: 600;}
     .metric-card h3 { color: var(--cream) !important; font-size: 1.5rem !important; margin: 10px 0; letter-spacing: 0.05em; }
 
-    /* Custom Status Bars */
+    /* Custom Status Bars (Replacing the blocky green alerts) */
     .status-bar {
         padding: 10px; border-radius: 4px; margin-bottom: 5px; font-weight: 700; font-size: 0.8rem; text-transform: uppercase;
     }
     .status-online { background: rgba(46, 160, 67, 0.2); color: #4cd964; border: 1px solid #2ea043; }
-    .status-warn { background: rgba(212, 175, 55, 0.15); color: var(--gold); border: 1px solid var(--gold); }
+    .status-warn { background: rgba(212, 175, 55, 0.15); color: var(--gold); border: 1px solid #D4AF37; }
     .status-offline { background: rgba(218, 54, 51, 0.2); color: #ff5f56; border: 1px solid #f85149; }
     
     /* 5. SIDEBAR */
