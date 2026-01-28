@@ -81,25 +81,6 @@ class SignetLogic:
         except Exception as e:
             return "Logo analysis failed. Please describe manually."
 
-    def analyze_social_post(self, image):
-        """Analyzes a social media screenshot for best practices."""
-        model_name = self.get_model()
-        model = genai.GenerativeModel(model_name)
-        prompt = """
-        Analyze this social media screenshot.
-        Identify the "Best Practices" used here.
-        Look for:
-        1. Formatting (Spacing, Emoji usage).
-        2. Hook style (Question, controversial statement).
-        3. Call to Action style.
-        Summarize the "Social Style Signature" in 2 sentences.
-        """
-        try:
-            response = model.generate_content([prompt, image])
-            return response.text
-        except:
-            return "No social data extracted."
-
     def run_visual_audit(self, image, rules):
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
@@ -136,7 +117,7 @@ class SignetLogic:
         model = genai.GenerativeModel(model_name)
         
         prompt = f"""
-        ### ROLE: Senior Copy Editor & Scorer.
+        ### ROLE: Senior Copy Editor.
         ### BRAND RULES:
         {rules}
         
@@ -144,45 +125,14 @@ class SignetLogic:
         "{text}"
         
         ### TASK:
-        1. Assign a "Signet Alignment Score" (0-100) based on how well this matches the Brand Voice.
-        2. Correct errors.
-        3. Rewrite for 100% alignment.
-        4. If the rules include a "Style Signature", MIMIC IT EXACTLY.
+        1. Correct all spelling/grammar.
+        2. Rewrite the text to strictly match the Brand Voice defined above.
+        3. If the brand rules include a "Style Signature" (sentence structure, vocabulary), MIMIC IT EXACTLY.
         
         ### OUTPUT:
-        **SIGNET SCORE:** [0-100] / 100
-        
-        **CRITIQUE:** [Why it got this score]
-        
-        **POLISHED COPY:** [The Rewrite]
-        """
-        response = model.generate_content(prompt)
-        return response.text
-
-    def run_content_generator(self, topic, format_type, key_points, rules):
-        """Generates new content based on bullets and brand rules."""
-        model_name = self.get_model()
-        model = genai.GenerativeModel(model_name)
-        
-        prompt = f"""
-        ### ROLE: Executive Ghost Writer & Brand Strategist.
-        ### BRAND RULES:
-        {rules}
-        
-        ### TASK:
-        Write a {format_type} about "{topic}".
-        
-        ### KEY DETAILS TO INCLUDE (Bullet Points):
-        {key_points}
-        
-        ### INSTRUCTIONS:
-        1. **VOICE ALIGNMENT:** Strictly adhere to the Brand Voice, Archetype, and Style Signature defined in the rules. 
-        2. **FORMATTING:** Use standard formatting for a {format_type} (e.g., Subject Line for emails, Headline/Dateline for Press Releases).
-        3. **EXPANSION:** Expand the bullet points into full, flowing prose. Do not just list them.
-        4. **NO FLUFF:** Keep it high-impact and professional.
-        
-        ### OUTPUT:
-        [Generate the full text here]
+        **1. CRITICAL EDITS:** [List errors or style violations]
+        **2. POLISHED COPY:** [ The Rewrite ]
+        **3. STRATEGY NOTE:** [Why this fits the brand better]
         """
         response = model.generate_content(prompt)
         return response.text
@@ -192,7 +142,7 @@ class SignetLogic:
         model_name = self.get_model()
         model = genai.GenerativeModel(model_name)
         
-        # Updated Prompt to handle "Voice Samples" and "Social Analysis"
+        # Updated Prompt to handle "Voice Samples"
         grounded_prompt = f"""
         ### ROLE: Brand Strategist & Linguistic Analyst.
         ### TASK: Create a comprehensive brand guideline document based STRICTLY on the user's provided inputs.
@@ -213,7 +163,6 @@ class SignetLogic:
            3. TYPOGRAPHY (Headlines, Body)
            4. LOGO RULES
            5. VOICE & TONE (Including "Style Signature" derived from samples)
-           6. SOCIAL MEDIA GUIDELINES (If social samples provided)
         """
         
         response = model.generate_content(grounded_prompt)
