@@ -4,9 +4,13 @@ import os
 from logic import SignetLogic
 
 # --- PAGE CONFIG ---
+# Using the uploaded icon file if available, otherwise a generic fallback
+icon_path = "Signet_Icon_Color.png"
+page_icon = Image.open(icon_path) if os.path.exists(icon_path) else "🛡️"
+
 st.set_page_config(
     page_title="Signet", 
-    page_icon="👑", 
+    page_icon=page_icon, 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -131,8 +135,13 @@ st.markdown("""
         border-radius: 8px;
         margin: 10px;
         transition: transform 0.2s;
+        height: 200px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
-    .hero-card:hover { transform: translateY(-5px); border-color: var(--c-sage); }
+    .hero-card:hover { transform: translateY(-5px); border-color: var(--c-sage); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     .hero-icon { font-size: 3rem; margin-bottom: 10px; }
     .hero-title { font-weight: 800; color: var(--c-gold-muted); font-size: 1.2rem; text-transform: uppercase; }
     .hero-desc { color: #a0a0a0; font-size: 0.9rem; margin-bottom: 15px; }
@@ -158,17 +167,6 @@ st.markdown("""
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
     
-    /* PURE CSS LOGO */
-    .signet-logo {
-        font-family: 'Times New Roman', serif;
-        font-weight: 900;
-        font-size: 4rem;
-        color: var(--c-gold-muted);
-        text-align: center;
-        letter-spacing: -0.05em;
-        text-shadow: 2px 2px 0px #1a2629;
-    }
-    
 </style>
 """, unsafe_allow_html=True)
 
@@ -178,16 +176,9 @@ if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
 if 'wiz_temp_sample' not in st.session_state: st.session_state['wiz_temp_sample'] = ""
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
 
-# Default Profiles (Empty to test Onboarding)
+# START EMPTY - No profiles by default to trigger the Onboarding View
 if 'profiles' not in st.session_state:
-    st.session_state['profiles'] = {
-        "Castellan PR (Demo)": """
-        1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
-        2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
-        3. VISUALS: Deep Teal, Muted Gold, Cream.
-        4. DATA DEPTH: High.
-        """
-    }
+    st.session_state['profiles'] = {}
 
 MAX_CHECKS = 50
 
@@ -231,16 +222,16 @@ if not st.session_state['authenticated']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # PURE CSS LOGO (No Image Dependency)
-        st.markdown("""
-        <div style="text-align: center; margin-bottom: 20px;">
-            <div style="font-size: 5rem; color: #ab8f59; line-height: 1;">♔</div>
-            <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 800; font-size: 3rem; color: #f5f5f0; letter-spacing: 0.2em;">SIGNET</div>
-            <div style="font-size: 0.8rem; color: #5c6b61; letter-spacing: 0.4em; margin-top: 10px;">BRAND GOVERNANCE SYSTEM</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Use Real Logo if available
+        if os.path.exists("Signet_Logo_Color.png"):
+            st.image("Signet_Logo_Color.png", width=300)
+        elif os.path.exists("Signet_Icon_Color.png"):
+            st.image("Signet_Icon_Color.png", width=150) 
+        else:
+            st.markdown("<div style='text-align: center; font-size: 3rem; color: #ab8f59; font-weight: 800; letter-spacing: 0.1em;'>SIGNET</div>", unsafe_allow_html=True)
         
-        st.markdown("<hr style='border-color: #5c6b61; opacity: 0.3;'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #f5f5f0; font-size: 0.8rem; letter-spacing: 0.2em; opacity: 0.7; margin-top: 10px; margin-bottom: 20px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #5c6b61;'>", unsafe_allow_html=True)
         
         password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -254,36 +245,38 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 30px; margin-top: 20px;">
-        <div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em;">SIGNET</div>
-        <div style="font-size: 0.7rem; color: #ab8f59; letter-spacing: 0.2em; font-weight: 700;">CASTELLAN PR</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Sidebar uses the Icon + Text if available, or just text
+    if os.path.exists("Signet_Logo_Color.png"):
+        st.image("Signet_Logo_Color.png", use_container_width=True)
+    else:
+        st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center;">SIGNET</div>', unsafe_allow_html=True)
     
-    # Profile Selector
+    st.divider()
+
+    # Profile Selector Logic
     profile_names = list(st.session_state['profiles'].keys())
     
     if profile_names:
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
         current_rules = st.session_state['profiles'][active_profile]
         cal_score, missing_items = calculate_calibration_score(current_rules)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.caption("ENGINE CONFIDENCE")
+        st.progress(cal_score / 100)
+        
+        if cal_score < 60: 
+            st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
+        elif cal_score < 90: 
+            st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
+        else: 
+            st.markdown("<span style='color: #5c6b61; font-weight: 700;'>✅ OPTIMIZED</span>", unsafe_allow_html=True)
     else:
         active_profile = None
         cal_score = 0
         current_rules = ""
         missing_items = []
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("ENGINE CONFIDENCE")
-    st.progress(cal_score / 100)
-    
-    if cal_score < 60: 
-        st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ LOW CALIBRATION</span>", unsafe_allow_html=True)
-    elif cal_score < 90: 
-        st.markdown("<span style='color: #ab8f59; font-weight: 700;'>⚠️ PARTIAL CALIBRATION</span>", unsafe_allow_html=True)
-    else: 
-        st.markdown("<span style='color: #5c6b61; font-weight: 700;'>✅ OPTIMIZED</span>", unsafe_allow_html=True)
+        st.info("No profiles loaded.")
 
     st.divider()
     app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"], label_visibility="collapsed")
@@ -301,7 +294,7 @@ if app_mode == "DASHBOARD":
     # HERO SECTION (Empty State Handling)
     if not active_profile:
         st.title("WELCOME TO SIGNET")
-        st.markdown("""<p style='font-size: 1.2rem; color: #a0a0a0;'>Initialize a brand profile to begin governance.</p>""", unsafe_allow_html=True)
+        st.markdown("""<p style='font-size: 1.2rem; color: #a0a0a0; margin-bottom: 40px;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
         
         # 3-Column Quick Start
         c1, c2, c3 = st.columns(3)
@@ -310,7 +303,7 @@ if app_mode == "DASHBOARD":
             <div class="hero-card">
                 <div class="hero-icon">🏗️</div>
                 <div class="hero-title">Create Profile</div>
-                <div class="hero-desc">Build a new brand identity from scratch.</div>
+                <div class="hero-desc">Build a new brand identity from scratch using the Architect Wizard.</div>
             </div>
             """, unsafe_allow_html=True)
         with c2:
@@ -318,7 +311,7 @@ if app_mode == "DASHBOARD":
             <div class="hero-card">
                 <div class="hero-icon">📄</div>
                 <div class="hero-title">Upload Guide</div>
-                <div class="hero-desc">Extract rules from an existing PDF.</div>
+                <div class="hero-desc">Extract rules and assets from an existing PDF Brand Guide.</div>
             </div>
             """, unsafe_allow_html=True)
         with c3:
@@ -326,11 +319,21 @@ if app_mode == "DASHBOARD":
             <div class="hero-card">
                 <div class="hero-icon">⚙️</div>
                 <div class="hero-title">Load Demo</div>
-                <div class="hero-desc">Load the Castellan sample data.</div>
+                <div class="hero-desc">Load the Castellan PR sample data for demonstration.</div>
             </div>
             """, unsafe_allow_html=True)
             
-        st.info("Navigate to **BRAND ARCHITECT** in the sidebar to begin.")
+        # Hidden Button to trigger Demo Load
+        if st.button("LOAD DEMO DATA"):
+            st.session_state['profiles']["Castellan PR (Demo)"] = """
+            1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
+            2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
+            3. VISUALS: Deep Teal, Muted Gold, Cream.
+            4. DATA DEPTH: High.
+            """
+            st.rerun()
+
+        st.info("👉 To begin, select **BRAND ARCHITECT** from the sidebar.")
 
     else:
         # ACTIVE STATE HUD
