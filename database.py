@@ -25,7 +25,7 @@ def init_db():
         )
     ''')
     
-    # 2. Profiles Table (Now with a 'content' column for JSON data)
+    # 2. Profiles Table (Stores full JSON content)
     c.execute('''
         CREATE TABLE IF NOT EXISTS brand_profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,18 +63,18 @@ def verify_user(username, password):
 
 # --- UPDATED PROFILE FUNCTIONS ---
 
-def create_profile(username, profile_name, profile_data):
-    """Saves a profile with its full data (JSON)."""
+def save_profile(username, profile_name, profile_data):
+    """Saves a profile (renamed from create_profile to match your app)."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
     # Convert the Python dictionary (profile_data) into a JSON string
     json_content = json.dumps(profile_data)
     
-    # Check for duplicates
+    # Check if profile already exists for this user
     c.execute('SELECT * FROM brand_profiles WHERE username = ? AND name = ?', (username, profile_name))
     if c.fetchone():
-        # Update existing if found
+        # Update existing
         c.execute('UPDATE brand_profiles SET content = ? WHERE username = ? AND name = ?', 
                   (json_content, username, profile_name))
     else:
@@ -94,13 +94,13 @@ def get_profiles(username):
     rows = c.fetchall()
     conn.close()
     
-    # Convert list of rows back into a Dictionary: {'Brand A': {data...}, 'Brand B': {data...}}
+    # Convert rows back into a Dictionary: {'Brand A': {data...}}
     results = {}
     for name, content in rows:
         try:
             results[name] = json.loads(content)
         except:
-            results[name] = {} # Handle empty/bad data gracefully
+            results[name] = {} 
             
     return results
 
