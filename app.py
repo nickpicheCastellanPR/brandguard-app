@@ -244,16 +244,22 @@ def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
 
 def calculate_calibration_score(profile_data):
+    # Backward compatibility: handle dict vs string
+    if isinstance(profile_data, dict):
+        text_data = profile_data.get('final_text', '')
+    else:
+        text_data = profile_data
+
     score = 0
     missing = []
-    if "STRATEGY" in profile_data: score += 10
-    if "VOICE" in profile_data: score += 10
-    if "VISUALS" in profile_data: score += 10
-    if "LOGO RULES" in profile_data: score += 10
-    if "TYPOGRAPHY" in profile_data: score += 10
-    if "Style Signature" in profile_data: score += 25
+    if "STRATEGY" in text_data: score += 10
+    if "VOICE" in text_data: score += 10
+    if "VISUALS" in text_data: score += 10
+    if "LOGO RULES" in text_data: score += 10
+    if "TYPOGRAPHY" in text_data: score += 10
+    if "Style Signature" in text_data: score += 25
     else: missing.append("Voice Samples")
-    if "SOCIAL MEDIA" in profile_data: score += 25
+    if "SOCIAL MEDIA" in text_data: score += 25
     else: missing.append("Social Screenshots")
     return score, missing
 
@@ -473,6 +479,7 @@ if app_mode == "DASHBOARD":
                             try:
                                 raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
                                 parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
+                                # Save as basic string for now since PDFs don't map to our wizard form easily
                                 st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
                                 st.success(f"SUCCESS: {dash_pdf.name} ingested.")
                                 st.session_state['dashboard_upload_open'] = False
@@ -505,7 +512,15 @@ if app_mode == "DASHBOARD":
                 st.rerun()
         with c3:
             if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
-                 st.session_state['profiles']["Castellan PR (Demo)"] = "..."
+                 # Save demo as structured dict
+                 st.session_state['profiles']["Castellan PR (Demo)"] = {
+                     "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
+                     "inputs": {
+                         "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
+                         "wiz_mission": "Architecting narratives.", "wiz_values": "Precision, Power.",
+                         "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"]
+                     }
+                 }
                  st.rerun()
         
         st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
@@ -522,7 +537,9 @@ elif app_mode == "VISUAL COMPLIANCE":
         uploaded_file = st.file_uploader("UPLOAD ASSET", type=["jpg", "png"])
         if uploaded_file and st.button("RUN AUDIT", type="primary"):
             with st.spinner("ANALYZING PIXELS..."):
-                result = logic.run_visual_audit(Image.open(uploaded_file), current_rules)
+                # Handle Dict or String profile
+                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
+                result = logic.run_visual_audit(Image.open(uploaded_file), prof_text)
                 st.markdown(result)
 
 # 3. COPY EDITOR
@@ -535,7 +552,8 @@ elif app_mode == "COPY EDITOR":
         with c2: st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{active_profile}</h3></div>""", unsafe_allow_html=True)
         if text_input and st.button("ANALYZE & REWRITE", type="primary"):
             with st.spinner("REWRITING..."):
-                result = logic.run_copy_editor(text_input, current_rules)
+                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
+                result = logic.run_copy_editor(text_input, prof_text)
                 st.markdown(result)
 
 # 4. CONTENT GENERATOR
@@ -548,8 +566,9 @@ elif app_mode == "CONTENT GENERATOR":
     key_points = st.text_area("KEY POINTS", height=150, placeholder="- Key point 1\n- Key point 2")
     if st.button("GENERATE DRAFT", type="primary"):
         with st.spinner("DRAFTING..."):
+            prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
             full_prompt_topic = f"{topic} (Audience: {audience})"
-            result = logic.run_content_generator(full_prompt_topic, format_type, key_points, current_rules)
+            result = logic.run_content_generator(full_prompt_topic, format_type, key_points, prof_text)
             st.markdown(result)
 
 # 5. BRAND ARCHITECT
@@ -624,17 +643,13 @@ elif app_mode == "BRAND ARCHITECT":
                             st.rerun()
             st.divider()
             
-            # --- DYNAMIC PALETTE PICKERS ---
             st.markdown("##### COLOR PALETTE")
             st.caption("Press 'Enter' after pasting a hex code for it to register.")
             
-            # Primary Loop
             st.markdown("**PRIMARY COLORS**")
             for i, color in enumerate(st.session_state['palette_primary']):
                 c1, c2 = st.columns([4,1])
-                with c1: 
-                    # Key ensures unique widgets
-                    st.session_state['palette_primary'][i] = st.color_picker(f"Primary {i+1}", color, key=f"p_{i}")
+                with c1: st.session_state['palette_primary'][i] = st.color_picker(f"Primary {i+1}", color, key=f"p_{i}")
                 with c2:
                     if st.button("REMOVE", key=f"del_p_{i}", type="secondary"):
                         remove_palette_color('palette_primary', i)
@@ -642,12 +657,10 @@ elif app_mode == "BRAND ARCHITECT":
             st.button("ADD PRIMARY COLOR", on_click=add_palette_color, args=('palette_primary',))
             
             st.markdown("---")
-            # Secondary Loop
             st.markdown("**SECONDARY COLORS**")
             for i, color in enumerate(st.session_state['palette_secondary']):
                 c1, c2 = st.columns([4,1])
-                with c1: 
-                    st.session_state['palette_secondary'][i] = st.color_picker(f"Secondary {i+1}", color, key=f"s_{i}")
+                with c1: st.session_state['palette_secondary'][i] = st.color_picker(f"Secondary {i+1}", color, key=f"s_{i}")
                 with c2:
                     if st.button("REMOVE", key=f"del_s_{i}", type="secondary"):
                         remove_palette_color('palette_secondary', i)
@@ -655,12 +668,10 @@ elif app_mode == "BRAND ARCHITECT":
             st.button("ADD SECONDARY COLOR", on_click=add_palette_color, args=('palette_secondary',))
             
             st.markdown("---")
-            # Accent Loop
             st.markdown("**ACCENT COLORS**")
             for i, color in enumerate(st.session_state['palette_accent']):
                 c1, c2 = st.columns([4,1])
-                with c1: 
-                    st.session_state['palette_accent'][i] = st.color_picker(f"Accent {i+1}", color, key=f"a_{i}")
+                with c1: st.session_state['palette_accent'][i] = st.color_picker(f"Accent {i+1}", color, key=f"a_{i}")
                 with c2:
                     if st.button("REMOVE", key=f"del_a_{i}", type="secondary"):
                         remove_palette_color('palette_accent', i)
@@ -672,7 +683,6 @@ elif app_mode == "BRAND ARCHITECT":
             else:
                 with st.spinner("CALIBRATING..."):
                     try:
-                        # Construct Palette String from Dynamic Lists
                         palette_str = f"Primary: {', '.join(st.session_state['palette_primary'])}. Secondary: {', '.join(st.session_state['palette_secondary'])}. Accents: {', '.join(st.session_state['palette_accent'])}."
                         
                         logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
@@ -684,30 +694,31 @@ elif app_mode == "BRAND ARCHITECT":
                         all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                         
                         prompt = f"""
-                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
-                        
-                        1. STRATEGY
-                        - Brand: {st.session_state.wiz_name}
-                        - Archetype: {st.session_state.wiz_archetype}
-                        - Mission: {st.session_state.wiz_mission}
-                        - Values: {st.session_state.wiz_values}
-                        
-                        2. VOICE
-                        - Tone Keywords: {st.session_state.wiz_tone}
-                        - Analysis of samples: {all_samples}
-                        
-                        3. VISUALS
-                        - Palette: {palette_str}
-                        - Logo: {logo_summary}
-                        - Social Media Style: {social_summary}
-                        
-                        4. GUARDRAILS
-                        - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
-                        
-                        5. DATA (TRAINING SAMPLES)
-                        {all_samples}
+                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile.
+                        1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
+                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
+                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social: {social_summary}
+                        4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
-                        st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
+                        
+                        final_text_out = logic.generate_brand_rules(prompt)
+                        
+                        # --- THE FIX: STORE AS STRUCTURED DICT ---
+                        st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = {
+                            "final_text": final_text_out,
+                            "inputs": {
+                                "wiz_name": st.session_state.wiz_name,
+                                "wiz_archetype": st.session_state.wiz_archetype,
+                                "wiz_tone": st.session_state.wiz_tone,
+                                "wiz_mission": st.session_state.wiz_mission,
+                                "wiz_values": st.session_state.wiz_values,
+                                "wiz_guardrails": st.session_state.wiz_guardrails,
+                                "palette_primary": st.session_state['palette_primary'],
+                                "palette_secondary": st.session_state['palette_secondary'],
+                                "palette_accent": st.session_state['palette_accent']
+                            }
+                        }
+                        
                         st.session_state['wiz_samples_list'] = []
                         st.session_state['wiz_social_list'] = []
                         st.session_state['wiz_logo_list'] = []
@@ -725,46 +736,88 @@ elif app_mode == "BRAND ARCHITECT":
                 st.success("EXTRACTED")
             except Exception as e: st.error(f"Error: {e}")
 
-# 6. BRAND MANAGER
+# 6. BRAND MANAGER (FIXED: FORM-BASED EDITING)
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
-        current_data = st.session_state['profiles'][target]
+        profile_obj = st.session_state['profiles'][target]
         
-        html_data = convert_to_html_brand_card(target, current_data)
+        # Determine if it's a "Structured" profile or "Legacy/Raw"
+        is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
+        
+        # Helper to get current text for export/viewing
+        final_text_view = profile_obj['final_text'] if is_structured else profile_obj
+        
+        html_data = convert_to_html_brand_card(target, final_text_view)
         st.download_button(label="DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html")
         st.divider()
         
-        def extract_section(full_text, start_marker, end_marker=None):
-            try:
-                start = full_text.find(start_marker)
-                if start == -1: return ""
-                if end_marker:
-                    end = full_text.find(end_marker)
-                    if end == -1: return full_text[start:]
-                    return full_text[start:end]
-                else: return full_text[start:]
-            except: return ""
+        if is_structured:
+            # --- FORM-BASED EDITOR ---
+            inputs = profile_obj['inputs']
+            
+            with st.expander("1. STRATEGY", expanded=True):
+                new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
+                new_arch = st.selectbox("ARCHETYPE", ARCHETYPES, index=ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0)
+                new_mission = st.text_area("MISSION", inputs['wiz_mission'])
+                new_values = st.text_area("VALUES", inputs['wiz_values'])
+            
+            with st.expander("2. VOICE"):
+                new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
+            
+            with st.expander("3. GUARDRAILS"):
+                new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
+            
+            # Simple Palette Display for now (Editing dynamic lists inside Manager is complex, keeping it read-only-ish or simple)
+            # For MVP, we allow simple text editing of palette or full re-generation.
+            # To avoid complexity, we rely on re-generating text from these inputs.
+            
+            if st.button("SAVE CHANGES & REGENERATE PROFILE"):
+                # Update the Inputs
+                profile_obj['inputs']['wiz_name'] = new_name
+                profile_obj['inputs']['wiz_archetype'] = new_arch
+                profile_obj['inputs']['wiz_mission'] = new_mission
+                profile_obj['inputs']['wiz_values'] = new_values
+                profile_obj['inputs']['wiz_tone'] = new_tone
+                profile_obj['inputs']['wiz_guardrails'] = new_guard
+                
+                # Reconstruct the Text String (Cheaper than calling AI again)
+                # We reuse the palette data from storage since we didn't edit it here yet
+                p_p = ", ".join(inputs['palette_primary'])
+                p_s = ", ".join(inputs['palette_secondary'])
+                
+                new_text = f"""
+                1. STRATEGY
+                - Brand: {new_name}
+                - Archetype: {new_arch}
+                - Mission: {new_mission}
+                - Values: {new_values}
+                
+                2. VOICE
+                - Tone Keywords: {new_tone}
+                
+                3. VISUALS
+                - Primary: {p_p}
+                - Secondary: {p_s}
+                
+                4. GUARDRAILS
+                - {new_guard}
+                """
+                profile_obj['final_text'] = new_text
+                st.session_state['profiles'][target] = profile_obj
+                st.success("UPDATED & REBUILT")
+                st.rerun()
 
-        val_strat = extract_section(current_data, "1. STRATEGY", "2. VOICE")
-        val_voice = extract_section(current_data, "2. VOICE", "3. VISUALS")
-        val_vis = extract_section(current_data, "3. VISUALS", "4. GUARDRAILS")
-        val_guard = extract_section(current_data, "4. GUARDRAILS", "5. DATA")
-        
-        edit_tab1, edit_tab2, edit_tab3, edit_tab4, edit_tab5 = st.tabs(["STRATEGY", "VOICE", "VISUALS", "GUARDRAILS", "RAW DATA"])
-        with edit_tab1: new_strat = st.text_area("EDIT STRATEGY", val_strat, height=300)
-        with edit_tab2: new_voice = st.text_area("EDIT VOICE", val_voice, height=300)
-        with edit_tab3: new_vis = st.text_area("EDIT VISUALS", val_vis, height=300)
-        with edit_tab4: new_guard = st.text_area("EDIT GUARDRAILS", val_guard, height=300)
-        with edit_tab5: new_raw = st.text_area("RAW FULL TEXT", current_data, height=300)
+        else:
+            # --- FALLBACK RAW EDITOR (For PDFs) ---
+            st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
+            new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
+            if st.button("SAVE RAW CHANGES"):
+                st.session_state['profiles'][target] = new_raw
+                st.success("SAVED")
 
-        c1, c2, c3 = st.columns(3)
-        if c1.button("SAVE CHANGES"):
-            if new_raw != current_data: st.session_state['profiles'][target] = new_raw
-            else: st.session_state['profiles'][target] = f"{new_strat}\n{new_voice}\n{new_vis}\n{new_guard}"
-            st.success("SAVED")
-        if c3.button("DELETE PROFILE"): 
+        if st.button("DELETE PROFILE"): 
             del st.session_state['profiles'][target]
             st.rerun()
 
