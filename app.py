@@ -245,6 +245,7 @@ if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
 if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] # Stores: {'platform': str, 'file': UploadedFile}
 if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     # Stores: {'file': UploadedFile}
+if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False # For Dashboard Toggle
 
 # DYNAMIC KEYS FOR UPLOADERS
 if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
@@ -439,25 +440,72 @@ if app_mode == "DASHBOARD":
         st.title("WELCOME TO SIGNET")
         st.markdown("""<p style='font-size: 1.1rem; color: #a0a0a0; margin-bottom: 40px; font-family: sans-serif;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
         
+        # --- CONDITIONAL UPLOAD MODAL ---
+        if st.session_state['dashboard_upload_open']:
+            with st.container():
+                st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0;">
+                <h3 style="color: #f5f5f0;">UPLOAD BRAND GUIDE (PDF)</h3>
+                <p style="color: #a0a0a0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p>
+                </div>""", unsafe_allow_html=True)
+                
+                dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
+                
+                col_sub, col_can = st.columns([1, 1])
+                with col_sub:
+                    if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
+                        with st.spinner("ANALYZING PDF STRUCTURE..."):
+                            # Extraction Logic
+                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000] # Limit char count
+                            
+                            # Structured Prompt
+                            parsing_prompt = f"""
+                            TASK: Analyze this Brand Guide PDF extract and restructure it into the standard Brand Profile format.
+                            
+                            SECTIONS TO EXTRACT:
+                            1. STRATEGY (Mission, Vision, Values, Archetype)
+                            2. VOICE (Tone keywords, Style instructions, Do's/Don'ts)
+                            3. VISUALS (Colors, Logo usage, Typography rules)
+                            
+                            RAW PDF CONTENT:
+                            {raw_text}
+                            """
+                            
+                            st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
+                            st.success(f"SUCCESS: {dash_pdf.name} ingested.")
+                            st.session_state['dashboard_upload_open'] = False
+                            st.rerun()
+                            
+                with col_can:
+                    if st.button("CANCEL"):
+                        st.session_state['dashboard_upload_open'] = False
+                        st.rerun()
+            st.divider()
+
+        # --- HERO CARDS ---
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("""<div class="hero-card"><div class="icon-build"></div><div class="hero-title">Create Profile</div><div class="hero-desc">Architect a new brand identity.</div></div>""", unsafe_allow_html=True)
+            if st.button("START WIZARD", use_container_width=True):
+                # We can't switch tabs programmatically in standard Streamlit easily without session hacks, 
+                # but we can direct them to the sidebar. For now, this is a visual directive.
+                st.info("Select 'BRAND ARCHITECT' in the sidebar.")
+                
         with c2:
             st.markdown("""<div class="hero-card"><div class="icon-doc"></div><div class="hero-title">Upload Guide</div><div class="hero-desc">Ingest existing PDF rules.</div></div>""", unsafe_allow_html=True)
+            if st.button("UPLOAD PDF", type="primary", use_container_width=True):
+                st.session_state['dashboard_upload_open'] = True
+                st.rerun()
+                
         with c3:
             st.markdown("""<div class="hero-card"><div class="icon-gear"></div><div class="hero-title">Load Demo</div><div class="hero-desc">Load Castellan sample data.</div></div>""", unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("LOAD DEMO DATA", type="primary"):
-            st.session_state['profiles']["Castellan PR (Demo)"] = """
-            1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
-            2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
-            3. VISUALS: Deep Teal, Muted Gold, Cream.
-            4. DATA DEPTH: High.
-            """
-            st.rerun()
-
-        st.markdown("""<div style="margin-top: 20px; padding: 15px; border: 1px solid #ab8f59; border-left: 4px solid #ab8f59; background: rgba(171, 143, 89, 0.1); color: #f5f5f0;">👉 To start fresh, select <strong>BRAND ARCHITECT</strong> from the sidebar.</div>""", unsafe_allow_html=True)
+            if st.button("LOAD DEMO DATA", use_container_width=True):
+                st.session_state['profiles']["Castellan PR (Demo)"] = """
+                1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
+                2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
+                3. VISUALS: Deep Teal, Muted Gold, Cream.
+                4. DATA DEPTH: High.
+                """
+                st.rerun()
 
     else:
         st.title("SYSTEM STATUS")
