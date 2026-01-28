@@ -405,15 +405,15 @@ def add_palette_color(key):
 def remove_palette_color(key, index):
     st.session_state[key].pop(index)
 
-# --- LOGIN / AUTH SCREEN (HERO LAYOUT) ---
+# --- LOGIN / AUTH SCREEN (HERO LAYOUT V2) ---
 if not st.session_state['authenticated']:
-    # Keep your existing CSS logic
+    # Keep your existing global CSS logic
     st.markdown("""<style>.stApp { background-color: #f5f5f0 !important; background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; } section[data-testid="stSidebar"] { display: none; } .stTextInput input { background-color: #ffffff !important; color: #24363b !important; border: 1px solid #c0c0c0 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); -webkit-text-fill-color: #24363b !important; } .stTextInput input:focus { border-color: #24363b !important; }</style>""", unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # SPLIT LAYOUT: LEFT = INFO, RIGHT = LOGIN
-    c1, c2 = st.columns([1.2, 1], gap="large")
+    # FIX 1: Balanced Column Widths [1, 1]
+    c1, c2 = st.columns([1, 1], gap="large")
     
     # --- LEFT COLUMN: THE PITCH ---
     with c1:
@@ -422,7 +422,24 @@ if not st.session_state['authenticated']:
         else:
             st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
             
+        # FIX 2: Custom Geometric CSS Shapes instead of Emojis
         st.markdown("""
+            <style>
+                /* Base Geometric Bullet Style */
+                .geo-bullet {
+                    display: inline-block;
+                    width: 12px; height: 12px;
+                    background-color: #ab8f59; /* Brand Gold */
+                    margin-right: 14px;
+                    vertical-align: middle;
+                    box-shadow: 0 0 0 2px #24363b; /* Subtle Teal Border */
+                    position: relative; top: -2px; /* Optical alignment */
+                }
+                /* Variations */
+                .geo-circle  { border-radius: 50%; }
+                .geo-diamond { transform: rotate(45deg); border-radius: 1px; }
+                .geo-square  { border-radius: 2px; }
+            </style>
             <div style='margin-top: 20px; color: #24363b;'>
                 <h1 style='border: none; padding: 0; font-size: 2.5rem; line-height: 1.2; margin-bottom: 20px;'>
                     Protect your brand's <br><span style='color: #ab8f59;'>integrity at scale.</span>
@@ -430,15 +447,21 @@ if not st.session_state['authenticated']:
                 <p style='font-size: 1.1rem; line-height: 1.6; color: #5c6b61; font-family: sans-serif;'>
                     Signet is the intelligent governance engine that ensures every piece of content—from emails to social posts—aligns perfectly with your brand identity.
                 </p>
-                <ul style='list-style: none; padding: 0; margin-top: 30px; font-family: sans-serif; color: #3d3d3d;'>
-                    <li style='margin-bottom: 15px;'><strong>🎯 Strategic Alignment:</strong> Calibrate AI to your specific archetype.</li>
-                    <li style='margin-bottom: 15px;'><strong>👁️ Visual Compliance:</strong> Audit assets against hex codes and logo rules.</li>
-                    <li style='margin-bottom: 15px;'><strong>✍️ Perfect Copy:</strong> Rewrite drafts to match your executive voice.</li>
+                <ul style='list-style: none; padding: 0; margin-top: 30px; font-family: sans-serif; color: #3d3d3d; font-size: 1.05rem;'>
+                    <li style='margin-bottom: 18px;'>
+                        <span class="geo-bullet geo-circle"></span><strong>Strategic Alignment:</strong> Calibrate AI to your specific archetype.
+                    </li>
+                    <li style='margin-bottom: 18px;'>
+                        <span class="geo-bullet geo-diamond"></span><strong>Visual Compliance:</strong> Audit assets against hex codes and logo rules.
+                    </li>
+                    <li style='margin-bottom: 18px;'>
+                        <span class="geo-bullet geo-square"></span><strong>Perfect Copy:</strong> Rewrite drafts to match your executive voice.
+                    </li>
                 </ul>
             </div>
         """, unsafe_allow_html=True)
 
-    # --- RIGHT COLUMN: THE LOGIN ---
+    # --- RIGHT COLUMN: THE LOGIN (Unchanged) ---
     with c2:
         st.markdown("<div style='background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border-top: 5px solid #24363b;'>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
@@ -995,6 +1018,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
