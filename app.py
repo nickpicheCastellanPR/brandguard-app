@@ -4,6 +4,7 @@ import os
 import re
 import json
 from logic import SignetLogic
+import database as db # IMPORT THE NEW DB HANDLER
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -19,10 +20,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize Logic
+# Initialize Logic & Database
 logic = SignetLogic()
+if 'db_init' not in st.session_state:
+    db.init_db()
+    st.session_state['db_init'] = True
 
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
+# (KEEP YOUR EXISTING CSS BLOCK HERE - IT IS PERFECT)
 st.markdown("""
 <style>
     /* 1. PALETTE DEFINITION */
@@ -205,33 +210,29 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE ---
+# --- SESSION STATE & AUTH ---
 if 'authenticated' not in st.session_state: st.session_state['authenticated'] = False
-if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
+if 'user_id' not in st.session_state: st.session_state['user_id'] = None
+if 'username' not in st.session_state: st.session_state['username'] = None
 
-# NAV STATE
+# WIZARD STATE DEFAULTS
+def init_wizard_state():
+    if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
+    if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] 
+    if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     
+    if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False 
+    if 'palette_primary' not in st.session_state: st.session_state['palette_primary'] = ["#24363b"]
+    if 'palette_secondary' not in st.session_state: st.session_state['palette_secondary'] = ["#f5f5f0", "#5c6b61"]
+    if 'palette_accent' not in st.session_state: st.session_state['palette_accent'] = ["#ab8f59"]
+    # Dynamic Keys
+    if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
+    if 'social_uploader_key' not in st.session_state: st.session_state['social_uploader_key'] = 1000
+    if 'logo_uploader_key' not in st.session_state: st.session_state['logo_uploader_key'] = 2000
+
+init_wizard_state()
+
+if 'profiles' not in st.session_state: st.session_state['profiles'] = {}
 if 'nav_selection' not in st.session_state: st.session_state['nav_selection'] = "DASHBOARD"
-
-# WIZARD STATE LISTS
-if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
-if 'wiz_social_list' not in st.session_state: st.session_state['wiz_social_list'] = [] 
-if 'wiz_logo_list' not in st.session_state: st.session_state['wiz_logo_list'] = []     
-if 'dashboard_upload_open' not in st.session_state: st.session_state['dashboard_upload_open'] = False 
-
-# DYNAMIC COLOR PALETTES
-if 'palette_primary' not in st.session_state: st.session_state['palette_primary'] = ["#24363b"]
-if 'palette_secondary' not in st.session_state: st.session_state['palette_secondary'] = ["#f5f5f0", "#5c6b61"]
-if 'palette_accent' not in st.session_state: st.session_state['palette_accent'] = ["#ab8f59"]
-
-# DYNAMIC KEYS FOR UPLOADERS
-if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
-if 'social_uploader_key' not in st.session_state: st.session_state['social_uploader_key'] = 1000
-if 'logo_uploader_key' not in st.session_state: st.session_state['logo_uploader_key'] = 2000
-
-if 'profiles' not in st.session_state:
-    st.session_state['profiles'] = {}
-
-MAX_CHECKS = 50
 
 ARCHETYPES = [
     "The Ruler", "The Creator", "The Sage", "The Innocent", 
@@ -248,7 +249,6 @@ def calculate_calibration_score(profile_data):
         text_data = profile_data.get('final_text', '')
     else:
         text_data = profile_data
-
     score = 0
     missing = []
     if "STRATEGY" in text_data: score += 10
@@ -262,58 +262,6 @@ def calculate_calibration_score(profile_data):
     else: missing.append("Social Screenshots")
     return score, missing
 
-# --- PERSISTENCE FUNCTIONS ---
-DRAFT_FILE = "signet_draft.json"
-
-def get_current_state_json():
-    """Generates a JSON string of the current wizard state."""
-    data = {
-        "wiz_name": st.session_state.get("wiz_name", ""),
-        "wiz_archetype": st.session_state.get("wiz_archetype", ""),
-        "wiz_tone": st.session_state.get("wiz_tone", ""),
-        "wiz_mission": st.session_state.get("wiz_mission", ""),
-        "wiz_values": st.session_state.get("wiz_values", ""),
-        "wiz_guardrails": st.session_state.get("wiz_guardrails", ""),
-        "wiz_samples_list": st.session_state.get("wiz_samples_list", []),
-        "palette_primary": st.session_state.get("palette_primary", []),
-        "palette_secondary": st.session_state.get("palette_secondary", []),
-        "palette_accent": st.session_state.get("palette_accent", [])
-    }
-    return json.dumps(data, indent=2)
-
-def load_wizard_draft(uploaded_file):
-    """Parses uploaded JSON and updates session state."""
-    if uploaded_file is not None:
-        try:
-            data = json.load(uploaded_file)
-            st.session_state["wiz_name"] = data.get("wiz_name", "")
-            st.session_state["wiz_archetype"] = data.get("wiz_archetype", None)
-            st.session_state["wiz_tone"] = data.get("wiz_tone", "")
-            st.session_state["wiz_mission"] = data.get("wiz_mission", "")
-            st.session_state["wiz_values"] = data.get("wiz_values", "")
-            st.session_state["wiz_guardrails"] = data.get("wiz_guardrails", "")
-            st.session_state["wiz_samples_list"] = data.get("wiz_samples_list", [])
-            st.session_state["palette_primary"] = data.get("palette_primary", ["#24363b"])
-            st.session_state["palette_secondary"] = data.get("palette_secondary", ["#f5f5f0"])
-            st.session_state["palette_accent"] = data.get("palette_accent", ["#ab8f59"])
-            st.toast("Draft Loaded Successfully", icon="✅")
-        except Exception as e:
-            st.error(f"Failed to load draft: {e}")
-
-def load_completed_profile(uploaded_file):
-    try:
-        data = json.load(uploaded_file)
-        if "inputs" in data and "final_text" in data:
-            name = data['inputs'].get('wiz_name', 'Imported Profile')
-            key_name = f"{name} (Imported)"
-            st.session_state['profiles'][key_name] = data
-            st.toast(f"Profile '{name}' Loaded!", icon="✅")
-        else:
-            st.error("Invalid Profile File: Missing core data.")
-    except Exception as e:
-        st.error(f"Failed to load profile: {e}")
-
-# --- EXPORT TO HTML FUNCTION ---
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -395,30 +343,9 @@ def add_palette_color(key):
 def remove_palette_color(key, index):
     st.session_state[key].pop(index)
 
-# --- LOGIN SCREEN ---
+# --- LOGIN / AUTH SCREEN ---
 if not st.session_state['authenticated']:
-    st.markdown("""
-    <style>
-        .stApp {
-            background-color: #f5f5f0 !important;
-            background-image: 
-                linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px),
-                radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%),
-                radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
-            background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
-        }
-        section[data-testid="stSidebar"] { display: none; }
-        .stTextInput input {
-            background-color: #ffffff !important;
-            color: #24363b !important;
-            border: 1px solid #c0c0c0 !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            -webkit-text-fill-color: #24363b !important;
-        }
-        .stTextInput input:focus { border-color: #24363b !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown("""<style>.stApp { background-color: #f5f5f0 !important; background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; } section[data-testid="stSidebar"] { display: none; } .stTextInput input { background-color: #ffffff !important; color: #24363b !important; border: 1px solid #c0c0c0 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); -webkit-text-fill-color: #24363b !important; } .stTextInput input:focus { border-color: #24363b !important; }</style>""", unsafe_allow_html=True)
 
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
@@ -428,23 +355,46 @@ if not st.session_state['authenticated']:
         else:
             st.markdown("<div style='text-align: center; font-size: 3.5rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
         st.markdown("<div style='text-align: center; color: #5c6b61; font-size: 0.8rem; letter-spacing: 0.3em; font-weight: 700; margin-top: 15px; margin-bottom: 30px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
-        password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
-        if st.button("INITIALIZE SYSTEM", type="primary"):
-            if logic.check_password(password):
-                st.session_state['authenticated'] = True
-                st.rerun()
-            else:
-                st.error("⛔ ACCESS DENIED")
+        
+        login_tab, reg_tab = st.tabs(["LOGIN", "REGISTER"])
+        
+        with login_tab:
+            l_user = st.text_input("USERNAME", key="l_user")
+            l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
+            if st.button("ENTER", type="primary"):
+                uid = db.verify_user(l_user, l_pass)
+                if uid:
+                    st.session_state['authenticated'] = True
+                    st.session_state['user_id'] = uid
+                    st.session_state['username'] = l_user
+                    # LOAD PROFILES FROM DB
+                    st.session_state['profiles'] = db.get_profiles(uid)
+                    st.rerun()
+                else:
+                    st.error("Invalid Credentials")
+        
+        with reg_tab:
+            r_user = st.text_input("CHOOSE USERNAME", key="r_user")
+            r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
+            if st.button("CREATE ACCOUNT"):
+                if db.create_user(r_user, r_pass):
+                    st.success("Account created! Please log in.")
+                else:
+                    st.error("Username already taken.")
+
         st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- SIDEBAR (AUTHENTICATED) ---
+# --- SIDEBAR ---
 with st.sidebar:
     if os.path.exists("Signet_Logo_Color.png"):
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
+    st.caption(f"LOGGED IN AS: {st.session_state.get('username', 'User').upper()}")
+    
+    # Refresh Profiles from DB logic if needed, but session state usually holds it
     profile_names = list(st.session_state['profiles'].keys())
     
     if profile_names:
@@ -468,8 +418,7 @@ with st.sidebar:
     st.divider()
     app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed", key="nav_selection")
     st.divider()
-    st.markdown("<div style='text-align: center; color: #24363b; font-size: 0.6rem; letter-spacing: 0.1em; margin-bottom: 10px;'>POWERED BY CASTELLAN PR</div>", unsafe_allow_html=True)
-    if st.button("SHUT DOWN"):
+    if st.button("LOGOUT"):
         st.session_state['authenticated'] = False
         st.rerun()
 
@@ -492,7 +441,12 @@ if app_mode == "DASHBOARD":
                             try:
                                 raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
                                 parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
-                                st.session_state['profiles'][f"{dash_pdf.name} (PDF)"] = logic.generate_brand_rules(parsing_prompt)
+                                profile_data = logic.generate_brand_rules(parsing_prompt)
+                                # Save to DB immediately
+                                profile_name = f"{dash_pdf.name} (PDF)"
+                                db.save_profile(st.session_state['user_id'], profile_name, profile_data)
+                                st.session_state['profiles'][profile_name] = profile_data
+                                
                                 st.success(f"SUCCESS: {dash_pdf.name} ingested.")
                                 st.session_state['dashboard_upload_open'] = False
                                 st.rerun()
@@ -524,7 +478,7 @@ if app_mode == "DASHBOARD":
                 st.rerun()
         with c3:
             if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
-                 st.session_state['profiles']["Castellan PR (Demo)"] = {
+                 demo_data = {
                      "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
                      "inputs": {
                          "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
@@ -532,6 +486,8 @@ if app_mode == "DASHBOARD":
                          "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"], "palette_accent": ["#f5f5f0"]
                      }
                  }
+                 st.session_state['profiles']["Castellan PR (Demo)"] = demo_data
+                 db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
                  st.rerun()
         
         st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
@@ -551,7 +507,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                 result = logic.run_visual_audit(Image.open(uploaded_file), prof_text)
                 st.markdown(result)
 
-# 3. COPY EDITOR (IMPROVED)
+# 3. COPY EDITOR
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     if not active_profile: st.warning("NO PROFILE SELECTED.")
@@ -559,30 +515,16 @@ elif app_mode == "COPY EDITOR":
         c1, c2 = st.columns([2, 1])
         with c1: 
             text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
-            
-            # --- NEW CONTEXT INPUTS ---
             cc1, cc2, cc3 = st.columns(3)
             with cc1: content_type = st.selectbox("CONTENT TYPE", ["Internal Email", "Press Release", "Blog Post", "Executive Memo", "Website Copy"])
             with cc2: sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
             with cc3: audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Employees")
-            
         with c2: st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{active_profile}</h3></div>""", unsafe_allow_html=True)
         
         if text_input and st.button("ANALYZE & REWRITE", type="primary"):
             with st.spinner("REWRITING..."):
                 prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                
-                # We wrap the new context into a single string for the logic engine
-                context_wrapper = f"""
-                CONTEXT:
-                - Type: {content_type}
-                - Sender: {sender}
-                - Audience: {audience}
-                
-                DRAFT CONTENT:
-                {text_input}
-                """
-                
+                context_wrapper = f"CONTEXT: Type: {content_type}, Sender: {sender}, Audience: {audience}\nDRAFT CONTENT: {text_input}"
                 result = logic.run_copy_editor(context_wrapper, prof_text)
                 st.markdown(result)
 
@@ -601,7 +543,7 @@ elif app_mode == "CONTENT GENERATOR":
             result = logic.run_content_generator(full_prompt_topic, format_type, key_points, prof_text)
             st.markdown(result)
 
-# 5. SOCIAL MEDIA ASSISTANT (NEW MODULE)
+# 5. SOCIAL MEDIA ASSISTANT
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
     if not active_profile: st.warning("NO PROFILE SELECTED.")
@@ -616,28 +558,21 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         if st.button("GENERATE POST", type="primary"):
             with st.spinner("ANALYZING & DRAFTING..."):
                 prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                
-                # 1. Analyze Image if present
                 img_context = ""
                 if social_img:
-                    # reusing the logic engine's vision capability
                     desc = logic.analyze_social_post(Image.open(social_img))
                     img_context = f"IMAGE CONTEXT: The post includes an image described as: {desc}"
                 
-                # 2. Construct Prompt for Social
                 social_prompt = f"""
                 TASK: Write a social media post for {platform}.
                 TOPIC: {topic_social}
                 {img_context}
-                
                 INSTRUCTIONS:
                 1. Apply the 'Social Media' rules from the Brand Profile.
                 2. Use the 'High Performing Posts' in the profile as a benchmark for tone/length.
                 3. Adhere to platform best practices for {platform} (hashtags, emoji usage, length).
                 4. Provide a 'Rationale' section explaining why you chose this angle.
                 """
-                
-                # We reuse the content generator logic as it handles the LLM call nicely
                 result = logic.run_content_generator(social_prompt, f"{platform} Post", "See prompt", prof_text)
                 st.markdown(result)
 
@@ -645,25 +580,8 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
-    # --- DRAFT ACTIONS ---
-    dc1, dc2 = st.columns([1, 6])
-    
-    # SAVE AS DOWNLOAD
-    current_json = get_current_state_json()
-    with dc1:
-        st.download_button(
-            label="SAVE DRAFT",
-            data=current_json,
-            file_name="signet_draft.json",
-            mime="application/json"
-        )
-        
-    # LOAD FROM UPLOAD
-    with dc2:
-        uploaded_draft = st.file_uploader("LOAD DRAFT", type=["json"], label_visibility="collapsed")
-        if uploaded_draft is not None:
-            load_wizard_draft(uploaded_draft)
-            st.rerun()
+    # PERSISTENCE HANDLED AUTOMATICALLY UPON GENERATION NOW
+    st.info("Profiles are automatically saved to your account upon generation.")
     
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
     with tab1:
@@ -771,43 +689,22 @@ elif app_mode == "BRAND ARCHITECT":
                 with st.spinner("CALIBRATING..."):
                     try:
                         palette_str = f"Primary: {', '.join(st.session_state['palette_primary'])}. Secondary: {', '.join(st.session_state['palette_secondary'])}. Accents: {', '.join(st.session_state['palette_accent'])}."
-                        
                         logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
                         logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
-                        
                         social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
                         social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
-                        
                         all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                         
                         prompt = f"""
                         SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
-                        
-                        1. STRATEGY
-                        - Brand: {st.session_state.wiz_name}
-                        - Archetype: {st.session_state.wiz_archetype}
-                        - Mission: {st.session_state.wiz_mission}
-                        - Values: {st.session_state.wiz_values}
-                        
-                        2. VOICE
-                        - Tone Keywords: {st.session_state.wiz_tone}
-                        - Analysis of samples: {all_samples}
-                        
-                        3. VISUALS
-                        - Palette: {palette_str}
-                        - Logo: {logo_summary}
-                        - Social Media Style: {social_summary}
-                        
-                        4. GUARDRAILS
-                        - Explicit Do's and Don'ts: {st.session_state.wiz_guardrails}
-                        
-                        5. DATA (TRAINING SAMPLES)
-                        {all_samples}
+                        1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
+                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
+                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social: {social_summary}
+                        4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
                         
                         final_text_out = logic.generate_brand_rules(prompt)
-                        
-                        st.session_state['profiles'][f"{st.session_state.wiz_name} (Gen)"] = {
+                        profile_data = {
                             "final_text": final_text_out,
                             "inputs": {
                                 "wiz_name": st.session_state.wiz_name,
@@ -822,10 +719,16 @@ elif app_mode == "BRAND ARCHITECT":
                             }
                         }
                         
+                        profile_name = f"{st.session_state.wiz_name} (Gen)"
+                        st.session_state['profiles'][profile_name] = profile_data
+                        
+                        # SAVE TO DB
+                        db.save_profile(st.session_state['user_id'], profile_name, profile_data)
+                        
                         st.session_state['wiz_samples_list'] = []
                         st.session_state['wiz_social_list'] = []
                         st.session_state['wiz_logo_list'] = []
-                        st.success("CALIBRATED")
+                        st.success("CALIBRATED & SAVED TO DATABASE")
                         st.rerun()
                     except Exception as e:
                         if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
@@ -842,21 +745,6 @@ elif app_mode == "BRAND ARCHITECT":
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
-    
-    # --- IMPORT/EXPORT COMPLETED PROFILES ---
-    with st.expander("📂 IMPORT / EXPORT PROFILE", expanded=False):
-        c_imp, c_exp = st.columns([1, 1])
-        with c_imp:
-            uploaded_profile = st.file_uploader("Load Profile JSON", type=["json"], key="profile_loader")
-            if uploaded_profile is not None:
-                if st.button("IMPORT PROFILE"):
-                    load_completed_profile(uploaded_profile)
-                    st.rerun()
-        with c_exp:
-            st.info("Select a profile below to see export options.")
-
-    st.divider()
-
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         profile_obj = st.session_state['profiles'][target]
@@ -864,20 +752,9 @@ elif app_mode == "BRAND MANAGER":
         is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
         final_text_view = profile_obj['final_text'] if is_structured else profile_obj
         
-        # --- EXPORT BUTTONS ROW ---
-        col_html, col_json = st.columns([1, 1])
+        html_data = convert_to_html_brand_card(target, final_text_view)
+        st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", use_container_width=True)
         
-        with col_html:
-            html_data = convert_to_html_brand_card(target, final_text_view)
-            st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", use_container_width=True)
-        
-        with col_json:
-            if is_structured:
-                json_data = json.dumps(profile_obj, indent=2)
-                st.download_button(label="💾 SAVE PROFILE TO FILE (JSON)", data=json_data, file_name=f"{target.replace(' ', '_')}_Profile.json", mime="application/json", use_container_width=True)
-            else:
-                st.warning("Save to File unavailable for legacy profiles.")
-
         st.divider()
         
         if is_structured:
@@ -926,6 +803,10 @@ elif app_mode == "BRAND MANAGER":
                 """
                 profile_obj['final_text'] = new_text
                 st.session_state['profiles'][target] = profile_obj
+                
+                # UPDATE DB
+                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                
                 st.success("UPDATED & REBUILT")
                 st.rerun()
 
@@ -934,10 +815,12 @@ elif app_mode == "BRAND MANAGER":
             new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
             if st.button("SAVE RAW CHANGES"):
                 st.session_state['profiles'][target] = new_raw
+                db.save_profile(st.session_state['user_id'], target, new_raw)
                 st.success("SAVED")
 
         if st.button("DELETE PROFILE"): 
             del st.session_state['profiles'][target]
+            db.delete_profile(st.session_state['user_id'], target)
             st.rerun()
 
 # --- FOOTER ---
