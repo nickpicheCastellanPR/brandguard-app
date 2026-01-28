@@ -405,31 +405,56 @@ def add_palette_color(key):
 def remove_palette_color(key, index):
     st.session_state[key].pop(index)
 
-# --- LOGIN / AUTH SCREEN ---
+# --- LOGIN / AUTH SCREEN (HERO LAYOUT) ---
 if not st.session_state['authenticated']:
+    # Keep your existing CSS logic
     st.markdown("""<style>.stApp { background-color: #f5f5f0 !important; background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; } section[data-testid="stSidebar"] { display: none; } .stTextInput input { background-color: #ffffff !important; color: #24363b !important; border: 1px solid #c0c0c0 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); -webkit-text-fill-color: #24363b !important; } .stTextInput input:focus { border-color: #24363b !important; }</style>""", unsafe_allow_html=True)
 
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # SPLIT LAYOUT: LEFT = INFO, RIGHT = LOGIN
+    c1, c2 = st.columns([1.2, 1], gap="large")
+    
+    # --- LEFT COLUMN: THE PITCH ---
+    with c1:
         if os.path.exists("Signet_Logo_Color.png"):
-            st.image("Signet_Logo_Color.png", width=300)
+            st.image("Signet_Logo_Color.png", width=180)
         else:
-            st.markdown("<div style='text-align: center; font-size: 3.5rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center; color: #5c6b61; font-size: 0.8rem; letter-spacing: 0.3em; font-weight: 700; margin-top: 15px; margin-bottom: 30px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
+            
+        st.markdown("""
+            <div style='margin-top: 20px; color: #24363b;'>
+                <h1 style='border: none; padding: 0; font-size: 2.5rem; line-height: 1.2; margin-bottom: 20px;'>
+                    Protect your brand's <br><span style='color: #ab8f59;'>integrity at scale.</span>
+                </h1>
+                <p style='font-size: 1.1rem; line-height: 1.6; color: #5c6b61; font-family: sans-serif;'>
+                    Signet is the intelligent governance engine that ensures every piece of content—from emails to social posts—aligns perfectly with your brand identity.
+                </p>
+                <ul style='list-style: none; padding: 0; margin-top: 30px; font-family: sans-serif; color: #3d3d3d;'>
+                    <li style='margin-bottom: 15px;'><strong>🎯 Strategic Alignment:</strong> Calibrate AI to your specific archetype.</li>
+                    <li style='margin-bottom: 15px;'><strong>👁️ Visual Compliance:</strong> Audit assets against hex codes and logo rules.</li>
+                    <li style='margin-bottom: 15px;'><strong>✍️ Perfect Copy:</strong> Rewrite drafts to match your executive voice.</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # --- RIGHT COLUMN: THE LOGIN ---
+    with c2:
+        st.markdown("<div style='background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border-top: 5px solid #24363b;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
         
         login_tab, reg_tab = st.tabs(["LOGIN", "REGISTER"])
         
         with login_tab:
             l_user = st.text_input("USERNAME", key="l_user")
             l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
-            if st.button("ENTER", type="primary"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("ENTER", type="primary", use_container_width=True):
                 uid = db.verify_user(l_user, l_pass)
                 if uid:
                     st.session_state['authenticated'] = True
                     st.session_state['user_id'] = uid
                     st.session_state['username'] = l_user
-                    # LOAD PROFILES FROM DB
                     st.session_state['profiles'] = db.get_profiles(uid)
                     st.rerun()
                 else:
@@ -438,15 +463,17 @@ if not st.session_state['authenticated']:
         with reg_tab:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user")
             r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
-            if st.button("CREATE ACCOUNT"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("CREATE ACCOUNT", use_container_width=True):
                 if db.create_user(r_user, r_pass):
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Username already taken.")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
+    st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
-
 # --- SIDEBAR ---
 with st.sidebar:
     # 1. BRANDING
@@ -968,6 +995,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
