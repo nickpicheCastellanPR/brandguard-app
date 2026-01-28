@@ -52,8 +52,8 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* 2. GLOW BUTTONS */
-    div.stButton > button {
+    /* 2. GLOW BUTTONS (Robust Selector) */
+    .stButton button {
         background-color: transparent !important;
         color: var(--gold) !important;
         border: 1px solid var(--gold) !important;
@@ -66,7 +66,7 @@ st.markdown("""
         box-shadow: 0 0 0 transparent; 
     }
     
-    div.stButton > button:hover {
+    .stButton button:hover {
         background-color: rgba(212, 175, 55, 0.15) !important;
         color: var(--cream) !important;
         border-color: var(--cream) !important;
@@ -75,10 +75,20 @@ st.markdown("""
     }
 
     /* 3. INPUTS (Contrast Fix) */
-    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #1c212c !important; 
-        color: #FFFFFF !important;
+    /* Targeting the input container to give it a lighter background */
+    div[data-baseweb="input"] {
+        background-color: #1c212c !important;
         border: 1px solid #444 !important;
+        border-radius: 2px !important; 
+    }
+    div[data-baseweb="input"] > div {
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #1c212c !important;
+        border: 1px solid #444 !important;
+        color: #FFFFFF !important;
     }
     
     /* 4. DASHBOARD HUD (Marcus's Requirement) */
