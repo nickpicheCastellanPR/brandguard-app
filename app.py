@@ -501,9 +501,7 @@ if app_mode == "DASHBOARD":
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("\nCREATE PROFILE\nArchitect a new brand identity"):
-                nav_to("BRAND ARCHITECT")
-                st.rerun()
+            st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=nav_to, args=("BRAND ARCHITECT",))
         with c2:
             if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
                 st.session_state['dashboard_upload_open'] = True
