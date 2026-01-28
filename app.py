@@ -395,7 +395,7 @@ with st.sidebar:
     st.caption(f"LOGGED IN AS: {st.session_state.get('username', 'User').upper()}")
     
     # Refresh Profiles from DB logic if needed, but session state usually holds it
-    profile_names = list(st.session_state['profiles'].keys())
+    profile_names = st.session_state['profiles']
     
     if profile_names:
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
@@ -825,3 +825,4 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
