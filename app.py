@@ -447,18 +447,15 @@ if app_mode == "DASHBOARD":
                         st.rerun()
             st.divider()
 
-        # --- HERO CARDS (CLICKABLE BUTTONS WITH TARGETED CSS) ---
+        # --- HERO CARDS (CLICKABLE BUTTONS WITH CSS ICONS) ---
         st.markdown("""
         <style>
-            /* TARGETED CSS: Only applies to buttons inside the specific column containers on the Dashboard.
-               We use [data-testid="stColumn"] .stButton button to hit the target accurately.
-            */
-            div[data-testid="stColumn"] .stButton button {
+            /* BASE BUTTON STYLE (Makes them look like cards) */
+            div[data-testid="column"] .stButton button {
                 background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important;
                 border: 1px solid #3a4b50 !important;
-                height: 220px !important;
+                height: 250px !important;
                 width: 100% !important;
-                white-space: pre-wrap !important; /* Forces newlines to render */
                 display: flex !important;
                 flex-direction: column !important;
                 align-items: center !important;
@@ -466,34 +463,71 @@ if app_mode == "DASHBOARD":
                 color: #f5f5f0 !important;
                 border-radius: 0px !important;
                 box-shadow: none !important;
+                padding-top: 50px !important; /* Space for the icon */
+                position: relative !important;
+                white-space: pre-wrap !important;
             }
-            
-            /* HOVER STATE */
-            div[data-testid="stColumn"] .stButton button:hover {
+            div[data-testid="column"] .stButton button:hover {
                 transform: translateY(-5px) !important;
                 border-color: #ab8f59 !important;
                 box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
                 color: #ab8f59 !important;
             }
-            
-            /* Increase text size inside these buttons */
-            div[data-testid="stColumn"] .stButton button p {
-                font-size: 1.1rem !important;
-                font-weight: 600 !important;
+            div[data-testid="column"] .stButton button p {
+                font-size: 1rem !important;
+                font-weight: 700 !important;
+                letter-spacing: 0.1em;
             }
+
+            /* --- GEOMETRIC CSS ICONS (INJECTED VIA PSEUDO-ELEMENTS) --- */
+            
+            /* 1. BLUEPRINT ICON (Create Profile) */
+            div[data-testid="column"]:nth-of-type(1) .stButton button::before {
+                content: '';
+                position: absolute;
+                top: 40px;
+                width: 40px;
+                height: 40px;
+                border: 2px solid #ab8f59;
+                box-shadow: 5px 5px 0px #5c6b61;
+            }
+
+            /* 2. DOCUMENT ICON (Upload Guide) */
+            div[data-testid="column"]:nth-of-type(2) .stButton button::before {
+                content: '';
+                position: absolute;
+                top: 40px;
+                width: 30px;
+                height: 40px;
+                border: 2px solid #ab8f59;
+                background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%);
+            }
+
+            /* 3. GEAR ICON (Load Demo) */
+            div[data-testid="column"]:nth-of-type(3) .stButton button::before {
+                content: '';
+                position: absolute;
+                top: 40px;
+                width: 40px;
+                height: 40px;
+                border: 2px solid #ab8f59;
+                border-radius: 50%;
+                background: radial-gradient(circle, #5c6b61 20%, transparent 21%);
+            }
+
         </style>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("CREATE PROFILE\nArchitect a new brand identity"):
+            if st.button("\nCREATE PROFILE\nArchitect a new brand identity"):
                 st.info("Select 'BRAND ARCHITECT' in the sidebar to begin.")
         with c2:
-            if st.button("UPLOAD GUIDE\nIngest existing PDF rules"):
+            if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
                 st.session_state['dashboard_upload_open'] = True
                 st.rerun()
         with c3:
-            if st.button("LOAD DEMO\nLoad Castellan sample data"):
+            if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
                  st.session_state['profiles']["Castellan PR (Demo)"] = """
                 1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
                 2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
