@@ -447,46 +447,53 @@ if app_mode == "DASHBOARD":
                         st.rerun()
             st.divider()
 
-        # --- HERO CARDS (BUTTONS WITH CSS OVERRIDE) ---
-        # INJECT HERO CSS ONLY FOR DASHBOARD MODE
+        # --- HERO CARDS (CLICKABLE BUTTONS WITH TARGETED CSS) ---
         st.markdown("""
         <style>
-            /* Target ALL buttons in the columns below to look like cards */
-            div[data-testid="column"] button {
+            /* TARGETED CSS: Only applies to buttons inside the specific column containers on the Dashboard.
+               We use [data-testid="stColumn"] .stButton button to hit the target accurately.
+            */
+            div[data-testid="stColumn"] .stButton button {
                 background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important;
                 border: 1px solid #3a4b50 !important;
                 height: 220px !important;
                 width: 100% !important;
+                white-space: pre-wrap !important; /* Forces newlines to render */
                 display: flex !important;
                 flex-direction: column !important;
                 align-items: center !important;
                 justify-content: center !important;
-                white-space: pre-wrap !important;
-                transition: transform 0.2s !important;
                 color: #f5f5f0 !important;
+                border-radius: 0px !important;
+                box-shadow: none !important;
             }
-            div[data-testid="column"] button:hover {
+            
+            /* HOVER STATE */
+            div[data-testid="stColumn"] .stButton button:hover {
                 transform: translateY(-5px) !important;
                 border-color: #ab8f59 !important;
                 box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
                 color: #ab8f59 !important;
             }
-            div[data-testid="column"] button p {
-                font-size: 1rem !important;
+            
+            /* Increase text size inside these buttons */
+            div[data-testid="stColumn"] .stButton button p {
+                font-size: 1.1rem !important;
+                font-weight: 600 !important;
             }
         </style>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("🛠️\n\nCREATE PROFILE\nArchitect a new brand identity"):
+            if st.button("CREATE PROFILE\nArchitect a new brand identity"):
                 st.info("Select 'BRAND ARCHITECT' in the sidebar to begin.")
         with c2:
-            if st.button("📄\n\nUPLOAD GUIDE\nIngest existing PDF rules"):
+            if st.button("UPLOAD GUIDE\nIngest existing PDF rules"):
                 st.session_state['dashboard_upload_open'] = True
                 st.rerun()
         with c3:
-            if st.button("⚙️\n\nLOAD DEMO\nLoad Castellan sample data"):
+            if st.button("LOAD DEMO\nLoad Castellan sample data"):
                  st.session_state['profiles']["Castellan PR (Demo)"] = """
                 1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
                 2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
@@ -536,7 +543,7 @@ if app_mode == "DASHBOARD":
                 for item in missing_items: 
                     st.markdown(f"""<div style="background: rgba(171, 143, 89, 0.1); border-left: 3px solid #ab8f59; color: #ab8f59; padding: 12px; margin-bottom: 8px;"><div style="font-weight: 700; font-size: 0.9rem;">MISSING DATA: {item}</div><div style="font-size: 0.75rem; opacity: 0.8; color: #f5f5f0;">Navigate to Brand Architect to upload.</div></div>""", unsafe_allow_html=True)
             else: 
-                st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border-left: 3px solid #5c6b61; color: #f5f5f0; padding: 12px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border-left: 3px solid #5c6b61; color: #f5f5f0; padding: 12px;">ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
 
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
@@ -606,7 +613,7 @@ elif app_mode == "BRAND ARCHITECT":
                 st.file_uploader("UPLOAD (PDF, DOCX, TXT, IMG)", type=["pdf", "docx", "txt", "png", "jpg"], key=u_key)
             
             # Add Button with Callback (Fixes the Error)
-            st.button("➕ ADD SAMPLE", on_click=add_voice_sample_callback)
+            st.button("ADD SAMPLE", on_click=add_voice_sample_callback)
             
             # Display Buffer
             if st.session_state['wiz_samples_list']: 
@@ -615,12 +622,12 @@ elif app_mode == "BRAND ARCHITECT":
                 
                 # Iterate safely with index to allow deletion
                 for i, sample in enumerate(st.session_state['wiz_samples_list']):
-                    col_text, col_del = st.columns([5, 1])
+                    col_text, col_del = st.columns([4, 1])
                     header = sample.split('\n')[0]
                     with col_text:
-                        st.caption(f"✅ {header}")
+                        st.caption(f"> {header}")
                     with col_del:
-                        if st.button("🗑️", key=f"del_sample_{i}", type="secondary"):
+                        if st.button("REMOVE", key=f"del_sample_{i}", type="secondary"):
                             st.session_state['wiz_samples_list'].pop(i)
                             st.rerun()
 
@@ -634,16 +641,16 @@ elif app_mode == "BRAND ARCHITECT":
             s_key = f"social_up_{st.session_state['social_uploader_key']}"
             st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
             
-            st.button("➕ ADD SOCIAL SAMPLE", on_click=add_social_callback)
+            st.button("ADD SOCIAL SAMPLE", on_click=add_social_callback)
             
             if st.session_state['wiz_social_list']:
                 st.divider()
                 st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} IMAGES**")
                 for i, item in enumerate(st.session_state['wiz_social_list']):
-                    c1, c2 = st.columns([5,1])
-                    with c1: st.caption(f"✅ {item['platform']} - {item['file'].name}")
+                    c1, c2 = st.columns([4,1])
+                    with c1: st.caption(f"> {item['platform']} - {item['file'].name}")
                     with c2: 
-                        if st.button("🗑️", key=f"del_social_{i}", type="secondary"):
+                        if st.button("REMOVE", key=f"del_social_{i}", type="secondary"):
                             st.session_state['wiz_social_list'].pop(i)
                             st.rerun()
             
@@ -653,16 +660,16 @@ elif app_mode == "BRAND ARCHITECT":
             st.markdown("##### LOGO")
             l_key = f"logo_up_{st.session_state['logo_uploader_key']}"
             st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"], key=l_key)
-            st.button("➕ ADD LOGO", on_click=add_logo_callback)
+            st.button("ADD LOGO", on_click=add_logo_callback)
             
             if st.session_state['wiz_logo_list']:
                 st.divider()
                 st.markdown(f"**LOGO BUFFER: {len(st.session_state['wiz_logo_list'])} FILES**")
                 for i, item in enumerate(st.session_state['wiz_logo_list']):
-                    c1, c2 = st.columns([5,1])
-                    with c1: st.caption(f"✅ {item['file'].name}")
+                    c1, c2 = st.columns([4,1])
+                    with c1: st.caption(f"> {item['file'].name}")
                     with c2: 
-                        if st.button("🗑️", key=f"del_logo_{i}", type="secondary"):
+                        if st.button("REMOVE", key=f"del_logo_{i}", type="secondary"):
                             st.session_state['wiz_logo_list'].pop(i)
                             st.rerun()
             
