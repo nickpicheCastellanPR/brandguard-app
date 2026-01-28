@@ -405,14 +405,52 @@ def add_palette_color(key):
 def remove_palette_color(key, index):
     st.session_state[key].pop(index)
 
-# --- LOGIN / AUTH SCREEN (HERO LAYOUT V2) ---
+# --- LOGIN / AUTH SCREEN (HERO LAYOUT V3 - FIXED) ---
 if not st.session_state['authenticated']:
-    # Keep your existing global CSS logic
-    st.markdown("""<style>.stApp { background-color: #f5f5f0 !important; background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; } section[data-testid="stSidebar"] { display: none; } .stTextInput input { background-color: #ffffff !important; color: #24363b !important; border: 1px solid #c0c0c0 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); -webkit-text-fill-color: #24363b !important; } .stTextInput input:focus { border-color: #24363b !important; }</style>""", unsafe_allow_html=True)
+    # 1. GLOBAL STYLES + LOGIN CARD CSS
+    st.markdown("""<style>
+        .stApp { 
+            background-color: #f5f5f0 !important; 
+            background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); 
+            background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; 
+        } 
+        section[data-testid="stSidebar"] { display: none; } 
+        .stTextInput input { 
+            background-color: #ffffff !important; 
+            color: #24363b !important; 
+            border: 1px solid #c0c0c0 !important; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            -webkit-text-fill-color: #24363b !important; 
+        } 
+        .stTextInput input:focus { border-color: #24363b !important; }
+        
+        /* FIX: TARGET THE RIGHT COLUMN TO CREATE THE CARD LOOK WITHOUT HTML WRAPPERS */
+        div[data-testid="column"]:nth-of-type(2) > div[data-testid="stVerticalBlock"] {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            border-top: 5px solid #24363b;
+        }
+        
+        /* Base Geometric Bullet Style */
+        .geo-bullet {
+            display: inline-block;
+            width: 12px; height: 12px;
+            background-color: #ab8f59; /* Brand Gold */
+            margin-right: 14px;
+            vertical-align: middle;
+            box-shadow: 0 0 0 2px #24363b; /* Subtle Teal Border */
+            position: relative; top: -2px; 
+        }
+        .geo-circle  { border-radius: 50%; }
+        .geo-diamond { transform: rotate(45deg); border-radius: 1px; }
+        .geo-square  { border-radius: 2px; }
+    </style>""", unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # FIX 1: Balanced Column Widths [1, 1]
+    # 2. BALANCED COLUMNS
     c1, c2 = st.columns([1, 1], gap="large")
     
     # --- LEFT COLUMN: THE PITCH ---
@@ -422,24 +460,7 @@ if not st.session_state['authenticated']:
         else:
             st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
             
-        # FIX 2: Custom Geometric CSS Shapes instead of Emojis
         st.markdown("""
-            <style>
-                /* Base Geometric Bullet Style */
-                .geo-bullet {
-                    display: inline-block;
-                    width: 12px; height: 12px;
-                    background-color: #ab8f59; /* Brand Gold */
-                    margin-right: 14px;
-                    vertical-align: middle;
-                    box-shadow: 0 0 0 2px #24363b; /* Subtle Teal Border */
-                    position: relative; top: -2px; /* Optical alignment */
-                }
-                /* Variations */
-                .geo-circle  { border-radius: 50%; }
-                .geo-diamond { transform: rotate(45deg); border-radius: 1px; }
-                .geo-square  { border-radius: 2px; }
-            </style>
             <div style='margin-top: 20px; color: #24363b;'>
                 <h1 style='border: none; padding: 0; font-size: 2.5rem; line-height: 1.2; margin-bottom: 20px;'>
                     Protect your brand's <br><span style='color: #ab8f59;'>integrity at scale.</span>
@@ -461,9 +482,11 @@ if not st.session_state['authenticated']:
             </div>
         """, unsafe_allow_html=True)
 
-    # --- RIGHT COLUMN: THE LOGIN (Unchanged) ---
+    # --- RIGHT COLUMN: THE LOGIN ---
     with c2:
-        st.markdown("<div style='background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border-top: 5px solid #24363b;'>", unsafe_allow_html=True)
+        # REMOVED: The st.markdown wrapper div that caused the ghost box.
+        # The CSS above now handles the white card background.
+        
         st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
         
         login_tab, reg_tab = st.tabs(["LOGIN", "REGISTER"])
@@ -492,8 +515,6 @@ if not st.session_state['authenticated']:
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Username already taken.")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
@@ -1018,6 +1039,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
