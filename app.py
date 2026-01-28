@@ -14,37 +14,38 @@ st.set_page_config(
 
 logic = SignetLogic()
 
-# --- PREMIUM CSS OVERHAUL (V2.1 - Contrast Fix) ---
+# --- PREMIUM CSS OVERHAUL (V3.0 - FORCED DARK MODE) ---
 st.markdown("""
 <style>
-    /* 1. GLOBAL FONTS & THEME */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-    
-    html, body, [class*="css"]  {
-        font-family: 'Inter', sans-serif;
-        color: #E0E0E0;
-        background-color: #0E1117; /* Deepest Dark Blue/Black */
+    /* 1. FORCE DARK MODE (Overrides Browser Light Mode) */
+    [data-testid="stAppViewContainer"], .stApp {
+        background-color: #0E1117 !important; /* Deepest Dark Blue/Black */
+        color: #E0E0E0 !important;
     }
     
-    /* 2. SIDEBAR STYLING */
+    /* 2. GLOBAL FONTS */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* 3. SIDEBAR STYLING */
     section[data-testid="stSidebar"] {
-        background-color: #050505; /* Pure Black for high contrast */
+        background-color: #050505 !important; /* Pure Black */
         border-right: 1px solid #2A2A2A;
     }
     
-    /* LOGO CONTAINER FIX: 
-       This targets the First Image in the Sidebar (The Logo).
-       It adds a light background so the Dark Text is visible. */
+    /* LOGO CONTAINER (Light Box Effect) */
     section[data-testid="stSidebar"] [data-testid="stImage"] {
-        background-color: #E0E0E0; /* Light Grey Background */
+        background-color: #E0E0E0; 
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
-    /* NAVIGATION MENU STYLING */
-    div[role="radiogroup"] > label > div:first-of-type {display: None;} /* Hide circles */
+    /* NAVIGATION MENU */
+    div[role="radiogroup"] > label > div:first-of-type {display: None;}
     div[role="radiogroup"] label {
         background: transparent;
         padding: 12px 15px;
@@ -52,45 +53,42 @@ st.markdown("""
         margin-bottom: 6px;
         border: 1px solid transparent;
         transition: all 0.2s ease;
-        color: #CCCCCC !important; /* High Contrast Grey */
+        color: #999 !important;
         font-weight: 500;
         cursor: pointer;
         display: block; 
     }
     div[role="radiogroup"] label:hover {
         background: #1E1E1E;
-        color: #FFFFFF !important; /* Pure White on Hover */
+        color: #FFF !important;
         border-color: #333;
         transform: translateX(4px); 
     }
-    /* Active State styling */
     div[role="radiogroup"] label[data-checked="true"] {
-        background: #1E1E1E;
+        background: #1A1A1A;
         color: #D4AF37 !important; /* Gold */
         border-left: 3px solid #D4AF37;
+        font-weight: 600;
     }
     
-    /* 3. INPUT FIELDS (Forced High Contrast) */
-    /* Force text to be white and background to be dark charcoal */
-    input[type="text"], input[type="password"], textarea {
-        background-color: #1E1E1E !important;
+    /* 4. INPUT FIELDS (Forced Dark Mode High Contrast) */
+    /* We target the specific input classes to override Light Mode defaults */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #1A1A1A !important;
         color: #FFFFFF !important;
-        border: 1px solid #444 !important;
-        border-radius: 6px;
+        border: 1px solid #333 !important;
     }
-    /* Focus state */
-    input:focus, textarea:focus {
+    .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: #D4AF37 !important;
         box-shadow: 0 0 0 1px #D4AF37 !important;
-        color: #FFFFFF !important;
     }
-    /* Select Box / Dropdown Text */
-    div[data-baseweb="select"] > div {
-        background-color: #1E1E1E !important;
-        color: #FFFFFF !important;
+    /* Placeholder text color fix */
+    ::placeholder {
+        color: #666 !important;
+        opacity: 1;
     }
 
-    /* 4. BUTTONS (Castellan Gold & Blue) */
+    /* 5. BUTTONS (Castellan Gold & Blue) */
     .stButton>button {
         background-color: #24363b; 
         color: white;
@@ -101,7 +99,7 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.05em;
         transition: 0.3s;
-        width: 100%;
+        width: 100%; /* Force Full Width */
     }
     .stButton>button:hover {
         background-color: #D4AF37; 
@@ -110,29 +108,28 @@ st.markdown("""
         box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); 
     }
     
-    /* 5. DASHBOARD CARDS */
+    /* 6. DASHBOARD CARDS & METRICS */
     div[data-testid="stMetric"] {
-        background-color: #161616;
+        background-color: #141414;
         border: 1px solid #333;
-        padding: 15px;
+        padding: 20px;
         border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     [data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
         color: #D4AF37 !important;
+        font-size: 2rem !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #888 !important;
     }
     
-    /* 6. WARNING BOX */
-    .custom-warning {
-        background-color: #1E1E1E;
-        border-left: 4px solid #D4AF37;
-        padding: 15px;
-        border-radius: 4px;
-        color: #E0E0E0;
-        margin-bottom: 20px;
+    /* Container styling for Dashboard Cards */
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {
+        background-color: transparent;
     }
 
-    /* UTILITIES */
+    /* 7. UTILITIES & FOOTER */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -142,16 +139,28 @@ st.markdown("""
         left: 0;
         bottom: 0;
         width: 100%;
-        background-color: #0E0E0E;
+        background-color: #050505;
         color: #444;
         text-align: right;
-        padding: 8px 30px;
-        font-size: 10px;
+        padding: 10px 30px;
+        font-size: 11px;
         border-top: 1px solid #222;
         z-index: 999;
         letter-spacing: 1px;
     }
-    .block-container { padding-bottom: 50px; }
+    /* Add padding to bottom so content isn't hidden by footer */
+    .block-container { padding-bottom: 80px; }
+    
+    /* Custom Warning Box */
+    .custom-warning {
+        background-color: #1A1A1A;
+        border-left: 4px solid #D4AF37;
+        padding: 20px;
+        border-radius: 4px;
+        color: #E0E0E0;
+        margin-bottom: 20px;
+        font-size: 0.95rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -171,7 +180,7 @@ if not st.session_state['authenticated']:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
-        # FIX: Restrict logo width so it doesn't explode
+        # Logo sizing fix
         if os.path.exists("Signet_Logo_Color.png"): 
             st.image("Signet_Logo_Color.png", width=300) 
         else: 
@@ -179,7 +188,6 @@ if not st.session_state['authenticated']:
         
         st.markdown("<p style='text-align: center; color: #666; font-size: 0.9rem; margin-top: -10px;'>ENTERPRISE BRAND GOVERNANCE</p><br>", unsafe_allow_html=True)
         
-        # Input color fixed via CSS
         pwd = st.text_input("SECURE ACCESS CODE", type="password", label_visibility="collapsed", placeholder="Enter Access Code")
         if st.button("AUTHENTICATE"):
             if logic.check_password(pwd):
@@ -192,7 +200,7 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # Logo is now styled by CSS to have a light background container
+    # Logo container is styled by CSS
     if os.path.exists("Signet_Logo_Color.png"): 
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else: 
@@ -264,15 +272,16 @@ if app_mode == "Dashboard":
         c1, c2, c3 = st.columns(3)
         with c1:
             with st.container(border=True):
-                st.markdown("**Visual Audit**")
+                st.markdown("**🎨 Visual Audit**")
                 st.caption("Validate creative assets.")
+                # We can add navigation logic or just visual buttons
         with c2:
             with st.container(border=True):
-                st.markdown("**Ghost Writer**")
+                st.markdown("**✍️ Ghost Writer**")
                 st.caption("Draft executive comms.")
         with c3:
             with st.container(border=True):
-                st.markdown("**Social Strategy**")
+                st.markdown("**📱 Social Strategy**")
                 st.caption("Generate posts.")
 
 # ==========================================
@@ -383,7 +392,6 @@ elif app_mode == "Brand Architect":
             
             st.markdown("---")
             st.markdown("##### 🗣️ Voice Calibration (Ghost-Writer)")
-            st.caption("Upload 'Gold Standard' samples (PDFs/Screenshots) to train the AI on specific formats.")
             
             # STAGING AREA
             col_in1, col_in2 = st.columns([1,2])
