@@ -129,6 +129,10 @@ st.markdown("""
         letter-spacing: 0.15em;
         transition: all 0.2s;
         padding: 0.6rem 1.2rem;
+        /* UPDATED: Allow multi-line buttons for Hero Cards */
+        white-space: pre-wrap !important; 
+        height: auto !important;
+        min-height: 50px;
     }
     .stButton button:hover {
         background-color: var(--c-gold-muted) !important;
@@ -166,40 +170,6 @@ st.markdown("""
     }
     div.stAlert > div { color: var(--c-cream) !important; }
     
-    /* 9. HERO CARDS (Icons via CSS) */
-    .hero-card {
-        background: linear-gradient(135deg, var(--c-teal-dark) 0%, #111 100%);
-        border: 1px solid #3a4b50;
-        padding: 30px;
-        text-align: center;
-        margin: 10px;
-        transition: transform 0.2s;
-        height: 220px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-    }
-    .hero-card:hover { 
-        transform: translateY(-5px); 
-        border-color: var(--c-gold-muted); 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4); 
-    }
-    
-    /* CSS Icons */
-    .icon-build { width: 40px; height: 40px; border: 2px solid var(--c-gold-muted); position: relative; margin-bottom: 20px; }
-    .icon-build::after { content: ''; position: absolute; top: -10px; left: 10px; width: 100%; height: 100%; border: 2px solid var(--c-sage); }
-    
-    .icon-doc { width: 30px; height: 40px; border: 2px solid var(--c-gold-muted); margin-bottom: 20px; position: relative; }
-    .icon-doc::before { content: ''; position: absolute; top: 5px; left: 5px; width: 15px; height: 2px; background: var(--c-sage); box-shadow: 0 5px 0 var(--c-sage), 0 10px 0 var(--c-sage); }
-
-    .icon-gear { width: 40px; height: 40px; border: 2px solid var(--c-gold-muted); border-radius: 50%; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; }
-    .icon-gear::after { content: ''; width: 10px; height: 10px; background: var(--c-sage); }
-
-    .hero-title { font-weight: 800; color: var(--c-cream); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.1em;}
-    .hero-desc { color: #a0a0a0; font-size: 0.8rem; margin-top: 10px; font-family: monospace; }
-
     /* 10. STATUS INDICATORS */
     .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
     .dot-green { background-color: #4cd964; box-shadow: 0 0 10px #4cd964; }
@@ -481,31 +451,37 @@ if app_mode == "DASHBOARD":
                         st.rerun()
             st.divider()
 
-        # --- HERO CARDS ---
+        # --- HERO BUTTONS (REPLACING CARDS) ---
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown("""<div class="hero-card"><div class="icon-build"></div><div class="hero-title">Create Profile</div><div class="hero-desc">Architect a new brand identity.</div></div>""", unsafe_allow_html=True)
-            if st.button("START WIZARD", use_container_width=True):
-                # We can't switch tabs programmatically in standard Streamlit easily without session hacks, 
-                # but we can direct them to the sidebar. For now, this is a visual directive.
-                st.info("Select 'BRAND ARCHITECT' in the sidebar.")
-                
+            if st.button("🛠️\nCREATE PROFILE\nArchitect a new brand identity", use_container_width=True):
+                st.info("Select 'BRAND ARCHITECT' in the sidebar to begin.")
         with c2:
-            st.markdown("""<div class="hero-card"><div class="icon-doc"></div><div class="hero-title">Upload Guide</div><div class="hero-desc">Ingest existing PDF rules.</div></div>""", unsafe_allow_html=True)
-            if st.button("UPLOAD PDF", type="primary", use_container_width=True):
+            if st.button("📄\nUPLOAD GUIDE\nIngest existing PDF rules", use_container_width=True):
                 st.session_state['dashboard_upload_open'] = True
                 st.rerun()
-                
         with c3:
-            st.markdown("""<div class="hero-card"><div class="icon-gear"></div><div class="hero-title">Load Demo</div><div class="hero-desc">Load Castellan sample data.</div></div>""", unsafe_allow_html=True)
-            if st.button("LOAD DEMO DATA", use_container_width=True):
-                st.session_state['profiles']["Castellan PR (Demo)"] = """
+            if st.button("⚙️\nLOAD DEMO\nLoad Castellan sample data", use_container_width=True):
+                 st.session_state['profiles']["Castellan PR (Demo)"] = """
                 1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
                 2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
                 3. VISUALS: Deep Teal, Muted Gold, Cream.
                 4. DATA DEPTH: High.
                 """
-                st.rerun()
+                 st.rerun()
+        
+        # --- ABOUT / DESCRIPTIVE TEXT ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;">
+            <h3 style="color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;">INTELLIGENT BRAND GOVERNANCE</h3>
+            <p style="color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;">
+                Signet is a proprietary engine designed to enforce strategic, visual, and tonal consistency across all communications. 
+                By digitizing your brand's core DNA—from mission statements to visual palettes—Signet ensures that every asset generated or audited 
+                aligns perfectly with your established identity.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     else:
         st.title("SYSTEM STATUS")
