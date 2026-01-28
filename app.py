@@ -261,7 +261,85 @@ def calculate_calibration_score(profile_data):
     if "SOCIAL MEDIA" in text_data: score += 25
     else: missing.append("Social Screenshots")
     return score, missing
+import re
 
+def calculate_calibration_score(profile_data):
+    # 1. Normalize Input
+    if isinstance(profile_data, dict):
+        text_data = profile_data.get('final_text', '')
+    else:
+        text_data = str(profile_data)
+    
+    score = 0
+    
+    # 2. Foundation Check (50 pts)
+    # Using specific headers your Wizard/Parser generates
+    core_sections = ["STRATEGY", "VOICE", "VISUALS", "LOGO RULES", "TYPOGRAPHY"]
+    foundations_found = 0
+    missing_core = []
+    
+    for section in core_sections:
+        if section in text_data:
+            foundations_found += 1
+        else:
+            missing_core.append(section.title()) # e.g. "Logo Rules"
+            
+    score += (foundations_found * 10)
+
+    # 3. Confidence Check (Word Count Volume) (50 pts)
+    # Regex to grab text between headers to count words
+    style_match = re.search(r'Style Signature(.*?)(SOCIAL MEDIA|$)', text_data, re.DOTALL)
+    social_match = re.search(r'SOCIAL MEDIA(.*?)$', text_data, re.DOTALL)
+    
+    style_count = len(style_match.group(1).split()) if style_match else 0
+    social_count = len(social_match.group(1).split()) if social_match else 0
+    
+    # Simple volume scaling
+    if style_count > 150: score += 25
+    elif style_count > 50: score += 10
+    
+    if social_count > 100: score += 25
+    elif social_count > 30: score += 10
+
+    # 4. Determine Status, Color & Specific Advice
+    if score < 50:
+        # TIER 1: FOUNDATION (Charcoal)
+        status_label = "Foundation"
+        # Use your exact charcoal hex
+        color = "#3d3d3d" 
+        # Advice: Tell them exactly which core section is missing
+        if missing_core:
+            next_step = f"Missing core data: {missing_core[0]}"
+        else:
+            next_step = "Add Strategy details to unlock the next tier."
+        msg = f"⚠️ <b>Risk: High.</b> {next_step}"
+
+    elif score < 80:
+        # TIER 2: DEVELOPING (Gold)
+        status_label = "Developing"
+        # Use your exact gold hex
+        color = "#ab8f59" 
+        # Advice: Tell them to add volume
+        if style_count < 150:
+            msg = "💡 <b>Refinement:</b> Add more writing samples to capture your tone."
+        elif social_count < 100:
+            msg = "💡 <b>Refinement:</b> Add social media examples to improve post generation."
+        else:
+            msg = "💡 <b>Refinement:</b> Fill out all sections to maximize accuracy."
+
+    else:
+        # TIER 3: CALIBRATED (Sage)
+        status_label = "Calibrated"
+        # Use the "Vibrant Sage" we designed
+        color = "#4E8065" 
+        msg = "✅ <b>Ready:</b> Signet has sufficient data to generate on-brand content."
+
+    return {
+        "score": score,
+        "status_label": status_label,
+        "color": color,
+        "message": msg
+    }
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -825,5 +903,6 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
