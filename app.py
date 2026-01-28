@@ -446,7 +446,12 @@ if not st.session_state['authenticated']:
 
 # --- SIDEBAR ---
 with st.sidebar:
+    # 1. LOGO AS HOME BUTTON
     if os.path.exists("Signet_Logo_Color.png"):
+        # If they click the image, it acts as a "Home" button
+        if st.button("🏠 DASHBOARD", use_container_width=True):
+            st.session_state['nav_selection'] = "DASHBOARD"
+            st.rerun()
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
@@ -502,70 +507,133 @@ with st.sidebar:
 # --- MODULES ---
 
 # 1. DASHBOARD
+# 1. DASHBOARD
 if app_mode == "DASHBOARD":
-    if not active_profile:
-        st.title("WELCOME TO SIGNET")
-        st.markdown("""<p style='font-size: 1.1rem; color: #a0a0a0; margin-bottom: 40px; font-family: sans-serif;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
-        
-        if st.session_state['dashboard_upload_open']:
-            with st.container():
-                st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0;"><h3 style="color: #f5f5f0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
-                dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
-                col_sub, col_can = st.columns([1, 1])
-                with col_sub:
-                    if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
-                        with st.spinner("ANALYZING PDF STRUCTURE..."):
-                            try:
-                                raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
-                                parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
-                                profile_data = logic.generate_brand_rules(parsing_prompt)
-                                # Save to DB immediately
-                                profile_name = f"{dash_pdf.name} (PDF)"
-                                db.save_profile(st.session_state['user_id'], profile_name, profile_data)
-                                st.session_state['profiles'][profile_name] = profile_data
-                                
-                                st.success(f"SUCCESS: {dash_pdf.name} ingested.")
-                                st.session_state['dashboard_upload_open'] = False
-                                st.rerun()
-                            except Exception as e:
-                                if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: The engine needs a break. Please wait 60 seconds.")
-                                else: st.error(f"Error: {e}")
-                with col_can:
-                    if st.button("CANCEL"):
-                        st.session_state['dashboard_upload_open'] = False
-                        st.rerun()
-            st.divider()
+    st.title("BRAND COMMAND CENTER")
+    
+    # --- TOP AREA: ACTIONS ---
+    # We keep the styling for the big 3 buttons
+    st.markdown("""<style>
+        div[data-testid*="Column"] .stButton button {
+            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
+        }
+        div[data-testid*="Column"] .stButton button:hover { transform: translateY(-5px) !important; border-color: #ab8f59 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; color: #ab8f59 !important; }
+        div[data-testid*="Column"] .stButton button p { font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0.1em; }
+        div[data-testid*="Column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
+        div[data-testid*="Column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
+        div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
+    </style>""", unsafe_allow_html=True)
 
-        st.markdown("""<style>
-            div[data-testid*="Column"] .stButton button {
-                background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
-            }
-            div[data-testid*="Column"] .stButton button:hover { transform: translateY(-5px) !important; border-color: #ab8f59 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; color: #ab8f59 !important; }
-            div[data-testid*="Column"] .stButton button p { font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0.1em; }
-            div[data-testid*="Column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
-            div[data-testid*="Column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
-            div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
-        </style>""", unsafe_allow_html=True)
-
-        c1, c2, c3 = st.columns(3)
-        with c1: st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=nav_to, args=("BRAND ARCHITECT",))
-        with c2: 
-            if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
-                st.session_state['dashboard_upload_open'] = True
-                st.rerun()
-        with c3:
-            if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
-                 demo_data = {
-                     "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
-                     "inputs": {
-                         "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
-                         "wiz_mission": "Architecting narratives.", "wiz_values": "Precision, Power.",
-                         "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"], "palette_accent": ["#f5f5f0"]
-                     }
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=nav_to, args=("BRAND ARCHITECT",))
+    with c2: 
+        if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
+            st.session_state['dashboard_upload_open'] = True
+            st.rerun()
+    with c3:
+        if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
+             demo_data = {
+                 "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
+                 "inputs": {
+                     "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
+                     "wiz_mission": "Architecting narratives.", "wiz_values": "Precision, Power.",
+                     "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"], "palette_accent": ["#f5f5f0"]
                  }
-                 st.session_state['profiles']["Castellan PR (Demo)"] = demo_data
-                 db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
-                 st.rerun()
+             }
+             st.session_state['profiles']["Castellan PR (Demo)"] = demo_data
+             db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
+             st.rerun()
+
+    # --- UPLOAD SECTION (Conditional) ---
+    if st.session_state['dashboard_upload_open']:
+        with st.container():
+            st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0;"><h3 style="color: #f5f5f0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
+            dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
+            col_sub, col_can = st.columns([1, 1])
+            with col_sub:
+                if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
+                    with st.spinner("ANALYZING PDF STRUCTURE..."):
+                        try:
+                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
+                            parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
+                            profile_data = logic.generate_brand_rules(parsing_prompt)
+                            # Save to DB immediately
+                            profile_name = f"{dash_pdf.name} (PDF)"
+                            db.save_profile(st.session_state['user_id'], profile_name, profile_data)
+                            st.session_state['profiles'][profile_name] = profile_data
+                            
+                            st.success(f"SUCCESS: {dash_pdf.name} ingested.")
+                            st.session_state['dashboard_upload_open'] = False
+                            st.rerun()
+                        except Exception as e:
+                            if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: The engine needs a break. Please wait 60 seconds.")
+                            else: st.error(f"Error: {e}")
+            with col_can:
+                if st.button("CANCEL"):
+                    st.session_state['dashboard_upload_open'] = False
+                    st.rerun()
+        st.divider()
+
+    # --- THE LIBRARY GRID (ALWAYS VISIBLE) ---
+    st.divider()
+    st.markdown("### BRAND SIGNAL LIBRARY")
+    
+    profiles = db.get_profiles(st.session_state['user_id'])
+    
+    if not profiles:
+        st.info("No active signals found. Initialize a profile above.")
+    else:
+        # Sort keys to ensure consistent order
+        profile_names = sorted(list(profiles.keys()))
+        
+        # Grid Logic
+        for i in range(0, len(profile_names), 3):
+            cols = st.columns(3)
+            for j in range(3):
+                if i + j < len(profile_names):
+                    p_name = profile_names[i+j]
+                    p_data = profiles[p_name]
+                    
+                    with cols[j]:
+                        with st.container():
+                            # START CARD
+                            st.markdown(f"<div class='dashboard-card'>", unsafe_allow_html=True)
+                            
+                            # HEADER
+                            st.markdown(f"#### {p_name}")
+                            
+                            # METER
+                            metrics = calculate_calibration_score(p_data)
+                            st.markdown(f"""
+                                <style>
+                                    .metric-container {{ font-family: 'Source Sans Pro', sans-serif; margin-bottom: 15px; }}
+                                    .metric-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }}
+                                    .metric-label {{ font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #5c6b61; }}
+                                    .metric-value {{ font-size: 0.85rem; font-weight: 800; color: {metrics['color']}; }}
+                                    .progress-track {{ width: 100%; height: 5px; background-color: #dcdcd9; border-radius: 999px; overflow: hidden; }}
+                                    .progress-fill {{ height: 100%; width: {metrics['score']}%; background-color: {metrics['color']}; border-radius: 999px; transition: width 0.8s ease; }}
+                                    .metric-hint {{ font-size: 0.75rem; color: #5c6b61; margin-top: 6px; font-style: italic; opacity: 0.9; min-height: 2.4em; }}
+                                </style>
+                                <div class="metric-container">
+                                    <div class="metric-header">
+                                        <span class="metric-label">{metrics['status_label']}</span>
+                                        <span class="metric-value">{metrics['score']}%</span>
+                                    </div>
+                                    <div class="progress-track">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div class="metric-hint">{metrics['message']}</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # ACTION BUTTON
+                            # This sets the profile as active AND moves you to the Architect tab
+                            if st.button("ACTIVATE SIGNAL", key=f"open_{p_name}", use_container_width=True):
+                                st.session_state['active_profile'] = p_name
+                                st.session_state['nav_selection'] = "BRAND ARCHITECT" # Force navigation
+                                st.rerun()
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
         
         # --- EXISTING BRAND SIGNALS (TIERED METER) ---
         st.divider()
@@ -958,5 +1026,6 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
