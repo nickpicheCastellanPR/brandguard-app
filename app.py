@@ -4,9 +4,12 @@ import os
 from logic import SignetLogic
 
 # --- PAGE CONFIG ---
-# Using the uploaded icon file if available, otherwise a generic fallback
+# Attempt to load icon, fallback to nothing if missing (no emojis allowed)
 icon_path = "Signet_Icon_Color.png"
-page_icon = Image.open(icon_path) if os.path.exists(icon_path) else "🛡️"
+if os.path.exists(icon_path):
+    page_icon = Image.open(icon_path)
+else:
+    page_icon = None 
 
 st.set_page_config(
     page_title="Signet", 
@@ -48,27 +51,27 @@ st.markdown("""
         color: var(--c-teal-deep) !important;
     }
     
-    /* 3. NAVIGATION MENU (Clean List) */
+    /* 3. NAVIGATION MENU (Clean List - No Radio Circles) */
     div[role="radiogroup"] label > div:first-child { display: none !important; }
     div[role="radiogroup"] label {
         padding: 12px 20px !important;
-        border-radius: 4px !important;
-        margin-bottom: 8px !important;
-        border: 1px solid transparent !important;
+        border-radius: 0px !important;
+        border-left: 2px solid transparent !important;
+        margin-bottom: 4px !important;
         transition: all 0.2s ease;
         font-weight: 600 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
+        font-family: 'Helvetica Neue', sans-serif !important;
     }
     div[role="radiogroup"] label:hover {
-        background-color: rgba(171, 143, 89, 0.1) !important;
+        background-color: rgba(36, 54, 59, 0.05) !important; /* Subtle Teal Tint */
         border-left: 4px solid var(--c-gold-muted) !important;
         padding-left: 16px !important;
     }
     div[role="radiogroup"] label[data-checked="true"] {
         background-color: var(--c-teal-deep) !important;
         color: var(--c-cream) !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     div[role="radiogroup"] label[data-checked="true"] * { color: var(--c-cream) !important; }
 
@@ -79,7 +82,7 @@ st.markdown("""
         text-transform: uppercase;
         color: var(--c-cream) !important;
         padding-bottom: 15px;
-        border-bottom: 2px solid var(--c-gold-muted);
+        border-bottom: 1px solid var(--c-gold-muted);
         letter-spacing: 0.05em;
     }
     
@@ -90,13 +93,14 @@ st.markdown("""
         background-color: var(--c-teal-dark) !important;
         border: 1px solid var(--c-sage) !important;
         color: var(--c-cream) !important;
+        border-radius: 0px !important; /* Architectural Sharpness */
     }
     .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: var(--c-gold-muted) !important;
-        box-shadow: 0 0 5px rgba(171, 143, 89, 0.5) !important;
+        box-shadow: 0 0 5px rgba(171, 143, 89, 0.3) !important;
     }
 
-    /* 6. BUTTONS */
+    /* 6. BUTTONS (Geometric & Sharp) */
     .stButton button {
         background-color: transparent !important;
         border: 1px solid var(--c-gold-muted) !important;
@@ -104,13 +108,14 @@ st.markdown("""
         border-radius: 0px !important;
         font-weight: 700 !important;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.15em;
         transition: all 0.2s;
+        padding: 0.6rem 1.2rem;
     }
     .stButton button:hover {
         background-color: var(--c-gold-muted) !important;
         color: var(--c-teal-deep) !important;
-        box-shadow: 0 0 15px rgba(171, 143, 89, 0.3);
+        box-shadow: 0 0 15px rgba(171, 143, 89, 0.2);
     }
     button[kind="primary"] {
         background: var(--c-gold-muted) !important;
@@ -118,50 +123,101 @@ st.markdown("""
         border: none !important;
     }
 
-    /* 7. DASHBOARD CARDS & HERO */
+    /* 7. DASHBOARD CARDS & HERO (No Emojis) */
     .dashboard-card {
-        background-color: rgba(0,0,0,0.2);
+        background-color: rgba(27, 42, 46, 0.6);
         border: 1px solid var(--c-sage);
         border-left: 4px solid var(--c-gold-muted);
         padding: 25px;
-        border-radius: 4px;
         margin-bottom: 20px;
     }
+    
+    /* CUSTOM GRAPHIC ICONS (CSS Shapes) */
     .hero-card {
         background: linear-gradient(135deg, var(--c-teal-dark) 0%, #111 100%);
-        border: 1px solid var(--c-gold-muted);
+        border: 1px solid #3a4b50;
         padding: 30px;
         text-align: center;
-        border-radius: 8px;
         margin: 10px;
         transition: transform 0.2s;
-        height: 200px;
+        height: 220px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        cursor: pointer;
     }
-    .hero-card:hover { transform: translateY(-5px); border-color: var(--c-sage); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .hero-icon { font-size: 3rem; margin-bottom: 10px; }
-    .hero-title { font-weight: 800; color: var(--c-gold-muted); font-size: 1.2rem; text-transform: uppercase; }
-    .hero-desc { color: #a0a0a0; font-size: 0.9rem; margin-bottom: 15px; }
+    .hero-card:hover { 
+        transform: translateY(-5px); 
+        border-color: var(--c-gold-muted); 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4); 
+    }
+    
+    /* Icon 1: The Builder (Stacked Squares) */
+    .icon-build {
+        width: 40px; height: 40px;
+        border: 2px solid var(--c-gold-muted);
+        position: relative;
+        margin-bottom: 20px;
+    }
+    .icon-build::after {
+        content: ''; position: absolute;
+        top: -10px; left: 10px;
+        width: 100%; height: 100%;
+        border: 2px solid var(--c-sage);
+    }
+    
+    /* Icon 2: The Document (Folded Corner) */
+    .icon-doc {
+        width: 30px; height: 40px;
+        border: 2px solid var(--c-gold-muted);
+        background: transparent;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .icon-doc::before {
+        content: ''; position: absolute;
+        top: 5px; left: 5px; width: 15px; height: 2px;
+        background: var(--c-sage); box-shadow: 0 5px 0 var(--c-sage), 0 10px 0 var(--c-sage);
+    }
+
+    /* Icon 3: The Gear (Circle + Cross) */
+    .icon-gear {
+        width: 40px; height: 40px;
+        border: 2px solid var(--c-gold-muted);
+        border-radius: 50%;
+        margin-bottom: 20px;
+        display: flex; justify-content: center; align-items: center;
+    }
+    .icon-gear::after {
+        content: ''; width: 10px; height: 10px;
+        background: var(--c-sage);
+    }
+
+    .hero-title { font-weight: 800; color: var(--c-cream); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.1em;}
+    .hero-desc { color: #a0a0a0; font-size: 0.8rem; margin-top: 10px; font-family: monospace; }
+
+    /* STATUS INDICATORS (No Emojis) */
+    .status-dot {
+        height: 10px; width: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+    }
+    .dot-green { background-color: #4cd964; box-shadow: 0 0 10px #4cd964; }
+    .dot-red { background-color: #ff5f56; opacity: 0.5; }
+    .dot-yellow { background-color: var(--c-gold-muted); box-shadow: 0 0 5px var(--c-gold-muted); }
 
     .status-row {
-        background: rgba(0,0,0,0.3);
+        background: rgba(255,255,255,0.03);
         padding: 15px;
         margin-bottom: 10px;
-        border-radius: 4px;
+        border-left: 2px solid transparent;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border: 1px solid transparent;
     }
-    .status-row.online { border-color: var(--c-sage); }
-    .status-row.offline { border-color: #8a3a3a; }
     
-    .status-label { font-weight: 700; font-size: 0.9rem; letter-spacing: 0.1em; color: var(--c-cream); }
-    .status-badge { font-family: monospace; font-weight: 700; color: var(--c-gold-muted); }
-
     /* 8. CLEANUP */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -176,25 +232,16 @@ if 'check_count' not in st.session_state: st.session_state['check_count'] = 0
 if 'wiz_temp_sample' not in st.session_state: st.session_state['wiz_temp_sample'] = ""
 if 'wiz_samples_list' not in st.session_state: st.session_state['wiz_samples_list'] = []
 
-# START EMPTY - No profiles by default to trigger the Onboarding View
+# START EMPTY - Trigger onboarding
 if 'profiles' not in st.session_state:
     st.session_state['profiles'] = {}
 
 MAX_CHECKS = 50
 
 ARCHETYPES = [
-    "The Ruler: Control, leadership, responsibility",
-    "The Creator: Innovation, imagination, expression",
-    "The Sage: Wisdom, truth, expertise",
-    "The Innocent: Optimism, safety, simplicity",
-    "The Outlaw: Disruption, liberation, rebellion",
-    "The Magician: Transformation, vision, wonder",
-    "The Hero: Mastery, action, courage",
-    "The Lover: Intimacy, connection, indulgence",
-    "The Jester: Humor, play, enjoyment",
-    "The Everyman: Belonging, connection, down-to-earth",
-    "The Caregiver: Service, nurturing, protection",
-    "The Explorer: Freedom, discovery, authenticity"
+    "The Ruler", "The Creator", "The Sage", "The Innocent", 
+    "The Outlaw", "The Magician", "The Hero", "The Lover", 
+    "The Jester", "The Everyman", "The Caregiver", "The Explorer"
 ]
 
 # --- HELPER FUNCTIONS ---
@@ -217,24 +264,45 @@ def add_voice_sample():
         st.session_state['wiz_samples_list'].append(st.session_state.wiz_temp_sample)
         st.session_state.wiz_temp_sample = ""
 
-# --- LOGIN SCREEN ---
+# --- LOGIN SCREEN (CREAM EDITION) ---
 if not st.session_state['authenticated']:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    # Injecting Specific Styles for the Login Page ONLY
+    st.markdown("""
+    <style>
+        .stApp {
+            background-color: #f5f5f0 !important; /* CREAM BACKGROUND */
+            background-image: radial-gradient(circle at 10% 20%, rgba(92, 107, 97, 0.1) 0%, transparent 20%), 
+                              radial-gradient(circle at 90% 80%, rgba(36, 54, 59, 0.1) 0%, transparent 20%);
+        }
+        /* Hide sidebar on login */
+        section[data-testid="stSidebar"] { display: none; }
+        
+        /* Dark Inputs for Contrast on Cream */
+        .stTextInput input {
+            background-color: #e8e8e3 !important;
+            color: #24363b !important;
+            border: 1px solid #c0c0c0 !important;
+        }
+        .stTextInput input:focus {
+            border-color: #24363b !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # Use Real Logo if available
+        # LOGO - DARK VERSION FOR CREAM BACKGROUND
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=300)
-        elif os.path.exists("Signet_Icon_Color.png"):
-            st.image("Signet_Icon_Color.png", width=150) 
         else:
-            st.markdown("<div style='text-align: center; font-size: 3rem; color: #ab8f59; font-weight: 800; letter-spacing: 0.1em;'>SIGNET</div>", unsafe_allow_html=True)
+            # Fallback Text Logo (Dark Teal)
+            st.markdown("<div style='text-align: center; font-size: 3.5rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
         
-        st.markdown("<div style='text-align: center; color: #f5f5f0; font-size: 0.8rem; letter-spacing: 0.2em; opacity: 0.7; margin-top: 10px; margin-bottom: 20px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
-        st.markdown("<hr style='border-color: #5c6b61;'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #5c6b61; font-size: 0.8rem; letter-spacing: 0.3em; font-weight: 700; margin-top: 15px; margin-bottom: 30px;'>INTELLIGENT BRAND GOVERNANCE</div>", unsafe_allow_html=True)
         
         password = st.text_input("ACCESS KEY", type="password", label_visibility="collapsed", placeholder="ENTER ACCESS KEY")
-        st.markdown("<br>", unsafe_allow_html=True)
+        
         if st.button("INITIALIZE SYSTEM", type="primary"):
             if logic.check_password(password):
                 st.session_state['authenticated'] = True
@@ -243,16 +311,14 @@ if not st.session_state['authenticated']:
                 st.error("⛔ ACCESS DENIED")
     st.stop()
 
-# --- SIDEBAR ---
+# --- SIDEBAR (AUTHENTICATED) ---
 with st.sidebar:
-    # Sidebar uses the Icon + Text if available, or just text
+    # Sidebar is Cream. Logo should be Dark.
     if os.path.exists("Signet_Logo_Color.png"):
         st.image("Signet_Logo_Color.png", use_container_width=True)
     else:
-        st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center;">SIGNET</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    st.divider()
-
     # Profile Selector Logic
     profile_names = list(st.session_state['profiles'].keys())
     
@@ -276,7 +342,8 @@ with st.sidebar:
         cal_score = 0
         current_rules = ""
         missing_items = []
-        st.info("No profiles loaded.")
+        # No profile loaded indicator
+        st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
     app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "BRAND ARCHITECT", "PROFILE MANAGER"], label_visibility="collapsed")
@@ -288,43 +355,44 @@ with st.sidebar:
 
 # --- MODULES ---
 
-# 1. DASHBOARD (The Command Center)
+# 1. DASHBOARD (Command Center)
 if app_mode == "DASHBOARD":
     
-    # HERO SECTION (Empty State Handling)
+    # EMPTY STATE (Day 1 Experience)
     if not active_profile:
         st.title("WELCOME TO SIGNET")
-        st.markdown("""<p style='font-size: 1.2rem; color: #a0a0a0; margin-bottom: 40px;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
+        st.markdown("""<p style='font-size: 1.1rem; color: #a0a0a0; margin-bottom: 40px; font-family: sans-serif;'>Initialize a brand profile to begin governance operations.</p>""", unsafe_allow_html=True)
         
-        # 3-Column Quick Start
+        # 3-Column Quick Start with CSS Icons (No Emojis)
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("""
             <div class="hero-card">
-                <div class="hero-icon">🏗️</div>
+                <div class="icon-build"></div>
                 <div class="hero-title">Create Profile</div>
-                <div class="hero-desc">Build a new brand identity from scratch using the Architect Wizard.</div>
+                <div class="hero-desc">Architect a new brand identity.</div>
             </div>
             """, unsafe_allow_html=True)
         with c2:
             st.markdown("""
             <div class="hero-card">
-                <div class="hero-icon">📄</div>
+                <div class="icon-doc"></div>
                 <div class="hero-title">Upload Guide</div>
-                <div class="hero-desc">Extract rules and assets from an existing PDF Brand Guide.</div>
+                <div class="hero-desc">Ingest existing PDF rules.</div>
             </div>
             """, unsafe_allow_html=True)
         with c3:
             st.markdown("""
             <div class="hero-card">
-                <div class="hero-icon">⚙️</div>
+                <div class="icon-gear"></div>
                 <div class="hero-title">Load Demo</div>
-                <div class="hero-desc">Load the Castellan PR sample data for demonstration.</div>
+                <div class="hero-desc">Load Castellan sample data.</div>
             </div>
             """, unsafe_allow_html=True)
             
         # Hidden Button to trigger Demo Load
-        if st.button("LOAD DEMO DATA"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("LOAD DEMO DATA", type="primary"):
             st.session_state['profiles']["Castellan PR (Demo)"] = """
             1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.
             2. VOICE: Professional, Authoritative, Direct. Style Signature: Concise.
@@ -333,7 +401,7 @@ if app_mode == "DASHBOARD":
             """
             st.rerun()
 
-        st.info("👉 To begin, select **BRAND ARCHITECT** from the sidebar.")
+        st.info("👉 To start fresh, select **BRAND ARCHITECT** from the sidebar.")
 
     else:
         # ACTIVE STATE HUD
@@ -352,17 +420,17 @@ if app_mode == "DASHBOARD":
         with c1:
             st.subheader("ENGINE CAPABILITIES")
             st.markdown(f"""
-            <div class="status-row {'online' if cal_score > 50 else 'offline'}">
+            <div class="status-row">
                 <span class="status-label">STRATEGY ENGINE</span>
-                <span class="status-badge">{'ONLINE' if cal_score > 50 else 'OFFLINE'}</span>
+                <span><span class="status-dot {'dot-green' if cal_score > 50 else 'dot-red'}"></span><span style="color: #f5f5f0; font-weight:700; font-size:0.8rem;">{'ONLINE' if cal_score > 50 else 'OFFLINE'}</span></span>
             </div>
-            <div class="status-row {'online' if cal_score > 70 else 'offline'}">
+            <div class="status-row">
                 <span class="status-label">VOICE ENGINE</span>
-                <span class="status-badge">{'ONLINE' if cal_score > 70 else 'CALIBRATING'}</span>
+                <span><span class="status-dot {'dot-green' if cal_score > 70 else 'dot-yellow'}"></span><span style="color: #f5f5f0; font-weight:700; font-size:0.8rem;">{'ONLINE' if cal_score > 70 else 'CALIBRATING'}</span></span>
             </div>
-            <div class="status-row {'online' if cal_score > 90 else 'offline'}">
+            <div class="status-row">
                 <span class="status-label">SOCIAL ENGINE</span>
-                <span class="status-badge">{'ONLINE' if cal_score > 90 else 'NO DATA'}</span>
+                <span><span class="status-dot {'dot-green' if cal_score > 90 else 'dot-red'}"></span><span style="color: #f5f5f0; font-weight:700; font-size:0.8rem;">{'ONLINE' if cal_score > 90 else 'NO DATA'}</span></span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -371,15 +439,12 @@ if app_mode == "DASHBOARD":
             if missing_items:
                 for item in missing_items: 
                     st.markdown(f"""
-                    <div style="background: rgba(171, 143, 89, 0.1); border: 1px solid #ab8f59; color: #ab8f59; padding: 12px; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center;">
-                        <span style="font-size: 1.2rem; margin-right: 10px;">⚠️</span>
-                        <div>
-                            <div style="font-weight: 700; font-size: 0.9rem;">MISSING: {item}</div>
-                            <div style="font-size: 0.75rem; opacity: 0.8;">Go to Brand Architect to upload.</div>
-                        </div>
+                    <div style="background: rgba(171, 143, 89, 0.1); border-left: 3px solid #ab8f59; color: #ab8f59; padding: 12px; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 0.9rem;">MISSING DATA: {item}</div>
+                        <div style="font-size: 0.75rem; opacity: 0.8; color: #f5f5f0;">Navigate to Brand Architect to upload.</div>
                     </div>""", unsafe_allow_html=True)
             else: 
-                st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border: 1px solid #5c6b61; color: #f5f5f0; padding: 12px; border-radius: 4px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="background: rgba(92, 107, 97, 0.2); border-left: 3px solid #5c6b61; color: #f5f5f0; padding: 12px;">✅ ALL SYSTEMS NOMINAL</div>""", unsafe_allow_html=True)
 
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
