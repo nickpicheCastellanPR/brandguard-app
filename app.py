@@ -434,6 +434,7 @@ if app_mode == "DASHBOARD":
                             1. STRATEGY (Mission, Vision, Values, Archetype)
                             2. VOICE (Tone keywords, Style instructions, Do's/Don'ts)
                             3. VISUALS (Colors, Logo usage, Typography rules)
+                            4. GUARDRAILS (Specific Do's and Don'ts, Banned words, Legal requirements)
                             
                             RAW PDF CONTENT:
                             {raw_text}
@@ -613,6 +614,8 @@ elif app_mode == "BRAND ARCHITECT":
             with c2: wiz_tone = st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold")
             wiz_mission = st.text_area("MISSION STATEMENT")
             wiz_values = st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community")
+            # --- NEW GUARDRAILS INPUT ---
+            wiz_guardrails = st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis. Always capitalize Product Names. No slang.")
             
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
@@ -697,11 +700,30 @@ elif app_mode == "BRAND ARCHITECT":
                     all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                     palette_str = f"Primary: {p1}, {p2}. Secondary: {s1}, {s2}, {s3}, {s4}. Accents: {a1}, {a2}."
                     
+                    # --- UPDATED PROMPT STRUCTURE FOR GUARDRAILS ---
                     prompt = f"""
-                    Profile for {wiz_name}. Archetype: {wiz_archetype}. 
-                    Mission: {wiz_mission}. Values: {wiz_values}. Tone Keywords: {wiz_tone}.
-                    TRAINING SAMPLES: {all_samples}
-                    Social Analysis: {social_summary}. Logo Analysis: {logo_summary}. Defined Palette: {palette_str}
+                    SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
+                    
+                    1. STRATEGY
+                    - Brand: {wiz_name}
+                    - Archetype: {wiz_archetype}
+                    - Mission: {wiz_mission}
+                    - Values: {wiz_values}
+                    
+                    2. VOICE
+                    - Tone Keywords: {wiz_tone}
+                    - Analysis of samples: {all_samples}
+                    
+                    3. VISUALS
+                    - Palette: {palette_str}
+                    - Logo: {logo_summary}
+                    - Social Media Style: {social_summary}
+                    
+                    4. GUARDRAILS
+                    - Explicit Do's and Don'ts: {wiz_guardrails}
+                    
+                    5. DATA (TRAINING SAMPLES)
+                    {all_samples}
                     """
                     st.session_state['profiles'][f"{wiz_name} (Gen)"] = logic.generate_brand_rules(prompt)
                     st.session_state['wiz_samples_list'] = []
@@ -715,15 +737,13 @@ elif app_mode == "BRAND ARCHITECT":
             st.session_state['profiles'][f"{pdf.name} (PDF)"] = logic.generate_brand_rules(f"Extract: {logic.extract_text_from_pdf(pdf)[:20000]}")
             st.success("EXTRACTED")
 
-# 6. BRAND MANAGER (FIXED: SPLIT TABS)
+# 6. BRAND MANAGER (FIXED: GUARDRAILS SPLIT)
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     if st.session_state['profiles']:
         target = st.selectbox("PROFILE", list(st.session_state['profiles'].keys()))
         current_data = st.session_state['profiles'][target]
         
-        # Simple extraction logic to split the massive string into editable sections
-        # We look for the standard headers we generated in 'logic.py' or 'wizard'
         def extract_section(full_text, start_marker, end_marker=None):
             try:
                 start = full_text.find(start_marker)
@@ -737,13 +757,14 @@ elif app_mode == "BRAND MANAGER":
             except:
                 return ""
 
-        # Attempt to split
+        # Update extraction to include Guardrails
         val_strat = extract_section(current_data, "1. STRATEGY", "2. VOICE")
         val_voice = extract_section(current_data, "2. VOICE", "3. VISUALS")
-        val_vis = extract_section(current_data, "3. VISUALS", "4. DATA")
+        val_vis = extract_section(current_data, "3. VISUALS", "4. GUARDRAILS")
+        val_guard = extract_section(current_data, "4. GUARDRAILS", "5. DATA")
         
-        # Tabs for editing
-        edit_tab1, edit_tab2, edit_tab3, edit_tab4 = st.tabs(["STRATEGY", "VOICE", "VISUALS", "RAW DATA"])
+        # New Tab Structure
+        edit_tab1, edit_tab2, edit_tab3, edit_tab4, edit_tab5 = st.tabs(["STRATEGY", "VOICE", "VISUALS", "GUARDRAILS", "RAW DATA"])
         
         with edit_tab1:
             new_strat = st.text_area("EDIT STRATEGY", val_strat, height=300)
@@ -752,16 +773,18 @@ elif app_mode == "BRAND MANAGER":
         with edit_tab3:
             new_vis = st.text_area("EDIT VISUALS", val_vis, height=300)
         with edit_tab4:
+            new_guard = st.text_area("EDIT GUARDRAILS", val_guard, height=300)
+        with edit_tab5:
             new_raw = st.text_area("RAW FULL TEXT", current_data, height=300)
 
         c1, c2, c3 = st.columns(3)
         if c1.button("SAVE CHANGES"):
-            # If Raw was edited, prioritize that. Otherwise, stitch tabs.
+            # If Raw was edited, prioritize that. Otherwise, stitch tabs including guardrails.
             if new_raw != current_data:
                 st.session_state['profiles'][target] = new_raw
             else:
                 # Reconstruct
-                st.session_state['profiles'][target] = f"{new_strat}\n{new_voice}\n{new_vis}"
+                st.session_state['profiles'][target] = f"{new_strat}\n{new_voice}\n{new_vis}\n{new_guard}"
             st.success("SAVED")
             
         if c3.button("DELETE PROFILE"): 
