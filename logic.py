@@ -16,11 +16,16 @@ class SignetLogic:
             genai.configure(api_key=self.api_key)
 
     def _get_api_key(self):
-        if "GOOGLE_API_KEY" in st.secrets:
-            return st.secrets["GOOGLE_API_KEY"]
-        elif os.getenv("GOOGLE_API_KEY"):
-            return os.getenv("GOOGLE_API_KEY")
-        return None
+    # Check Railway/System variables first
+    if "GOOGLE_API_KEY" in os.environ:
+        return os.environ["GOOGLE_API_KEY"]
+        
+    # If not found there, check local secrets file (for when you run on your laptop)
+    if "GOOGLE_API_KEY" in st.secrets:
+        return st.secrets["GOOGLE_API_KEY"]
+        
+    st.error("API Key not found!")
+    return None
 
     def check_password(self, input_password):
         CORRECT_PASSWORD = "beta" 
