@@ -142,22 +142,48 @@ class SignetLogic:
         response = model.generate_content(prompt)
         return response.text
 
-    def generate_brand_rules(self, inputs):
-        model_name = self.get_model()
-        model = genai.GenerativeModel(model_name)
-        grounded_prompt = f"""
-        ### ROLE: Brand Strategist.
-        ### INPUTS: {inputs}
-        ### INSTRUCTIONS:
-        1. NO OUTSIDE KNOWLEDGE.
-        2. ANALYZE SAMPLES for "Style Signature" (Sentence length, vocab).
-        3. FORMAT:
-           1. STRATEGY (Mission, Values, Archetype)
-           2. COLOR PALETTE
-           3. TYPOGRAPHY
-           4. LOGO RULES
-           5. VOICE & TONE (w/ Style Signature)
-           6. SOCIAL MEDIA (If applicable)
+    def generate_brand_rules_from_pdf(pdf_text):
+        # We ask for JSON specifically
+        parsing_prompt = f"""
+        TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
+        
+        RAW CONTENT:
+        {pdf_text[:50000]} # Truncate to safe limit
+        
+        INSTRUCTIONS:
+        Return a VALID JSON object with the following keys. Do not include markdown formatting (like ```json), just the raw JSON string.
+        
+        REQUIRED JSON STRUCTURE:
+        {{
+            "wiz_name": "Extract the brand name",
+            "wiz_archetype": "Infer the closest Archetype from this list: The Ruler, The Creator, The Sage, The Innocent, The Outlaw, The Magician, The Hero, The Lover, The Jester, The Everyman, The Caregiver, The Explorer",
+            "wiz_tone": "Extract 3-5 keywords describing the tone (e.g. Professional, Witty)",
+            "wiz_mission": "Extract the mission statement or purpose. If none, write a 1-sentence summary based on the text.",
+            "wiz_values": "Extract core values (comma separated)",
+            "wiz_guardrails": "Extract 'Don'ts' or negative constraints (e.g. 'Do not use jargon')",
+            "palette_primary": ["#Hex1", "#Hex2"], // Extract up to 3 primary hex codes. If none found, use ["#24363b"]
+            "palette_secondary": ["#Hex3", "#Hex4"], // Extract secondary hex codes
+            "writing_sample": "Extract a representative paragraph of copy to serve as a style sample."
+        }}
         """
-        response = model.generate_content(grounded_prompt)
-        return response.text
+        
+        # Call your AI (assuming you have a standardized call_ai function)
+        # Ensure you set temperature=0 for consistent JSON
+        try:
+            response_text = call_ai_function(parsing_prompt) # Pseudo-code for your AI call
+            
+            # Clean the response (sometimes AI adds ```json wrappers)
+            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
+            
+            import json
+            data = json.loads(cleaned_text)
+            return data
+            
+        except Exception as e:
+            print(f"JSON Parse Error: {e}")
+            # Fallback: Return a partial object so the app doesn't crash
+            return {
+                "wiz_name": "New Brand (Parse Error)",
+                "wiz_mission": "Could not auto-extract. Please fill manually.",
+                "raw_dump": response_text # Save the raw attempt just in case
+            }
