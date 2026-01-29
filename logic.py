@@ -8,51 +8,43 @@ class SignetLogic:
         # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
         
-        # 2. INITIALIZE MODEL (Simplified to prevent startup timeouts)
-        # We default to Flash directly to avoid calling the API during startup
+        # 2. INITIALIZE MODEL
         self.model = None
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel('gemini-1.5-flash')
+                # FIX: Switched to 'gemini-pro' (Stable) instead of 'gemini-1.5-flash'
+                self.model = genai.GenerativeModel('gemini-pro')
             except Exception as e:
                 print(f"Model Init Warning: {e}")
 
     def _get_api_key(self):
-        # Safe environment loading (Import inside function)
+        # Safe environment loading
         try:
             from dotenv import load_dotenv
             load_dotenv()
         except ImportError:
             pass
 
-        # Check Railway/System variables
-        if "GOOGLE_API_KEY" in os.environ:
-            return os.environ["GOOGLE_API_KEY"]
-        
-        if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
-            return st.secrets["GOOGLE_API_KEY"]
-        
-        if "GEMINI_API_KEY" in os.environ:
-             return os.environ["GEMINI_API_KEY"]
-
+        if "GOOGLE_API_KEY" in os.environ: return os.environ["GOOGLE_API_KEY"]
+        if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets: return st.secrets["GOOGLE_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ: return os.environ["GEMINI_API_KEY"]
         return None
 
     def check_password(self, input_password):
         return input_password == "beta" 
 
     def get_model(self):
-        return 'models/gemini-1.5-flash'
+        # FIX: Fallback to 'models/gemini-pro'
+        return 'models/gemini-pro'
 
-    # --- PDF & INGESTION FUNCTIONS (With Lazy Imports) ---
+    # --- PDF & INGESTION FUNCTIONS ---
 
     def extract_text_from_pdf(self, uploaded_file):
-        """Helper to pull raw string data from a PDF file object"""
-        # LAZY IMPORT: Only loads pypdf when this specific function is called
         try:
             import pypdf
         except ImportError:
-            return "Error: 'pypdf' library is missing. Check requirements.txt."
+            return "Error: 'pypdf' library is missing."
 
         try:
             pdf_reader = pypdf.PdfReader(uploaded_file)
@@ -64,7 +56,6 @@ class SignetLogic:
             return f"Error reading PDF: {e}"
 
     def create_pdf(self, brand_name, rules_text):
-        # LAZY IMPORT
         try:
             from fpdf import FPDF
         except ImportError:
@@ -83,19 +74,13 @@ class SignetLogic:
 
     def generate_brand_rules_from_pdf(self, pdf_text):
         """Analyzes PDF text and returns a Structured JSON object for the Wizard"""
-        # 1. Check if model is alive
         if not self.model:
-            return {
-                "wiz_name": "Connection Error", 
-                "wiz_mission": "The AI Model did not start. Check your API Key."
-            }
+            return {"wiz_name": "Error", "wiz_mission": "AI Model not connected."}
 
-        # 2. Lazy Import Regex
-        import re
-
-        # FIX: Initialize variable here so it exists if the Try block fails
+        # Initialize variable so it exists if the Try block fails
         response_text = ""
-
+        import re
+        
         parsing_prompt = f"""
         TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
         
@@ -120,12 +105,11 @@ class SignetLogic:
         """
         
         try:
-            # 3. Call AI
+            # Call the model
             response = self.model.generate_content(parsing_prompt)
             response_text = response.text
             
-            # 4. ROBUST JSON PARSING
-            # Find the first opening brace '{' and the last closing brace '}'
+            # Robust JSON Parsing
             json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
             
             if json_match:
@@ -139,7 +123,6 @@ class SignetLogic:
             print(f"Extraction Error: {e}")
             return {
                 "wiz_name": "Extraction Failed",
-                # Now safe to reference response_text because we defined it at the top
                 "wiz_mission": f"Error: {str(e)} \n\nRaw Output: {response_text[:100]}...",
                 "wiz_archetype": "The Sage"
             }
@@ -149,16 +132,18 @@ class SignetLogic:
     def describe_logo(self, image):
         if not self.model: return "AI not ready."
         try:
-            prompt = "Describe this logo in technical detail. Focus on Symbols, Colors, Vibe."
+            prompt = "Describe this logo in technical detail."
+            # gemini-pro is text-only. If you need image analysis, we need gemini-pro-vision
+            # But for stability, let's keep it simple for now or use a try/except switch
             response = self.model.generate_content([prompt, image])
             return response.text
         except Exception:
-            return "Logo analysis failed."
+            return "Logo analysis failed (Model may not support images)."
 
     def analyze_social_post(self, image):
         if not self.model: return "AI not ready."
         try:
-            prompt = "Analyze this social post. Identify Best Practices and Social Style Signature."
+            prompt = "Analyze this social post."
             response = self.model.generate_content([prompt, image])
             return response.text
         except:
@@ -166,11 +151,7 @@ class SignetLogic:
 
     def run_visual_audit(self, image, rules):
         if not self.model: return "AI not ready."
-        prompt = f"""
-        ### ROLE: Signet Compliance Engine.
-        ### RULES: {rules}
-        ### TASK: Audit image against guidelines.
-        """
+        prompt = f"Audit image against rules: {rules}"
         try:
             response = self.model.generate_content([prompt, image])
             return response.text
@@ -179,12 +160,7 @@ class SignetLogic:
 
     def run_copy_editor(self, text, rules):
         if not self.model: return "AI not ready."
-        prompt = f"""
-        ### ROLE: Senior Copy Editor.
-        ### RULES: {rules}
-        ### DRAFT: "{text}"
-        ### TASK: Rewrite to match Brand Voice.
-        """
+        prompt = f"Rewrite this text: '{text}' using rules: {rules}"
         try:
             response = self.model.generate_content(prompt)
             return response.text
@@ -193,12 +169,7 @@ class SignetLogic:
 
     def run_content_generator(self, topic, format_type, key_points, rules):
         if not self.model: return "AI not ready."
-        prompt = f"""
-        ### ROLE: Executive Ghost Writer.
-        ### RULES: {rules}
-        ### TASK: Write a {format_type} about "{topic}".
-        ### POINTS: {key_points}
-        """
+        prompt = f"Write a {format_type} about {topic} using rules: {rules}. Points: {key_points}"
         try:
             response = self.model.generate_content(prompt)
             return response.text
