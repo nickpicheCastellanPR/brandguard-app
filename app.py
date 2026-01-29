@@ -238,7 +238,69 @@ ARCHETYPES = [
     "The Outlaw", "The Magician", "The Hero", "The Lover", 
     "The Jester", "The Everyman", "The Caregiver", "The Explorer"
 ]
-
+# --- ARCHETYPE DEFINITIONS ---
+ARCHETYPE_INFO = {
+    "The Ruler": {
+        "tagline": "Power, Control, & Stability", 
+        "desc": "You create order from chaos. You lead with authority and expect excellence.",
+        "examples": "Rolex, Mercedes-Benz, Microsoft"
+    },
+    "The Creator": {
+        "tagline": "Innovation, Art, & Imagination",
+        "desc": "You realize a vision. You foster innovation and believe in the power of imagination.",
+        "examples": "Apple, Adobe, Lego"
+    },
+    "The Sage": {
+        "tagline": "Wisdom, Truth, & Expertise",
+        "desc": "You seek the truth. You are an expert source of information and analysis.",
+        "examples": "Google, BBC, McKinsey & Co"
+    },
+    "The Innocent": {
+        "tagline": "Optimism, Safety, & Purity",
+        "desc": "You just want to be happy. You are honest, pure, and offer a simple solution.",
+        "examples": "Dove, Coca-Cola, Nintendo"
+    },
+    "The Outlaw": {
+        "tagline": "Disruption, Liberation, & Revolution",
+        "desc": "You break the rules. You disrupt the status quo and shock people out of complacency.",
+        "examples": "Harley-Davidson, Virgin, Diesel"
+    },
+    "The Magician": {
+        "tagline": "Transformation, Vision, & Belief",
+        "desc": "You make dreams come true. You create transformative experiences.",
+        "examples": "Disney, Tesla, Dyson"
+    },
+    "The Hero": {
+        "tagline": "Mastery, Courage, & Growth",
+        "desc": "You prove worth through action. You want to improve the world through mastery.",
+        "examples": "Nike, BMW, FedEx"
+    },
+    "The Lover": {
+        "tagline": "Intimacy, Passion, & Connection",
+        "desc": "You create relationships. You evoke emotion, desire, and sensory pleasure.",
+        "examples": "Chanel, Victoria's Secret, Alfa Romeo"
+    },
+    "The Jester": {
+        "tagline": "Joy, Humor, & Lightness",
+        "desc": "You live in the moment. You help people have a good time and lighten up.",
+        "examples": "Old Spice, M&M's, Ben & Jerry's"
+    },
+    "The Everyman": {
+        "tagline": "Belonging, Connection, & Comfort",
+        "desc": "You are one of them. You are down-to-earth, supportive, and accessible.",
+        "examples": "IKEA, Target, Levi's"
+    },
+    "The Caregiver": {
+        "tagline": "Service, Nurturing, & Protection",
+        "desc": "You protect people from harm. You are compassionate, generous, and supportive.",
+        "examples": "Johnson & Johnson, Volvo, UNICEF"
+    },
+    "The Explorer": {
+        "tagline": "Freedom, Discovery, & Adventure",
+        "desc": "You seek new experiences. You help people escape the ordinary and find freedom.",
+        "examples": "Jeep, The North Face, NASA"
+    }
+}
 # --- HELPER FUNCTIONS ---
 def nav_to(page_name):
     st.session_state['nav_selection'] = page_name
@@ -825,7 +887,32 @@ elif app_mode == "BRAND ARCHITECT":
         with st.expander("1. STRATEGY (CORE)", expanded=True):
             st.text_input("BRAND NAME", key="wiz_name")
             c1, c2 = st.columns(2)
-            with c1: st.selectbox("ARCHETYPE *", ARCHETYPES, index=None, placeholder="SELECT...", key="wiz_archetype")
+            def format_archetype(option):
+                if option in ARCHETYPE_INFO:
+                    return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
+                return option
+
+            with c1: 
+                selected_arch = st.selectbox(
+                    "ARCHETYPE *", 
+                    options=ARCHETYPES, 
+                    index=None, 
+                    placeholder="SELECT...", 
+                    key="wiz_archetype",
+                    format_func=format_archetype
+                )
+            # Dynamic Info Card (Appears below the columns)
+            if selected_arch:
+                info = ARCHETYPE_INFO[selected_arch]
+                st.markdown(f"""
+                    <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 15px; margin-top: 10px; margin-bottom: 20px; border-radius: 0 4px 4px 0;">
+                        <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE VIBE:</strong>
+                        <span style="color: #5c6b61; font-size: 0.9rem;">{info['desc']}</span>
+                        <div style="margin-top: 8px; font-size: 0.8rem; color: #888;">
+                            <em>Real World Examples: {info['examples']}</em>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
             with c2: st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold", key="wiz_tone")
             st.text_area("MISSION STATEMENT", key="wiz_mission")
             st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values")
@@ -1004,7 +1091,27 @@ elif app_mode == "BRAND MANAGER":
             with st.expander("1. STRATEGY", expanded=True):
                 new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
                 idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
-                new_arch = st.selectbox("ARCHETYPE", ARCHETYPES, index=idx)
+                def format_archetype_edit(option):
+                    if option in ARCHETYPE_INFO:
+                        return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
+                    return option
+
+                idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
+            
+                new_arch = st.selectbox(
+                    "ARCHETYPE", 
+                    ARCHETYPES, 
+                    index=idx,
+                    format_func=format_archetype_edit
+                )
+                # Info Card for Editor
+                if new_arch:
+                    info = ARCHETYPE_INFO[new_arch]
+                    st.markdown(f"""
+                        <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
+                            <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
                 new_mission = st.text_area("MISSION", inputs['wiz_mission'])
                 new_values = st.text_area("VALUES", inputs['wiz_values'])
             
@@ -1066,6 +1173,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
