@@ -1103,7 +1103,7 @@ def extract_and_map_pdf():
                         if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
                         else: st.error(f"Error: {e}")
 
-    with tab2:
+        with tab2:
             st.markdown("### AUTO-FILL FROM GUIDELINES")
             st.caption("Upload a PDF to automatically populate the Wizard fields.")
             
@@ -1112,7 +1112,7 @@ def extract_and_map_pdf():
             
             # The button simply triggers the callback
             st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
-
+        
             # Display Messages based on the flags set in callback
             if st.session_state.get('extraction_success'):
                 st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
@@ -1229,6 +1229,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
