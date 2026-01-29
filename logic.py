@@ -9,15 +9,14 @@ class SignetLogic:
         # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
         
-        # 2. INITIALIZE MODEL
-        # We start with None and try to connect safely
+        # 2. INITIALIZE MAIN MODEL (TEXT ONLY - STABLE)
+        # We force 'gemini-pro' here because it is the most reliable model.
+        # This ensures the PDF Wizard and Copy Editor ALWAYS work.
         self.model = None
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Find the best available model (prioritizing Vision support)
-                model_name = self.get_model()
-                self.model = genai.GenerativeModel(model_name)
+                self.model = genai.GenerativeModel('gemini-pro')
             except Exception as e:
                 print(f"Model Init Warning: {e}")
 
@@ -35,30 +34,6 @@ class SignetLogic:
         if "GEMINI_API_KEY" in os.environ: return os.environ["GEMINI_API_KEY"]
 
         return None
-
-    def get_model(self):
-        # Helper to find the best available model version for this API Key
-        # Priority: Flash-001 (Fast+Vision) -> Flash (Generic) -> Pro-Vision (Old Vision) -> Pro (Text Only)
-        candidates = [
-            'models/gemini-1.5-flash-001',
-            'models/gemini-1.5-flash',
-            'models/gemini-pro-vision',
-            'models/gemini-pro'
-        ]
-        
-        try:
-            # Get list of models available to this key
-            available_models = [m.name for m in genai.list_models()]
-            
-            for candidate in candidates:
-                if candidate in available_models:
-                    return candidate
-            
-            # Default fallback if list_models fails or is empty
-            return 'models/gemini-1.5-flash'
-        except:
-            # If API call fails, just try the standard name
-            return 'models/gemini-1.5-flash'
 
     def check_password(self, input_password):
         return input_password == "beta" 
@@ -132,12 +107,11 @@ class SignetLogic:
         """
         
         try:
-            # Call the model
+            # Uses 'gemini-pro' (Stable Text Model)
             response = self.model.generate_content(parsing_prompt)
             response_text = response.text
             
             # ROBUST JSON PARSING (Regex Hunter)
-            # Finds the first '{' and last '}' to ignore conversational fluff
             json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
             
             if json_match:
@@ -155,38 +129,60 @@ class SignetLogic:
                 "wiz_archetype": "The Sage"
             }
 
-    # --- AI VISION & TEXT TASKS ---
+    # --- AI VISION FUNCTIONS (ISOLATED) ---
+    # These functions attempt to load a Vision model separately.
+    # If they fail, they return a clean error without crashing the app.
+
+    def _get_vision_model(self):
+        """Attempts to load a vision-capable model just for image tasks."""
+        try:
+            # Try specific version tags known to support images
+            return genai.GenerativeModel('gemini-1.5-flash-001')
+        except:
+            try:
+                # Fallback to older vision model
+                return genai.GenerativeModel('gemini-pro-vision')
+            except:
+                return None
 
     def describe_logo(self, image):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable (Model connection error)."
+        
         try:
             prompt = "Describe this logo in technical detail. Focus on Symbols, Colors, Vibe."
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
-        except Exception:
-            return "Logo analysis failed (Model may not support images)."
+        except Exception as e:
+            return f"Logo analysis failed: {str(e)}"
 
     def analyze_social_post(self, image):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable (Model connection error)."
+        
         try:
             prompt = "Analyze this social post. Identify Best Practices and Social Style Signature."
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
         except:
             return "No social data extracted."
 
     def run_visual_audit(self, image, rules):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable (Model connection error)."
+
         prompt = f"""
         ### ROLE: Signet Compliance Engine.
         ### RULES: {rules}
         ### TASK: Audit image against guidelines.
         """
         try:
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
         except:
             return "Audit failed."
+
+    # --- TEXT GENERATION FUNCTIONS (USE MAIN MODEL) ---
 
     def run_copy_editor(self, text, rules):
         if not self.model: return "AI not ready."
