@@ -143,12 +143,14 @@ class SignetLogic:
         return response.text
 
     def generate_brand_rules_from_pdf(self, pdf_text):
-        # We ask for JSON specifically
+        # 1. Initialize variable to prevent "UnboundLocalError"
+        response_text = ""
+        
         parsing_prompt = f"""
         TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
         
         RAW CONTENT:
-        {pdf_text[:50000]} # Truncate to safe limit
+        {pdf_text[:50000]}
         
         INSTRUCTIONS:
         Return a VALID JSON object with the following keys. Do not include markdown formatting (like ```json), just the raw JSON string.
@@ -161,18 +163,18 @@ class SignetLogic:
             "wiz_mission": "Extract the mission statement or purpose. If none, write a 1-sentence summary based on the text.",
             "wiz_values": "Extract core values (comma separated)",
             "wiz_guardrails": "Extract 'Don'ts' or negative constraints (e.g. 'Do not use jargon')",
-            "palette_primary": ["#Hex1", "#Hex2"], // Extract up to 3 primary hex codes. If none found, use ["#24363b"]
-            "palette_secondary": ["#Hex3", "#Hex4"], // Extract secondary hex codes
+            "palette_primary": ["#Hex1", "#Hex2"], 
+            "palette_secondary": ["#Hex3", "#Hex4"],
             "writing_sample": "Extract a representative paragraph of copy to serve as a style sample."
         }}
         """
         
-        # Call your AI (assuming you have a standardized call_ai function)
-        # Ensure you set temperature=0 for consistent JSON
         try:
-            response_text = call_ai_function(parsing_prompt) # Pseudo-code for your AI call
+            # 2. Call the AI (Using standard Gemini syntax)
+            response = self.model.generate_content(parsing_prompt)
+            response_text = response.text
             
-            # Clean the response (sometimes AI adds ```json wrappers)
+            # 3. Clean and Parse
             cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
             
             import json
@@ -183,7 +185,7 @@ class SignetLogic:
             print(f"JSON Parse Error: {e}")
             # Fallback: Return a partial object so the app doesn't crash
             return {
-                "wiz_name": "New Brand (Parse Error)",
-                "wiz_mission": "Could not auto-extract. Please fill manually.",
-                "raw_dump": response_text # Save the raw attempt just in case
+                "wiz_name": "New Brand (Extraction Failed)",
+                "wiz_mission": f"Could not auto-extract due to error: {str(e)}",
+                "raw_dump": response_text # Now safe to reference
             }
