@@ -708,23 +708,44 @@ if app_mode == "DASHBOARD":
             dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
             col_sub, col_can = st.columns([1, 1])
             with col_sub:
+                # [REPLACE THE DASHBOARD INGEST BLOCK WITH THIS]
                 if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
                     with st.spinner("ANALYZING PDF STRUCTURE..."):
                         try:
-                            raw_text = logic.extract_text_from_pdf(dash_pdf)[:50000]
-                            parsing_prompt = f"TASK: Analyze this Brand Guide PDF...\nRAW PDF CONTENT:\n{raw_text}"
-                            profile_data = logic.generate_brand_rules(parsing_prompt)
-                            # Save to DB immediately
-                            profile_name = f"{dash_pdf.name} (PDF)"
-                            db.save_profile(st.session_state['user_id'], profile_name, profile_data)
-                            st.session_state['profiles'][profile_name] = profile_data
+                            # 1. Extract Text
+                            raw_text = logic.extract_text_from_pdf(dash_pdf)
                             
-                            st.success(f"SUCCESS: {dash_pdf.name} ingested.")
-                            st.session_state['dashboard_upload_open'] = False
+                            # 2. Get Structured Data (The New Function)
+                            extracted_data = logic.generate_brand_rules_from_pdf(raw_text)
+                            
+                            # 3. Create the Profile Object (Matching the Wizard Structure)
+                            # We map the AI's JSON directly to your 'inputs' dictionary
+                            new_profile = {
+                                "inputs": {
+                                    "wiz_name": extracted_data.get("wiz_name", "New Brand"),
+                                    "wiz_archetype": extracted_data.get("wiz_archetype", "The Sage"),
+                                    "wiz_tone": extracted_data.get("wiz_tone", "Professional"),
+                                    "wiz_mission": extracted_data.get("wiz_mission", ""),
+                                    "wiz_values": extracted_data.get("wiz_values", ""),
+                                    "wiz_guardrails": extracted_data.get("wiz_guardrails", ""),
+                                    "palette_primary": extracted_data.get("palette_primary", ["#24363b"]),
+                                    "palette_secondary": extracted_data.get("palette_secondary", ["#ab8f59"]),
+                                    "palette_accent": ["#f5f5f0"] # Default
+                                },
+                                # We still generate the "Master Rules" text for the engine to read
+                                "final_text": f"1. STRATEGY\nMission: {extracted_data.get('wiz_mission')}\nValues: {extracted_data.get('wiz_values')}\n\n2. VOICE\nTone: {extracted_data.get('wiz_tone')}\nSample: {extracted_data.get('writing_sample')}"
+                            }
+                            
+                            # 4. Save
+                            profile_name = f"{extracted_data.get('wiz_name')} (PDF)"
+                            db.save_profile(st.session_state['user_id'], profile_name, new_profile)
+                            st.session_state['profiles'][profile_name] = new_profile
+                            
+                            st.success(f"SUCCESS: {profile_name} ingested.")
                             st.rerun()
+                            
                         except Exception as e:
-                            if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: The engine needs a break. Please wait 60 seconds.")
-                            else: st.error(f"Error: {e}")
+                            st.error(f"Error: {e}")
             with col_can:
                 if st.button("CANCEL"):
                     st.session_state['dashboard_upload_open'] = False
@@ -1173,6 +1194,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
