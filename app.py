@@ -21,7 +21,16 @@ st.set_page_config(
 )
 
 # Initialize Logic & Database
-logic = SignetLogic()
+# --- SAFE LOGIC INITIALIZATION ---
+import logic # Ensure this is imported
+try:
+    # Try to start the engine
+    logic_engine = logic.SignetLogic()
+except Exception as e:
+    # If it fails, STOP everything and show the error.
+    st.error(f"🚨 CRITICAL STARTUP ERROR: {e}")
+    st.code(f"Details: {type(e).__name__}", language="text")
+    st.stop()
 if 'db_init' not in st.session_state:
     db.init_db()
     st.session_state['db_init'] = True
@@ -1229,6 +1238,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
