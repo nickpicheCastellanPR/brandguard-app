@@ -82,55 +82,64 @@ class SignetLogic:
             return str(e).encode()
 
     def generate_brand_rules_from_pdf(self, pdf_text):
-        """Analyzes PDF text and returns a Structured JSON object for the Wizard"""
-        if not self.model:
-            return {"wiz_name": "Error", "wiz_mission": "AI Model not connected."}
-
-        # Initialize safe fallback
-        response_text = ""
-        
-        parsing_prompt = f"""
-        TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
-        
-        RAW CONTENT:
-        {pdf_text[:50000]}
-        
-        INSTRUCTIONS:
-        Return a VALID JSON object with the following keys. Do not include markdown formatting (like ```json), just the raw JSON string.
-        
-        REQUIRED JSON STRUCTURE:
-        {{
-            "wiz_name": "Extract the brand name",
-            "wiz_archetype": "Infer the closest Archetype from this list: The Ruler, The Creator, The Sage, The Innocent, The Outlaw, The Magician, The Hero, The Lover, The Jester, The Everyman, The Caregiver, The Explorer",
-            "wiz_tone": "Extract 3-5 keywords describing the tone (e.g. Professional, Witty)",
-            "wiz_mission": "Extract the mission statement or purpose. If none, write a 1-sentence summary based on the text.",
-            "wiz_values": "Extract core values (comma separated)",
-            "wiz_guardrails": "Extract 'Don'ts' or negative constraints (e.g. 'Do not use jargon')",
-            "palette_primary": ["#Hex1", "#Hex2"], 
-            "palette_secondary": ["#Hex3", "#Hex4"],
-            "writing_sample": "Extract a representative paragraph of copy to serve as a style sample."
-        }}
-        """
-        
-        try:
-            # Call the model
-            response = self.model.generate_content(parsing_prompt)
-            response_text = response.text
+            """Analyzes PDF text and returns a Structured JSON object for the Wizard"""
+            # 1. Check if model is alive
+            if not self.model:
+                return {
+                    "wiz_name": "Connection Error", 
+                    "wiz_mission": "The AI Model did not start. Check your API Key."
+                }
+    
+            # 2. Lazy Import Regex (Standard Python library, always safe)
+            import re
+    
+            parsing_prompt = f"""
+            TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
             
-            # Clean and Parse JSON
-            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
-            data = json.loads(cleaned_text)
-            return data
+            RAW CONTENT:
+            {pdf_text[:50000]}
             
-        except Exception as e:
-            print(f"JSON Parse Error: {e}")
-            # Fallback object so app doesn't crash
-            return {
-                "wiz_name": "New Brand (Extraction Failed)",
-                "wiz_mission": f"Could not auto-extract. Error: {str(e)}",
-                "wiz_archetype": "The Sage", 
-                "raw_dump": response_text
-            }
+            INSTRUCTIONS:
+            Return a VALID JSON object. Do not include markdown formatting.
+            
+            REQUIRED JSON STRUCTURE:
+            {{
+                "wiz_name": "Brand Name",
+                "wiz_archetype": "The Sage",
+                "wiz_tone": "Tone keywords",
+                "wiz_mission": "Mission statement",
+                "wiz_values": "Values",
+                "wiz_guardrails": "Do's and Don'ts",
+                "palette_primary": ["#000000"], 
+                "palette_secondary": ["#ffffff"],
+                "writing_sample": "Sample text"
+            }}
+            """
+            
+            try:
+                # 3. Call AI
+                response = self.model.generate_content(parsing_prompt)
+                response_text = response.text
+                
+                # 4. ROBUST JSON PARSING (The Fix)
+                # Find the first opening brace '{' and the last closing brace '}'
+                # This ignores "Here is the JSON:" or "```json" wrappers.
+                json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                
+                if json_match:
+                    clean_json = json_match.group(0)
+                    data = json.loads(clean_json)
+                    return data
+                else:
+                    raise ValueError("No JSON object found in AI response")
+                
+            except Exception as e:
+                print(f"Extraction Error: {e}")
+                return {
+                    "wiz_name": "Extraction Failed",
+                    "wiz_mission": f"Error: {str(e)} \n\nRaw Output: {response_text[:100]}...",
+                    "wiz_archetype": "The Sage"
+                }
 
     # --- AI VISION & TEXT TASKS ---
 
