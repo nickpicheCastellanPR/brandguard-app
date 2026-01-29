@@ -899,7 +899,31 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 # 6. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
-    
+def extract_and_map_pdf():
+    # This runs BEFORE the page redraws
+    uploaded_file = st.session_state.get('arch_pdf_uploader')
+    if uploaded_file:
+        try:
+            raw_text = logic.extract_text_from_pdf(uploaded_file)
+            data = logic.generate_brand_rules_from_pdf(raw_text)
+            
+            # Update Session State safely
+            st.session_state['wiz_name'] = data.get('wiz_name', '')
+            st.session_state['wiz_tone'] = data.get('wiz_tone', '')
+            st.session_state['wiz_mission'] = data.get('wiz_mission', '')
+            st.session_state['wiz_values'] = data.get('wiz_values', '')
+            st.session_state['wiz_guardrails'] = data.get('wiz_guardrails', '')
+            
+            # Match Archetype
+            suggested_arch = data.get('wiz_archetype')
+            if suggested_arch in ARCHETYPES:
+                st.session_state['wiz_archetype'] = suggested_arch
+            
+            st.session_state['extraction_success'] = True
+            
+        except Exception as e:
+            st.session_state['extraction_error'] = str(e)
+            
     # PERSISTENCE HANDLED AUTOMATICALLY UPON GENERATION NOW
     st.info("Profiles are automatically saved to your account upon generation.")
     
@@ -1080,39 +1104,24 @@ elif app_mode == "BRAND ARCHITECT":
                         else: st.error(f"Error: {e}")
 
     with tab2:
-        st.markdown("### AUTO-FILL FROM GUIDELINES")
-        st.caption("Upload a PDF to automatically populate the Wizard fields with strategy, tone, and visual rules.")
-        
-        arch_pdf = st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
-        
-        if arch_pdf and st.button("EXTRACT & MAP TO WIZARD", type="primary"):
-            with st.spinner("READING PDF & MAPPING TO FIELDS..."):
-                try:
-                    # 1. Extract Text
-                    raw_text = logic.extract_text_from_pdf(arch_pdf)
-                    
-                    # 2. Get Structured JSON (Using the NEW function)
-                    data = logic.generate_brand_rules_from_pdf(raw_text)
-                    
-                    # 3. Map to Session State (This fills the Wizard inputs)
-                    # We use .get() with empty strings as fallbacks
-                    st.session_state['wiz_name'] = data.get('wiz_name', '')
-                    st.session_state['wiz_tone'] = data.get('wiz_tone', '')
-                    st.session_state['wiz_mission'] = data.get('wiz_mission', '')
-                    st.session_state['wiz_values'] = data.get('wiz_values', '')
-                    st.session_state['wiz_guardrails'] = data.get('wiz_guardrails', '')
-                    
-                    # Intelligent Archetype Matching
-                    # We try to match the AI's string to your specific list
-                    suggested_arch = data.get('wiz_archetype')
-                    if suggested_arch in ARCHETYPES:
-                        st.session_state['wiz_archetype'] = suggested_arch
-                    
-                    # Success Message
-                    st.success("Extraction Complete! Switch to the 'WIZARD' tab to review and save.")
-                    
-                except Exception as e:
-                    st.error(f"Extraction Error: {e}")
+            st.markdown("### AUTO-FILL FROM GUIDELINES")
+            st.caption("Upload a PDF to automatically populate the Wizard fields.")
+            
+            # The uploader needs the key match the callback
+            st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
+            
+            # The button simply triggers the callback
+            st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
+
+            # Display Messages based on the flags set in callback
+            if st.session_state.get('extraction_success'):
+                st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
+                # Clear flag so it doesn't stay forever
+                st.session_state['extraction_success'] = False
+            
+            if st.session_state.get('extraction_error'):
+                st.error(f"Extraction Error: {st.session_state['extraction_error']}")
+                st.session_state['extraction_error'] = None
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
@@ -1220,6 +1229,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
