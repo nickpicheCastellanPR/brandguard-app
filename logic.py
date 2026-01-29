@@ -2,76 +2,58 @@ import os
 import streamlit as st
 import google.generativeai as genai
 import json
-import io
-
-# --- SAFE IMPORTS (Prevents Crash if libraries are missing) ---
-try:
-    import pypdf
-except ImportError:
-    pypdf = None
-
-try:
-    from fpdf import FPDF
-except ImportError:
-    FPDF = None
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv() # Load local .env if available
-except ImportError:
-    pass
-# -----------------------------------------------------------
 
 class SignetLogic:
     def __init__(self):
         # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
+        
+        # 2. INITIALIZE MODEL (Simplified to prevent startup timeouts)
+        # We default to Flash directly to avoid calling the API during startup
+        self.model = None
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            
-        # 2. INITIALIZE MODEL
-        # We wrap this in a try/except to prevent startup crashes
-        try:
-            model_name = self.get_model()
-            self.model = genai.GenerativeModel(model_name)
-        except Exception as e:
-            print(f"Model Init Error: {e}")
-            self.model = None
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"Model Init Warning: {e}")
 
     def _get_api_key(self):
-        # Check Railway/System variables first
+        # Safe environment loading (Import inside function)
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+
+        # Check Railway/System variables
         if "GOOGLE_API_KEY" in os.environ:
             return os.environ["GOOGLE_API_KEY"]
         
-        # If not found there, check local secrets file (for local dev)
         if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
             return st.secrets["GOOGLE_API_KEY"]
         
-        # Fallback to internal/Railway variable name if distinct
         if "GEMINI_API_KEY" in os.environ:
              return os.environ["GEMINI_API_KEY"]
 
-        # Don't crash, just warn
-        print("API Key not found! Please check your Railway variables.")
         return None
 
-    def get_model(self):
-        # Helper to find the best available model
-        try:
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
-                    return m.name
-            return 'models/gemini-1.5-flash'
-        except:
-            return 'models/gemini-1.5-flash'
+    def check_password(self, input_password):
+        return input_password == "beta" 
 
-    # --- PDF & INGESTION FUNCTIONS ---
+    def get_model(self):
+        return 'models/gemini-1.5-flash'
+
+    # --- PDF & INGESTION FUNCTIONS (With Lazy Imports) ---
 
     def extract_text_from_pdf(self, uploaded_file):
         """Helper to pull raw string data from a PDF file object"""
-        if not pypdf:
-            return "Error: 'pypdf' library not installed."
-            
+        # LAZY IMPORT: Only loads pypdf when this specific function is called
+        try:
+            import pypdf
+        except ImportError:
+            return "Error: 'pypdf' library is missing. Check requirements.txt."
+
         try:
             pdf_reader = pypdf.PdfReader(uploaded_file)
             text = ""
@@ -82,21 +64,27 @@ class SignetLogic:
             return f"Error reading PDF: {e}"
 
     def create_pdf(self, brand_name, rules_text):
-        if not FPDF:
-            return b"Error: 'fpdf' library not installed."
-            
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Brand Guidelines: {brand_name}", ln=1, align='C')
-        pdf.ln(10)
-        pdf.multi_cell(0, 10, txt=rules_text)
-        return pdf.output(dest='S').encode('latin-1')
+        # LAZY IMPORT
+        try:
+            from fpdf import FPDF
+        except ImportError:
+            return b"Error: 'fpdf' library is missing."
+
+        try:
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt=f"Brand Guidelines: {brand_name}", ln=1, align='C')
+            pdf.ln(10)
+            pdf.multi_cell(0, 10, txt=rules_text)
+            return pdf.output(dest='S').encode('latin-1')
+        except Exception as e:
+            return str(e).encode()
 
     def generate_brand_rules_from_pdf(self, pdf_text):
         """Analyzes PDF text and returns a Structured JSON object for the Wizard"""
         if not self.model:
-            return {"wiz_name": "Error", "wiz_mission": "AI Model not initialized."}
+            return {"wiz_name": "Error", "wiz_mission": "AI Model not connected."}
 
         # Initialize safe fallback
         response_text = ""
@@ -125,7 +113,7 @@ class SignetLogic:
         """
         
         try:
-            # Call the model defined in __init__
+            # Call the model
             response = self.model.generate_content(parsing_prompt)
             response_text = response.text
             
