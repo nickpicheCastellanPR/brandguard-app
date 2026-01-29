@@ -42,26 +42,26 @@ class SignetLogic:
         try:
             # Get all models your API key can see
             available = list(genai.list_models())
+            available_names = [m.name for m in available]
             
             # Priority 1: 1.5 Flash (Best for speed & long PDFs)
-            for m in available:
-                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name and '1.5' in m.name:
-                    return m.name
+            for name in available_names:
+                if 'flash' in name and '1.5' in name:
+                    return name
             
             # Priority 2: 1.5 Pro (Best for reasoning)
-            for m in available:
-                if 'generateContent' in m.supported_generation_methods and 'pro' in m.name and '1.5' in m.name:
-                    return m.name
+            for name in available_names:
+                if 'pro' in name and '1.5' in name:
+                    return name
                     
             # Priority 3: Gemini Pro (Legacy 1.0)
-            for m in available:
-                if 'generateContent' in m.supported_generation_methods and 'pro' in m.name:
-                    return m.name
+            for name in available_names:
+                if 'gemini-pro' in name and 'vision' not in name:
+                    return name
 
             # Fallback: Just take the first one that generates text
-            for m in available:
-                if 'generateContent' in m.supported_generation_methods:
-                    return m.name
+            if available_names:
+                return available_names[0]
                     
             return 'models/gemini-1.5-flash' # Absolute fallback
             
@@ -163,36 +163,59 @@ class SignetLogic:
             }
 
     # --- AI VISION & TEXT TASKS ---
-    # These also use self.model now for simplicity and stability.
     
+    def _get_vision_model(self):
+        """Attempts to load a vision-capable model just for image tasks."""
+        try:
+            # Get list of all available models
+            available = list(genai.list_models())
+            names = [m.name for m in available]
+            
+            # Try to find a 'flash' model (usually supports vision)
+            for n in names:
+                if 'flash' in n: return genai.GenerativeModel(n)
+                
+            # Fallback to pro-vision
+            for n in names:
+                if 'vision' in n: return genai.GenerativeModel(n)
+                
+            return None
+        except:
+            return None
+
     def describe_logo(self, image):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable (Model connection error)."
+        
         try:
             prompt = "Describe this logo in technical detail. Focus on Symbols, Colors, Vibe."
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
-        except Exception:
-            # Graceful fallback if the selected model is Text-Only
-            return "Logo analysis unavailable (Model does not support images)."
+        except Exception as e:
+            return f"Logo analysis failed: {str(e)}"
 
     def analyze_social_post(self, image):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable."
+        
         try:
             prompt = "Analyze this social post. Identify Best Practices and Social Style Signature."
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
         except:
             return "No social data extracted."
 
     def run_visual_audit(self, image, rules):
-        if not self.model: return "AI not ready."
+        model = self._get_vision_model()
+        if not model: return "Visual analysis unavailable."
+
         prompt = f"""
         ### ROLE: Signet Compliance Engine.
         ### RULES: {rules}
         ### TASK: Audit image against guidelines.
         """
         try:
-            response = self.model.generate_content([prompt, image])
+            response = model.generate_content([prompt, image])
             return response.text
         except:
             return "Audit failed."
@@ -215,3 +238,12 @@ class SignetLogic:
         if not self.model: return "AI not ready."
         prompt = f"""
         ### ROLE: Executive Ghost Writer.
+        ### RULES: {rules}
+        ### TASK: Write a {format_type} about "{topic}".
+        ### POINTS: {key_points}
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"Error: {e}"
