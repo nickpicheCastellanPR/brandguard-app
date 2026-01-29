@@ -142,7 +142,7 @@ class SignetLogic:
         response = model.generate_content(prompt)
         return response.text
 
-    def generate_brand_rules_from_pdf(pdf_text):
+    def generate_brand_rules_from_pdf(self, pdf_text):
         # We ask for JSON specifically
         parsing_prompt = f"""
         TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
