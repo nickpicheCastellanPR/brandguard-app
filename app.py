@@ -913,8 +913,8 @@ elif app_mode == "BRAND ARCHITECT":
         uploaded_file = st.session_state.get('arch_pdf_uploader')
         if uploaded_file:
             try:
-                raw_text = logic.extract_text_from_pdf(uploaded_file)
-                data = logic.generate_brand_rules_from_pdf(raw_text)
+                raw_text = logic_engine.extract_text_from_pdf(uploaded_file)
+                data = logic_engine.generate_brand_rules_from_pdf(raw_text)
                 
                 # Update Session State safely
                 st.session_state['wiz_name'] = data.get('wiz_name', '')
@@ -1238,6 +1238,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
