@@ -899,30 +899,30 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 # 6. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
-def extract_and_map_pdf():
-    # This runs BEFORE the page redraws
-    uploaded_file = st.session_state.get('arch_pdf_uploader')
-    if uploaded_file:
-        try:
-            raw_text = logic.extract_text_from_pdf(uploaded_file)
-            data = logic.generate_brand_rules_from_pdf(raw_text)
-            
-            # Update Session State safely
-            st.session_state['wiz_name'] = data.get('wiz_name', '')
-            st.session_state['wiz_tone'] = data.get('wiz_tone', '')
-            st.session_state['wiz_mission'] = data.get('wiz_mission', '')
-            st.session_state['wiz_values'] = data.get('wiz_values', '')
-            st.session_state['wiz_guardrails'] = data.get('wiz_guardrails', '')
-            
-            # Match Archetype
-            suggested_arch = data.get('wiz_archetype')
-            if suggested_arch in ARCHETYPES:
-                st.session_state['wiz_archetype'] = suggested_arch
-            
-            st.session_state['extraction_success'] = True
-            
-        except Exception as e:
-            st.session_state['extraction_error'] = str(e)
+    def extract_and_map_pdf():
+        # This runs BEFORE the page redraws
+        uploaded_file = st.session_state.get('arch_pdf_uploader')
+        if uploaded_file:
+            try:
+                raw_text = logic.extract_text_from_pdf(uploaded_file)
+                data = logic.generate_brand_rules_from_pdf(raw_text)
+                
+                # Update Session State safely
+                st.session_state['wiz_name'] = data.get('wiz_name', '')
+                st.session_state['wiz_tone'] = data.get('wiz_tone', '')
+                st.session_state['wiz_mission'] = data.get('wiz_mission', '')
+                st.session_state['wiz_values'] = data.get('wiz_values', '')
+                st.session_state['wiz_guardrails'] = data.get('wiz_guardrails', '')
+                
+                # Match Archetype
+                suggested_arch = data.get('wiz_archetype')
+                if suggested_arch in ARCHETYPES:
+                    st.session_state['wiz_archetype'] = suggested_arch
+                
+                st.session_state['extraction_success'] = True
+                
+            except Exception as e:
+                st.session_state['extraction_error'] = str(e)
             
     # PERSISTENCE HANDLED AUTOMATICALLY UPON GENERATION NOW
     st.info("Profiles are automatically saved to your account upon generation.")
@@ -1229,6 +1229,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
