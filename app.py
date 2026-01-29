@@ -580,9 +580,8 @@ if app_mode == "DASHBOARD":
     st.title("BRAND COMMAND CENTER")
 # 1. Determine if the user is "New" (Has no profiles yet)
     has_profiles = bool(st.session_state.get('profiles'))
-    # 2. Render the Expander
-    # expanded=not has_profiles means: If NO profiles, it stays OPEN. If YES profiles, it starts CLOSED.
-    with st.expander("🚀 QUICK START GUIDE: HOW TO USE SIGNET", expanded=not has_profiles):
+# 2. Render the Expander (Clean Title, No Emoji)
+    with st.expander("QUICK START GUIDE: OPERATIONAL WORKFLOW", expanded=not has_profiles):
         st.markdown("""
         <div style='font-family: sans-serif; color: #f5f5f0; font-size: 0.95rem; line-height: 1.6;'>
             <p><strong>Signet</strong> acts as your brand's digital gatekeeper. Here is the workflow:</p>
@@ -592,20 +591,21 @@ if app_mode == "DASHBOARD":
                     <em>Wizard</em> (for new brands) or <em>Upload Guide</em> (for existing PDFs).
                 </li>
                 <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>CALIBRATE:</strong> The engine will score your profile confidence. 
-                    Add more writing samples or social screenshots until you reach <span style='color: #4cd964; font-weight:bold;'>CALIBRATED</span> status.
+                    <strong style='color: #ab8f59;'>CALIBRATE:</strong> The engine scores your profile confidence. 
+                    <em>Note:</em> You can generate content immediately, but adding more samples increases the precision of the engine's audits and copy generation.
                 </li>
                 <li style='margin-bottom: 10px;'>
                     <strong style='color: #ab8f59;'>EXECUTE:</strong> Once a profile is active, use the sidebar modules:
                     <ul>
                         <li><strong>Copy Editor:</strong> Paste a draft to rewrite it in your executive voice.</li>
-                        <li><strong>Visual Compliance:</strong> Upload an image to check hex codes.</li>
-                        <li><strong>Generator:</strong> Create new content from scratch.</li>
+                        <li><strong>Visual Compliance:</strong> Upload an image to check hex codes against your palette.</li>
+                        <li><strong>Content Generator:</strong> Create new content from scratch.</li>
+                        <li><strong>Social Media Assistant:</strong> Generate platform-specific captions and hashtags.</li>
                     </ul>
                 </li>
             </ol>
         </div>
-        """, unsafe_allow_html=True)    
+        """, unsafe_allow_html=True)   
     # --- STYLE FOR ACTION BUTTONS ---
     st.markdown("""<style>
         div[data-testid*="Column"] .stButton button {
@@ -1066,6 +1066,7 @@ elif app_mode == "BRAND MANAGER":
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
