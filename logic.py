@@ -8,19 +8,19 @@ class SignetLogic:
     def __init__(self):
         # 1. AUTH & CONFIG
         self.api_key = self._get_api_key()
-        
+
         # 2. DYNAMIC MODEL INITIALIZATION
         # We don't hardcode the name anymore. We find what's available.
         self.model = None
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                
+
                 # AUTO-DISCOVERY: Pick the best model you actually have access to
                 model_name = self._auto_select_model()
                 print(f"✅ CONNECTED TO MODEL: {model_name}")
                 self.model = genai.GenerativeModel(model_name)
-                
+
             except Exception as e:
                 print(f"Model Init Warning: {e}")
 
@@ -43,17 +43,17 @@ class SignetLogic:
             # Get all models your API key can see
             available = list(genai.list_models())
             available_names = [m.name for m in available]
-            
+
             # Priority 1: 1.5 Flash (Best for speed & long PDFs)
             for name in available_names:
                 if 'flash' in name and '1.5' in name:
                     return name
-            
+
             # Priority 2: 1.5 Pro (Best for reasoning)
             for name in available_names:
                 if 'pro' in name and '1.5' in name:
                     return name
-                    
+
             # Priority 3: Gemini Pro (Legacy 1.0)
             for name in available_names:
                 if 'gemini-pro' in name and 'vision' not in name:
@@ -62,15 +62,15 @@ class SignetLogic:
             # Fallback: Just take the first one that generates text
             if available_names:
                 return available_names[0]
-                    
+
             return 'models/gemini-1.5-flash' # Absolute fallback
-            
+
         except Exception as e:
             print(f"Auto-Discovery Failed: {e}")
             return 'models/gemini-1.5-flash'
 
     def check_password(self, input_password):
-        return input_password == "beta" 
+        return input_password == "beta"
 
     # --- PDF & INGESTION FUNCTIONS ---
 
@@ -114,16 +114,16 @@ class SignetLogic:
 
         # Initialize safe fallback
         response_text = ""
-        
+
         parsing_prompt = f"""
         TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
-        
+
         RAW CONTENT:
         {pdf_text[:50000]}
-        
+
         INSTRUCTIONS:
         Return a VALID JSON object. Do not include markdown formatting.
-        
+
         REQUIRED JSON STRUCTURE:
         {{
             "wiz_name": "Brand Name",
@@ -132,28 +132,28 @@ class SignetLogic:
             "wiz_mission": "Mission statement",
             "wiz_values": "Values",
             "wiz_guardrails": "Do's and Don'ts",
-            "palette_primary": ["#000000"], 
+            "palette_primary": ["#000000"],
             "palette_secondary": ["#ffffff"],
             "writing_sample": "Sample text"
         }}
         """
-        
+
         try:
             # Call the auto-selected model
             response = self.model.generate_content(parsing_prompt)
             response_text = response.text
-            
+
             # ROBUST JSON PARSING (Regex Hunter)
             # Finds the first '{' and last '}' to ignore conversational fluff
             json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            
+
             if json_match:
                 clean_json = json_match.group(0)
                 data = json.loads(clean_json)
                 return data
             else:
                 raise ValueError("No JSON object found in AI response")
-            
+
         except Exception as e:
             print(f"Extraction Error: {e}")
             return {
@@ -163,22 +163,22 @@ class SignetLogic:
             }
 
     # --- AI VISION & TEXT TASKS ---
-    
+
     def _get_vision_model(self):
         """Attempts to load a vision-capable model just for image tasks."""
         try:
             # Get list of all available models
             available = list(genai.list_models())
             names = [m.name for m in available]
-            
+
             # Try to find a 'flash' model (usually supports vision)
             for n in names:
                 if 'flash' in n: return genai.GenerativeModel(n)
-                
+
             # Fallback to pro-vision
             for n in names:
                 if 'vision' in n: return genai.GenerativeModel(n)
-                
+
             return None
         except:
             return None
@@ -186,7 +186,7 @@ class SignetLogic:
     def describe_logo(self, image):
         model = self._get_vision_model()
         if not model: return "Visual analysis unavailable (Model connection error)."
-        
+
         try:
             prompt = "Describe this logo in technical detail. Focus on Symbols, Colors, Vibe."
             response = model.generate_content([prompt, image])
@@ -197,7 +197,7 @@ class SignetLogic:
     def analyze_social_post(self, image):
         model = self._get_vision_model()
         if not model: return "Visual analysis unavailable."
-        
+
         try:
             prompt = "Analyze this social post. Identify Best Practices and Social Style Signature."
             response = model.generate_content([prompt, image])
