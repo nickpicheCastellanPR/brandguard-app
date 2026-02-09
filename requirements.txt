@@ -4,3 +4,4 @@ pillow
 python-dotenv
 pypdf
 fpdf
+argon2-cffi
