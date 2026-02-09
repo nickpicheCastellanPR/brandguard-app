@@ -627,8 +627,16 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    st.caption(f"LOGGED IN AS: {st.session_state.get('username', 'User').upper()}")
+# USER & STATUS BADGE
+    user_tag = st.session_state.get('username', 'User').upper()
+    status_tag = st.session_state.get('status', 'trial').upper()
     
+    st.caption(f"OPERATIVE: {user_tag}")
+    
+    if status_tag == "ACTIVE":
+        st.markdown("<span style='background-color:#ab8f59; color:#1b2a2e; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; letter-spacing: 1px;'>AGENCY TIER</span>", unsafe_allow_html=True)
+    else:
+        st.markdown("<span style='background-color:#3d3d3d; color:#a0a0a0; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; letter-spacing: 1px;'>TRIAL LICENSE</span>", unsafe_allow_html=True)    
     # 2. ACTIVE PROFILE CALIBRATION
     profile_names = list(st.session_state['profiles'].keys())
     
@@ -639,6 +647,7 @@ with st.sidebar:
         metrics = calculate_calibration_score(current_rules)
         
         st.markdown("<br>", unsafe_allow_html=True)
+        
         # CASTELLAN SIDEBAR METER
         st.markdown(f"""
             <style>
@@ -1444,6 +1453,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
