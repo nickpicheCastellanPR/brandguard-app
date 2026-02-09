@@ -1,249 +1,194 @@
-import os
-import streamlit as st
 import google.generativeai as genai
+import os
 import json
-import re
+from PIL import Image
+import numpy as np
+from sklearn.cluster import KMeans
+from collections import Counter
 
+# --- CONFIG ---
+api_key = os.environ.get("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+
+# --- 1. COLOR MATH ENGINE (THE BIOMETRIC EYE) ---
+def rgb_to_hex(rgb):
+    """Converts a tuple (R, G, B) to HEX string."""
+    return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+
+def extract_dominant_colors(image, num_colors=5):
+    """
+    Mathematically extracts the top N dominant colors from an image.
+    Returns a list of HEX codes.
+    """
+    try:
+        # 1. Resize image for speed (don't process 4k pixels)
+        image = image.resize((150, 150))
+        img_array = np.array(image)
+        
+        # 2. Reshape to a list of pixels
+        # (Height * Width, 3 RGB channels)
+        pixels = img_array.reshape(-1, 3)
+        
+        # 3. Use K-Means Clustering to find "centers" of color groups
+        kmeans = KMeans(n_clusters=num_colors, n_init=10)
+        kmeans.fit(pixels)
+        
+        # 4. Get the dominant colors
+        colors = kmeans.cluster_centers_
+        
+        # 5. Convert to HEX
+        hex_colors = [rgb_to_hex(color) for color in colors]
+        return hex_colors
+        
+    except Exception as e:
+        print(f"Color Extraction Error: {e}")
+        return []
+
+# --- 2. MAIN LOGIC CLASS ---
 class SignetLogic:
     def __init__(self):
-        # 1. AUTH & CONFIG
-        self.api_key = self._get_api_key()
-        
-        # 2. DYNAMIC MODEL INITIALIZATION
-        # We don't hardcode the name anymore. We find what's available.
-        self.model = None
-        if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                
-                # AUTO-DISCOVERY: Pick the best model you actually have access to
-                model_name = self._auto_select_model()
-                print(f"✅ CONNECTED TO MODEL: {model_name}")
-                self.model = genai.GenerativeModel(model_name)
-                
-            except Exception as e:
-                print(f"Model Init Warning: {e}")
-
-    def _get_api_key(self):
-        # Safe environment loading
-        try:
-            from dotenv import load_dotenv
-            load_dotenv()
-        except ImportError:
-            pass
-
-        if "GOOGLE_API_KEY" in os.environ: return os.environ["GOOGLE_API_KEY"]
-        if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets: return st.secrets["GOOGLE_API_KEY"]
-        if "GEMINI_API_KEY" in os.environ: return os.environ["GEMINI_API_KEY"]
-        return None
-
-    def _auto_select_model(self):
-        """Finds the best available model to prevent 404 errors."""
-        try:
-            # Get all models your API key can see
-            available = list(genai.list_models())
-            available_names = [m.name for m in available]
-            
-            # Priority 1: 1.5 Flash (Best for speed & long PDFs)
-            for name in available_names:
-                if 'flash' in name and '1.5' in name:
-                    return name
-            
-            # Priority 2: 1.5 Pro (Best for reasoning)
-            for name in available_names:
-                if 'pro' in name and '1.5' in name:
-                    return name
-                    
-            # Priority 3: Gemini Pro (Legacy 1.0)
-            for name in available_names:
-                if 'gemini-pro' in name and 'vision' not in name:
-                    return name
-
-            # Fallback: Just take the first one that generates text
-            if available_names:
-                return available_names[0]
-                    
-            return 'models/gemini-1.5-flash' # Absolute fallback
-            
-        except Exception as e:
-            print(f"Auto-Discovery Failed: {e}")
-            return 'models/gemini-1.5-flash'
-
-    def check_password(self, input_password):
-        return input_password == "beta" 
-
-    # --- PDF & INGESTION FUNCTIONS ---
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def extract_text_from_pdf(self, uploaded_file):
-        """Helper to pull raw string data from a PDF file object"""
+        """Extracts raw text from PDF for the Ingest module."""
+        import PyPDF2
         try:
-            import pypdf
-        except ImportError:
-            return "Error: 'pypdf' library is missing. Check requirements.txt."
-
-        try:
-            pdf_reader = pypdf.PdfReader(uploaded_file)
+            reader = PyPDF2.PdfReader(uploaded_file)
             text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() or ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
             return text
         except Exception as e:
             return f"Error reading PDF: {e}"
 
-    def create_pdf(self, brand_name, rules_text):
-        try:
-            from fpdf import FPDF
-        except ImportError:
-            return b"Error: 'fpdf' library is missing."
-
-        try:
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=f"Brand Guidelines: {brand_name}", ln=1, align='C')
-            pdf.ln(10)
-            pdf.multi_cell(0, 10, txt=rules_text)
-            return pdf.output(dest='S').encode('latin-1')
-        except Exception as e:
-            return str(e).encode()
-
     def generate_brand_rules_from_pdf(self, pdf_text):
-        """Analyzes PDF text and returns a Structured JSON object for the Wizard"""
-        if not self.model:
-            return {"wiz_name": "Error", "wiz_mission": "AI Model not connected."}
-
-        # Initialize safe fallback
-        response_text = ""
-        
-        parsing_prompt = f"""
-        TASK: You are a Brand Strategy Architect. Analyze the raw text from a Brand Guidelines PDF and extract structured data.
-        
-        RAW CONTENT:
-        {pdf_text[:50000]}
-        
-        INSTRUCTIONS:
-        Return a VALID JSON object. Do not include markdown formatting.
-        
-        REQUIRED JSON STRUCTURE:
-        {{
-            "wiz_name": "Brand Name",
-            "wiz_archetype": "The Sage",
-            "wiz_tone": "Tone keywords",
-            "wiz_mission": "Mission statement",
-            "wiz_values": "Values",
-            "wiz_guardrails": "Do's and Don'ts",
-            "palette_primary": ["#000000"], 
-            "palette_secondary": ["#ffffff"],
-            "writing_sample": "Sample text"
-        }}
         """
+        AI Analyst: Reads raw PDF text and structures it into the Signet Profile format.
+        """
+        prompt = f"""
+        TASK: You are a Senior Brand Strategist. Analyze this raw text from a Brand Guidelines PDF.
         
+        OUTPUT: Return a purely valid JSON object with these keys:
+        - "wiz_name": (String) Brand Name
+        - "wiz_archetype": (String) One of: The Ruler, The Creator, The Sage, The Innocent, The Outlaw, The Magician, The Hero, The Lover, The Jester, The Everyman, The Caregiver, The Explorer. (Pick the closest fit).
+        - "wiz_mission": (String) Mission statement found.
+        - "wiz_values": (String) Core values found.
+        - "wiz_tone": (String) Tone of voice keywords (comma separated).
+        - "wiz_guardrails": (String) Do's and Don'ts found.
+        - "palette_primary": (List of Strings) Hex codes found (e.g. ["#24363b"]). If none, guess based on descriptions.
+        - "palette_secondary": (List of Strings) Secondary hex codes.
+        - "writing_sample": (String) A representative paragraph of text from the document to use as a voice sample.
+
+        RAW TEXT:
+        {pdf_text[:15000]}
+        """
         try:
-            # Call the auto-selected model
-            response = self.model.generate_content(parsing_prompt)
-            response_text = response.text
-            
-            # ROBUST JSON PARSING (Regex Hunter)
-            # Finds the first '{' and last '}' to ignore conversational fluff
-            json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            
-            if json_match:
-                clean_json = json_match.group(0)
-                data = json.loads(clean_json)
-                return data
-            else:
-                raise ValueError("No JSON object found in AI response")
-            
+            response = self.model.generate_content(prompt)
+            cleaned = response.text.replace("```json", "").replace("```", "")
+            return json.loads(cleaned)
         except Exception as e:
-            print(f"Extraction Error: {e}")
+            # Fallback if JSON fails
             return {
-                "wiz_name": "Extraction Failed",
-                "wiz_mission": f"Error: {str(e)} \n\nRaw Output: {response_text[:100]}...",
-                "wiz_archetype": "The Sage"
+                "wiz_name": "New Brand",
+                "wiz_archetype": "The Sage", 
+                "wiz_mission": "Error extracting mission.",
+                "wiz_values": "Error extracting values.",
+                "palette_primary": ["#000000"]
             }
 
-    # --- AI VISION & TEXT TASKS ---
-    
-    def _get_vision_model(self):
-        """Attempts to load a vision-capable model just for image tasks."""
-        try:
-            # Get list of all available models
-            available = list(genai.list_models())
-            names = [m.name for m in available]
-            
-            # Try to find a 'flash' model (usually supports vision)
-            for n in names:
-                if 'flash' in n: return genai.GenerativeModel(n)
-                
-            # Fallback to pro-vision
-            for n in names:
-                if 'vision' in n: return genai.GenerativeModel(n)
-                
-            return None
-        except:
-            return None
+    def generate_brand_rules(self, prompt_text):
+        """Generates the Master Text Profile from the Wizard inputs."""
+        response = self.model.generate_content(prompt_text)
+        return response.text
+
+    def run_visual_audit(self, image, profile_text):
+        """
+        THE JUDGE: Compares the image against the Brand Profile.
+        NOW POWERED BY BIOMETRICS.
+        """
+        # 1. MATHEMATICALLY EXTRACT COLORS
+        detected_hexes = extract_dominant_colors(image)
+        hex_str = ", ".join(detected_hexes)
+        
+        # 2. CONSTRUCT THE EVIDENCE
+        prompt = f"""
+        ROLE: You are the Chief Brand Officer. You are auditing a creative asset for strict compliance.
+        
+        EVIDENCE A: THE BRAND RULES
+        {profile_text}
+        
+        EVIDENCE B: THE ASSET DATA
+        - The image has been mathematically analyzed.
+        - DOMINANT HEX CODES FOUND: {hex_str}
+        
+        TASK:
+        1. Compare the 'Dominant Hex Codes' found in the image against the 'Palette' in the Brand Rules.
+        2. Are they close? (Note: Lighting can shift hex codes slightly, so allow for minor variance, but flag obvious mismatches).
+        3. Analyze the Style/Vibe of the image. Does it match the Archetype?
+        4. Check for Logo usage (if visible).
+        
+        OUTPUT FORMAT (Markdown):
+        ### 🚨 COMPLIANCE REPORT
+        **Pass/Fail Status**
+        
+        **1. COLOR FORENSICS**
+        * **Detected:** `{hex_str}`
+        * **Verdict:** [Explain if these match the approved palette. Be specific.]
+        
+        **2. STYLE & ARCHETYPE**
+        * [Analysis of the visual vibe vs the brand voice]
+        
+        **3. RECOMMENDATION**
+        * [Actionable advice to fix or approve]
+        """
+        
+        # 3. CALL THE AI JUDGE
+        response = self.model.generate_content([prompt, image])
+        return response.text
+
+    def run_copy_editor(self, user_draft, profile_text):
+        """Rewrites text to match the brand voice."""
+        prompt = f"""
+        ROLE: You are an Executive Ghostwriter.
+        GOAL: Rewrite the 'Draft' to perfectly match the 'Brand Voice'.
+        
+        BRAND VOICE RULES:
+        {profile_text}
+        
+        DRAFT CONTENT:
+        {user_draft}
+        
+        INSTRUCTIONS:
+        1. Keep the core message.
+        2. Change the tone, vocabulary, and sentence structure to match the profile.
+        3. Output ONLY the rewritten text.
+        """
+        response = self.model.generate_content(prompt)
+        return response.text
+
+    def run_content_generator(self, topic, format_type, key_points, profile_text):
+        """Generates new content from scratch."""
+        prompt = f"""
+        ROLE: Brand Content Studio.
+        TASK: Create a {format_type}.
+        TOPIC: {topic}
+        KEY POINTS: {key_points}
+        
+        BRAND GUIDELINES:
+        {profile_text}
+        """
+        response = self.model.generate_content(prompt)
+        return response.text
 
     def describe_logo(self, image):
-        model = self._get_vision_model()
-        if not model: return "Visual analysis unavailable (Model connection error)."
-        
-        try:
-            prompt = "Describe this logo in technical detail. Focus on Symbols, Colors, Vibe."
-            response = model.generate_content([prompt, image])
-            return response.text
-        except Exception as e:
-            return f"Logo analysis failed: {str(e)}"
+        """Helper to analyze a logo file during Wizard setup."""
+        prompt = "Describe this logo in detail (colors, shapes, text, vibe) for a brand style guide."
+        response = self.model.generate_content([prompt, image])
+        return response.text
 
     def analyze_social_post(self, image):
-        model = self._get_vision_model()
-        if not model: return "Visual analysis unavailable."
-        
-        try:
-            prompt = "Analyze this social post. Identify Best Practices and Social Style Signature."
-            response = model.generate_content([prompt, image])
-            return response.text
-        except:
-            return "No social data extracted."
-
-    def run_visual_audit(self, image, rules):
-        model = self._get_vision_model()
-        if not model: return "Visual analysis unavailable."
-
-        prompt = f"""
-        ### ROLE: Signet Compliance Engine.
-        ### RULES: {rules}
-        ### TASK: Audit image against guidelines.
-        """
-        try:
-            response = model.generate_content([prompt, image])
-            return response.text
-        except:
-            return "Audit failed."
-
-    def run_copy_editor(self, text, rules):
-        if not self.model: return "AI not ready."
-        prompt = f"""
-        ### ROLE: Senior Copy Editor.
-        ### RULES: {rules}
-        ### DRAFT: "{text}"
-        ### TASK: Rewrite to match Brand Voice.
-        """
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Error: {e}"
-
-    def run_content_generator(self, topic, format_type, key_points, rules):
-        if not self.model: return "AI not ready."
-        prompt = f"""
-        ### ROLE: Executive Ghost Writer.
-        ### RULES: {rules}
-        ### TASK: Write a {format_type} about "{topic}".
-        ### POINTS: {key_points}
-        """
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Error: {e}"
+        """Helper to analyze a social media screenshot."""
+        prompt = "Analyze this social media post. What is the tone? What is the visual style? What makes it successful?"
+        response = self.model.generate_content([prompt, image])
+        return response.text
