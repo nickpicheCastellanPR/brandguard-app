@@ -6,3 +6,5 @@ pypdf
 fpdf
 bcrypt
 requests
+scikit-learn
+numpy
