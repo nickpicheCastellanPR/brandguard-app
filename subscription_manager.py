@@ -2,10 +2,9 @@ import requests
 import os
 import db_manager as db
 
-# 1. GET CONFIG FROM RAILWAY
-# We use os.environ.get to safely read the key you will add later
+# 1. GET CONFIG
 LS_API_KEY = os.environ.get("LEMONSQUEEZY_API_KEY")
-LS_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID") 
+LS_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID")
 
 HEADERS = {
     "Accept": "application/vnd.api+json",
@@ -16,15 +15,13 @@ HEADERS = {
 def check_subscription_status(user_email):
     """
     Pings Lemon Squeezy to see if this email has an active subscription.
-    Returns: 'active' or 'trial' (or 'past_due', etc.)
+    Returns: 'active', 'inactive', or 'trial'
     """
     if not LS_API_KEY:
-        print("⚠️ DEBUG: No API Key found. Defaulting to TRIAL mode.")
+        # Dev safety: If no key, don't lock everyone out, but don't grant full access.
         return "trial"
 
     try:
-        # 2. QUERY LEMON SQUEEZY
-        # We search for subscriptions attached to this email
         url = "https://api.lemonsqueezy.com/v1/subscriptions"
         params = {
             "filter[user_email]": user_email,
@@ -36,42 +33,59 @@ def check_subscription_status(user_email):
         if response.status_code == 200:
             data = response.json()
             
-            # 3. CHECK RESULTS
-            # If no data comes back, they never bought anything.
+            # CASE A: No Record Found -> TRIAL
             if not data['data']:
                 return "trial"
             
-            # If data exists, check the status of the *most recent* subscription
-            # (Lemon Squeezy returns a list, usually most recent first)
+            # CASE B: Record Found -> Check Status
+            # Lemon Squeezy returns a list. We check the most recent one.
             latest_sub = data['data'][0]
-            status = latest_sub['attributes']['status']
+            ls_status = latest_sub['attributes']['status']
             
-            # Map LS status to our DB status
-            # LS Statuses: active, past_due, unpaid, cancelled, expired, on_trial
-            if status in ['active', 'on_trial']:
+            # MAPPING LEMON SQUEEZY STATUSES TO SIGNET STATUSES
+            # LS: on_trial, active, paused, past_due, unpaid, cancelled, expired
+            
+            if ls_status in ['active', 'on_trial']:
                 return "active"
+            
+            elif ls_status in ['cancelled', 'expired', 'unpaid']:
+                return "inactive" # They churned
+            
+            elif ls_status == 'past_due':
+                return "inactive" # Strict: No pay, no play.
+                
             else:
-                return "trial" # They bought it but cancelled/expired
+                return "trial" # Fallback
                 
         else:
-            print(f"⚠️ LS API ERROR: {response.status_code} - {response.text}")
-            return "trial" # Fail safe: don't give free access on error
+            print(f"⚠️ LS API ERROR: {response.status_code}")
+            return "trial" 
             
     except Exception as e:
         print(f"⚠️ SUBSCRIPTION CHECK FAILED: {e}")
-        return "trial" # Fail safe
+        return "trial"
 
 def sync_user_status(username, email):
     """
-    The main function called by app.py on login.
-    Checks LS, then updates the local database.
+    The Doorman.
+    1. Checks if they are a 'Retainer' (Manual Grant).
+    2. If not, checks Lemon Squeezy.
+    3. Updates DB.
     """
-    # 1. Ask the Bouncer
+    
+    # 1. CHECK LOCAL DB FOR MANUAL OVERRIDES
+    # We need to peek at the current status first
+    # (We will add a quick check function to db_manager for this)
+    current_status = db.get_user_status(username)
+    
+    # PROTECTED STATUSES: If you manually set them to these, the API won't touch them.
+    if current_status in ["retainer", "lifetime", "admin"]:
+        return "active"
+
+    # 2. ASK LEMON SQUEEZY
     real_status = check_subscription_status(email)
     
-    # 2. Update the Database
-    # We need to add a quick function to db_manager to update status
-    # (We will add that in a second)
+    # 3. UPDATE DB
     db.update_user_status(username, real_status)
     
     return real_status
