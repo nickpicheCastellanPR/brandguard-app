@@ -75,10 +75,9 @@ def sync_user_status(username, email):
     
     # 1. CHECK LOCAL DB FOR MANUAL OVERRIDES
     # We need to peek at the current status first
-    # (We will add a quick check function to db_manager for this)
     current_status = db.get_user_status(username)
     
-    # PROTECTED STATUSES: If you manually set them to these, the API won't touch them.
+    # PROTECTED STATUSES:
     if current_status in ["retainer", "lifetime", "admin"]:
         return "active"
 
