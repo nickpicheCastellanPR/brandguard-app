@@ -5,6 +5,7 @@ import re
 import json
 from logic import SignetLogic
 import db_manager as db
+import subscription_manager as sub_manager
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -553,7 +554,7 @@ if not st.session_state['authenticated']:
             </div>
         """, unsafe_allow_html=True)
 
-    # --- RIGHT COLUMN: THE LOGIN ---
+# --- RIGHT COLUMN: THE LOGIN ---
     with c2:
         st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
         
@@ -579,15 +580,25 @@ if not st.session_state['authenticated']:
             l_user = st.text_input("USERNAME", key="l_user")
             l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
             st.markdown("<br>", unsafe_allow_html=True)
+            
             if st.button("ENTER", type="primary", use_container_width=True):
-                # UPDATED: Use check_login instead of verify_user
+                # 1. CHECK CREDENTIALS
                 user_data = db.check_login(l_user, l_pass) 
+                
                 if user_data:
+                    # 2. SET SESSION STATE
                     st.session_state['authenticated'] = True
-                    # UPDATED: Use data from check_login
                     st.session_state['user_id'] = user_data['username'] 
                     st.session_state['username'] = user_data['username']
                     st.session_state['is_admin'] = user_data['is_admin']
+                    
+                    # 3. SYNC SUBSCRIPTION STATUS (The Bouncer Check)
+                    user_email = user_data.get('email', '')
+                    # This checks Lemon Squeezy and updates the DB
+                    status = sub_manager.sync_user_status(user_data['username'], user_email)
+                    st.session_state['status'] = status
+                    
+                    # 4. LOAD PROFILES & RERUN
                     st.session_state['profiles'] = db.get_profiles(user_data['username'])
                     st.rerun()
                 else:
@@ -596,10 +607,10 @@ if not st.session_state['authenticated']:
         with reg_tab:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user")
             r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
-            r_email = st.text_input("EMAIL", key="r_email") # Added Email Field for DB compatibility
+            r_email = st.text_input("EMAIL", key="r_email") 
             st.markdown("<br>", unsafe_allow_html=True)
+            
             if st.button("CREATE ACCOUNT", use_container_width=True):
-                # UPDATED: Use create_user with email
                 if db.create_user(r_user, r_email, r_pass):
                     st.success("Account created! Please log in.")
                 else:
@@ -607,6 +618,7 @@ if not st.session_state['authenticated']:
 
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
+    
 # --- SIDEBAR ---
 with st.sidebar:
     # 1. BRANDING
@@ -662,6 +674,48 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
+def show_paywall():
+    """Renders the Castellan Agency Tier Paywall."""
+    st.markdown("""
+        <style>
+            .paywall-card {
+                background-color: #1b2a2e;
+                border: 1px solid #ab8f59;
+                padding: 40px;
+                text-align: center;
+                border-radius: 4px;
+                margin-top: 50px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            }
+            .paywall-icon { font-size: 3rem; margin-bottom: 20px; display: block; }
+            .paywall-title { 
+                color: #f5f5f0; font-family: 'Helvetica Neue', sans-serif; 
+                font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+                font-size: 1.5rem; margin-bottom: 10px;
+            }
+            .paywall-desc { color: #5c6b61; margin-bottom: 30px; font-size: 1rem; line-height: 1.6; }
+            .paywall-price { color: #ab8f59; font-size: 1.2rem; font-weight: 700; margin-bottom: 30px; }
+        </style>
+        <div class="paywall-card">
+            <span class="paywall-icon">🔒</span>
+            <div class="paywall-title">Agency Tier Restricted</div>
+            <div class="paywall-desc">
+                This capability requires high-fidelity engine processing.<br>
+                Upgrade to the Agency Tier to unlock full narrative governance.
+            </div>
+            <div class="paywall-price"></div>
+            <a href="https://castellanpr.lemonsqueezy.com" target="_blank">
+                <button style="
+                    background-color: #ab8f59; color: #1b2a2e; border: none; 
+                    padding: 12px 30px; font-weight: 800; letter-spacing: 0.1em; 
+                    cursor: pointer; text-transform: uppercase;">
+                    Initialize Subscription
+                </button>
+            </a>
+        </div>
+    """, unsafe_allow_html=True)
+    st.stop() # CRITICAL: This halts the app so users can't see the tool below.
+    
 # --- MODULES ---
 
 # 1. DASHBOARD
@@ -735,7 +789,6 @@ if app_mode == "DASHBOARD":
             dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
             col_sub, col_can = st.columns([1, 1])
             with col_sub:
-                # [REPLACE THE DASHBOARD INGEST BLOCK WITH THIS]
                 if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
                     with st.spinner("ANALYZING PDF STRUCTURE..."):
                         try:
@@ -746,7 +799,7 @@ if app_mode == "DASHBOARD":
                             extracted_data = logic.generate_brand_rules_from_pdf(raw_text)
                             
                             # 3. Create the Profile Object (Matching the Wizard Structure)
-                            # We map the AI's JSON directly to your 'inputs' dictionary
+                            # map the AI's JSON directly to 'inputs' dictionary
                             new_profile = {
                                 "inputs": {
                                     "wiz_name": extracted_data.get("wiz_name", "New Brand"),
@@ -759,7 +812,7 @@ if app_mode == "DASHBOARD":
                                     "palette_secondary": extracted_data.get("palette_secondary", ["#ab8f59"]),
                                     "palette_accent": ["#f5f5f0"] # Default
                                 },
-                                # We still generate the "Master Rules" text for the engine to read
+                                # generate the "Master Rules" text for the engine to read
                                 "final_text": f"1. STRATEGY\nMission: {extracted_data.get('wiz_mission')}\nValues: {extracted_data.get('wiz_values')}\n\n2. VOICE\nTone: {extracted_data.get('wiz_tone')}\nSample: {extracted_data.get('writing_sample')}"
                             }
                             
@@ -857,6 +910,12 @@ elif app_mode == "VISUAL COMPLIANCE":
 # 3. COPY EDITOR
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
+    
+    # --- AGENCY TIER CHECK ---
+    if st.session_state.get('status') != 'active':
+        show_paywall()
+    # -------------------------
+    
     if not active_profile: st.warning("NO PROFILE SELECTED.")
     else:
         c1, c2 = st.columns([2, 1])
@@ -878,6 +937,12 @@ elif app_mode == "COPY EDITOR":
 # 4. CONTENT GENERATOR
 elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
+
+    # --- AGENCY TIER CHECK ---
+    if st.session_state.get('status') != 'active':
+        show_paywall()
+    # -------------------------
+    
     c1, c2 = st.columns(2)
     with c1: format_type = st.selectbox("TYPE", ["Press Release", "Email", "LinkedIn Post", "Article"])
     with c2: topic = st.text_input("TOPIC")
@@ -893,6 +958,12 @@ elif app_mode == "CONTENT GENERATOR":
 # 5. SOCIAL MEDIA ASSISTANT
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
+
+    # --- AGENCY TIER CHECK ---
+    if st.session_state.get('status') != 'active':
+        show_paywall()
+    # -------------------------
+    
     if not active_profile: st.warning("NO PROFILE SELECTED.")
     else:
         c1, c2 = st.columns([1, 1])
@@ -1351,6 +1422,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
