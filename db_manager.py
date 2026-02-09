@@ -1,10 +1,11 @@
 import sqlite3
-import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 import json
 import os
 from datetime import datetime
 
-# --- CRITICAL: POINT TO THE SAFE VOLUME ---
+# --- CONFIG ---
 if os.path.exists("/app/data"):
     DB_FOLDER = "/app/data"
 else:
@@ -12,12 +13,15 @@ else:
 
 DB_NAME = os.path.join(DB_FOLDER, "users.db")
 
+# Initialize Argon2 Hasher
+ph = PasswordHasher()
+
 # --- 1. SETUP & MIGRATION ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
-    # 1. USERS TABLE
+    # Users Table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -29,19 +33,19 @@ def init_db():
         )
     ''')
 
-    # 2. PROFILES TABLE (Restored Functionality)
+    # Profiles Table
     c.execute('''
         CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT,
             name TEXT,
-            data TEXT, -- JSON storage
+            data TEXT,
             created_at TEXT,
             UNIQUE(user_id, name)
         )
     ''')
 
-    # 3. LOGS TABLE
+    # Logs Table
     c.execute('''
         CREATE TABLE IF NOT EXISTS generation_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,9 +60,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- 2. SECURITY (BCRYPT) ---
+# --- 2. SECURITY (ARGON2) ---
 def create_user(username, email, password, is_admin=False):
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    """Creates a new user with ARGON2 hashing."""
+    # Hash the password (Argon2 handles salt automatically)
+    hashed = ph.hash(password)
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     try:
@@ -74,17 +81,37 @@ def create_user(username, email, password, is_admin=False):
         conn.close()
 
 def check_login(username, password):
+    """Verifies password using Argon2 and returns user info + email."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute('SELECT password_hash, is_admin, subscription_status FROM users WHERE username = ?', (username,))
+    # Critical: Fetch Email for the Paywall check
+    c.execute('SELECT password_hash, is_admin, subscription_status, email FROM users WHERE username = ?', (username,))
     data = c.fetchone()
     conn.close()
 
     if data:
         stored_hash = data[0]
-        # Verify Password
-        if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
-            return {"username": username, "is_admin": bool(data[1]), "status": data[2]}
+        try:
+            # Verify the password
+            ph.verify(stored_hash, password)
+            
+            # Check if hash needs updating (Argon2 feature)
+            if ph.check_needs_rehash(stored_hash):
+                # We could update it here, but skipping for simplicity
+                pass
+                
+            return {
+                "username": username, 
+                "is_admin": bool(data[1]), 
+                "status": data[2],
+                "email": data[3]
+            }
+        except VerifyMismatchError:
+            # Password wrong
+            return None
+        except Exception as e:
+            print(f"Auth Error: {e}")
+            return None
     return None
 
 def get_user_count():
@@ -96,11 +123,10 @@ def get_user_count():
     conn.close()
     return count
 
-# --- 3. PROFILE MANAGEMENT (Restored) ---
+# --- 3. PROFILE MANAGEMENT ---
 def save_profile(username, profile_name, profile_data):
     conn = sqlite3.connect(DB_NAME)
     data_json = json.dumps(profile_data)
-    # Upsert logic (Insert or Replace)
     conn.execute('''
         INSERT OR REPLACE INTO profiles (user_id, name, data, created_at)
         VALUES (?, ?, ?, ?)
@@ -115,7 +141,10 @@ def get_profiles(username):
     
     profiles = {}
     for row in rows:
-        profiles[row[0]] = json.loads(row[1])
+        try:
+            profiles[row[0]] = json.loads(row[1])
+        except:
+            pass
     return profiles
 
 def delete_profile(username, profile_name):
@@ -150,7 +179,6 @@ def get_all_logs():
 
 # --- 6. SUBSCRIPTION HELPERS ---
 def get_user_status(username):
-    """Peeks at the current status without changing it."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT subscription_status FROM users WHERE username = ?", (username,))
@@ -159,7 +187,6 @@ def get_user_status(username):
     return result[0] if result else "trial"
 
 def update_user_status(username, new_status):
-    """Updates the user's subscription status."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("UPDATE users SET subscription_status = ? WHERE username = ?", (new_status, username))
