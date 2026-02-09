@@ -633,17 +633,37 @@ with st.sidebar:
     
     st.caption(f"OPERATIVE: {user_tag}")
     
+    # CSS HACK: Define global classes to force the colors
+    st.markdown("""
+        <style>
+            .trial-badge {
+                background-color: #3d3d3d !important;
+                color: #f5f5f0 !important;
+                border: 1px solid #5c6b61 !important;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 800;
+                letter-spacing: 1px;
+                display: inline-block;
+            }
+            .agency-badge {
+                background-color: #ab8f59 !important;
+                color: #1b2a2e !important;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 800;
+                letter-spacing: 1px;
+                display: inline-block;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     if status_tag == "ACTIVE":
-        st.markdown(
-            "<div style='display:inline-block; background-color:#ab8f59; color:#1b2a2e !important; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px;'>AGENCY TIER</div>", 
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="agency-badge">AGENCY TIER</div>', unsafe_allow_html=True)
     else:
-        # UPDATED: Added !important, changed span to div for better box model control, added border.
-        st.markdown(
-            "<div style='display:inline-block; background-color:#3d3d3d; color:#f5f5f0 !important; border: 1px solid #5c6b61; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px;'>TRIAL LICENSE</div>", 
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="trial-badge">TRIAL LICENSE</div>', unsafe_allow_html=True)
         
     # 2. ACTIVE PROFILE CALIBRATION
     profile_names = list(st.session_state['profiles'].keys())
@@ -1461,6 +1481,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
