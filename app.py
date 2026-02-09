@@ -4,7 +4,7 @@ import os
 import re
 import json
 from logic import SignetLogic
-import database as db
+import db_manager as db
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -555,11 +555,24 @@ if not st.session_state['authenticated']:
 
     # --- RIGHT COLUMN: THE LOGIN ---
     with c2:
-        # REMOVED: The st.markdown wrapper div that caused the ghost box.
-        # The CSS above now handles the white card background.
-        
         st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
         
+        # --- NEW: SELF-SEALING ADMIN SETUP ---
+        # This checks if the DB is empty. If so, it lets you create the Admin.
+        if db.get_user_count() == 0:
+            st.warning("⚠️ SYSTEM RESET: CREATE ADMIN ACCOUNT")
+            with st.form("setup_admin_hero"):
+                new_admin_user = st.text_input("Admin Username")
+                new_admin_pass = st.text_input("Admin Password", type="password")
+                new_admin_email = st.text_input("Admin Email")
+                if st.form_submit_button("Initialize System"):
+                    if new_admin_user and new_admin_pass:
+                        db.create_user(new_admin_user, new_admin_email, new_admin_pass, is_admin=True)
+                        st.success("Admin Created! Please Log In.")
+                        st.rerun()
+            st.divider()
+        # -------------------------------------
+
         login_tab, reg_tab = st.tabs(["LOGIN", "REGISTER"])
         
         with login_tab:
@@ -567,12 +580,15 @@ if not st.session_state['authenticated']:
             l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("ENTER", type="primary", use_container_width=True):
-                uid = db.verify_user(l_user, l_pass)
-                if uid:
+                # UPDATED: Use check_login instead of verify_user
+                user_data = db.check_login(l_user, l_pass) 
+                if user_data:
                     st.session_state['authenticated'] = True
-                    st.session_state['user_id'] = uid
-                    st.session_state['username'] = l_user
-                    st.session_state['profiles'] = db.get_profiles(uid)
+                    # UPDATED: Use data from check_login
+                    st.session_state['user_id'] = user_data['username'] 
+                    st.session_state['username'] = user_data['username']
+                    st.session_state['is_admin'] = user_data['is_admin']
+                    st.session_state['profiles'] = db.get_profiles(user_data['username'])
                     st.rerun()
                 else:
                     st.error("Invalid Credentials")
@@ -580,9 +596,11 @@ if not st.session_state['authenticated']:
         with reg_tab:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user")
             r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
+            r_email = st.text_input("EMAIL", key="r_email") # Added Email Field for DB compatibility
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("CREATE ACCOUNT", use_container_width=True):
-                if db.create_user(r_user, r_pass):
+                # UPDATED: Use create_user with email
+                if db.create_user(r_user, r_email, r_pass):
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Username already taken.")
@@ -1235,9 +1253,105 @@ elif app_mode == "BRAND MANAGER":
             del st.session_state['profiles'][target]
             db.delete_profile(st.session_state['user_id'], target)
             st.rerun()
+# --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
+if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
+    st.markdown("---")
+    with st.expander("Show Admin Dashboard 🛡️"):
+        # Custom CSS for the Admin Panel to match the Theme
+        st.markdown("""
+        <style>
+            /* Force Tables to look like Data Terminals */
+            div[data-testid="stDataFrame"] div[class*="stDataFrame"] {
+                background-color: #1b2a2e !important;
+                border: 1px solid #5c6b61;
+            }
+            div[data-testid="stDataFrame"] table {
+                color: #f5f5f0 !important;
+                font-family: 'Courier New', monospace !important;
+                font-size: 0.85rem !important;
+            }
+            div[data-testid="stDataFrame"] th {
+                background-color: #24363b !important;
+                color: #ab8f59 !important;
+                border-bottom: 1px solid #ab8f59 !important;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+            }
+            div[data-testid="stDataFrame"] td {
+                border-bottom: 1px solid #3d3d3d !important;
+            }
+            /* Style the Metrics */
+            div[data-testid="stMetricValue"] {
+                color: #ab8f59 !important;
+                font-family: 'Helvetica Neue', sans-serif !important;
+            }
+            div[data-testid="stMetricLabel"] {
+                color: #5c6b61 !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
+        st.markdown("<h3 style='color: #ab8f59; letter-spacing: 0.1em;'>SYSTEM OVERVIEW</h3>", unsafe_allow_html=True)
+        
+        # 1. METRICS ROW
+        users = db.get_all_users()
+        logs = db.get_all_logs()
+        
+        m1, m2, m3 = st.columns(3)
+        with m1: st.metric("TOTAL OPERATIVES", len(users) if users else 0)
+        with m2: st.metric("TOTAL GENERATIONS", len(logs) if logs else 0)
+        with m3: st.metric("SYSTEM STATUS", "ONLINE", delta_color="normal")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 2. TABS FOR DATA
+        tab_users, tab_logs = st.tabs(["OPERATIVE DATABASE", "GENERATION LOGS"])
+        
+        import pandas as pd
+
+        with tab_users:
+            if users:
+                df_users = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "SUB STATUS", "CREATED AT"])
+                # Clean up the view
+                df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "🛡️ ADMIN" if x else "USER")
+                st.dataframe(df_users, use_container_width=True, hide_index=True)
+            else:
+                st.info("No users found.")
+
+        with tab_logs:
+            if logs:
+                df_logs = pd.DataFrame(logs, columns=["OPERATIVE", "TIMESTAMP", "INPUTS (JSON)", "EST. COST", "OUTPUT"])
+                
+                # Filter for readability
+                display_cols = ["TIMESTAMP", "OPERATIVE", "EST. COST"]
+                selection = st.dataframe(
+                    df_logs[display_cols], 
+                    use_container_width=True, 
+                    hide_index=True,
+                    on_select="rerun", 
+                    selection_mode="single-row"
+                )
+                
+                # Detail View (The Inspector)
+                st.markdown("<h5 style='color: #ab8f59; margin-top: 20px;'>LOG INSPECTOR</h5>", unsafe_allow_html=True)
+                if selection and len(selection.selection.rows) > 0:
+                    row_idx = selection.selection.rows[0]
+                    selected_log = df_logs.iloc[row_idx]
+                    
+                    c_in, c_out = st.columns(2)
+                    with c_in:
+                        st.caption("INPUT DATA")
+                        st.json(selected_log["INPUTS (JSON)"])
+                    with c_out:
+                        st.caption("OUTPUT GENERATION")
+                        st.code(selected_log["OUTPUT"], language="markdown", line_numbers=True)
+                else:
+                    st.caption("Select a log entry above to inspect payload.")
+            else:
+                st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
