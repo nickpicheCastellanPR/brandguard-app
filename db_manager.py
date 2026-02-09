@@ -5,8 +5,6 @@ import os
 from datetime import datetime
 
 # --- CRITICAL: POINT TO THE SAFE VOLUME ---
-# If the /app/data folder exists (Railway), use it.
-# If not (Local testing), use the current folder.
 if os.path.exists("/app/data"):
     DB_FOLDER = "/app/data"
 else:
@@ -16,11 +14,10 @@ DB_NAME = os.path.join(DB_FOLDER, "users.db")
 
 # --- 1. SETUP & MIGRATION ---
 def init_db():
-    """Creates the database tables if they don't exist."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
-    # Create USERS table
+    # 1. USERS TABLE
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -32,7 +29,19 @@ def init_db():
         )
     ''')
 
-    # Create LOGS table
+    # 2. PROFILES TABLE (Restored Functionality)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            name TEXT,
+            data TEXT, -- JSON storage
+            created_at TEXT,
+            UNIQUE(user_id, name)
+        )
+    ''')
+
+    # 3. LOGS TABLE
     c.execute('''
         CREATE TABLE IF NOT EXISTS generation_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,9 +58,7 @@ def init_db():
 
 # --- 2. SECURITY (BCRYPT) ---
 def create_user(username, email, password, is_admin=False):
-    """Creates a new user with a SECURE hashed password."""
     hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     try:
@@ -67,7 +74,6 @@ def create_user(username, email, password, is_admin=False):
         conn.close()
 
 def check_login(username, password):
-    """Verifies password and returns user info."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute('SELECT password_hash, is_admin, subscription_status FROM users WHERE username = ?', (username,))
@@ -76,7 +82,7 @@ def check_login(username, password):
 
     if data:
         stored_hash = data[0]
-        # BCRYPT CHECK
+        # Verify Password
         if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
             return {"username": username, "is_admin": bool(data[1]), "status": data[2]}
     return None
@@ -85,12 +91,40 @@ def get_user_count():
     conn = sqlite3.connect(DB_NAME)
     try:
         count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    except sqlite3.OperationalError:
+    except:
         count = 0
     conn.close()
     return count
 
-# --- 3. LOGGING ---
+# --- 3. PROFILE MANAGEMENT (Restored) ---
+def save_profile(username, profile_name, profile_data):
+    conn = sqlite3.connect(DB_NAME)
+    data_json = json.dumps(profile_data)
+    # Upsert logic (Insert or Replace)
+    conn.execute('''
+        INSERT OR REPLACE INTO profiles (user_id, name, data, created_at)
+        VALUES (?, ?, ?, ?)
+    ''', (username, profile_name, data_json, datetime.now()))
+    conn.commit()
+    conn.close()
+
+def get_profiles(username):
+    conn = sqlite3.connect(DB_NAME)
+    rows = conn.execute("SELECT name, data FROM profiles WHERE user_id = ?", (username,)).fetchall()
+    conn.close()
+    
+    profiles = {}
+    for row in rows:
+        profiles[row[0]] = json.loads(row[1])
+    return profiles
+
+def delete_profile(username, profile_name):
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("DELETE FROM profiles WHERE user_id = ? AND name = ?", (username, profile_name))
+    conn.commit()
+    conn.close()
+
+# --- 4. LOGGING ---
 def log_generation(username, inputs_dict, output_text, token_usage_est):
     conn = sqlite3.connect(DB_NAME)
     inputs_json = json.dumps(inputs_dict)
@@ -101,7 +135,7 @@ def log_generation(username, inputs_dict, output_text, token_usage_est):
     conn.commit()
     conn.close()
 
-# --- 4. ADMIN VIEWS ---
+# --- 5. ADMIN VIEWS ---
 def get_all_users():
     conn = sqlite3.connect(DB_NAME)
     users = conn.execute("SELECT username, email, is_admin, subscription_status, created_at FROM users").fetchall()
