@@ -11,7 +11,7 @@ if os.path.exists("/app/data"):
 else:
     DB_FOLDER = "."
 
-DB_NAME = os.path.join(DB_FOLDER, "users.db")
+DB_NAME = os.path.join(DB_FOLDER, "users_v2.db")
 
 # Initialize Argon2 Hasher
 ph = PasswordHasher()
