@@ -4,7 +4,8 @@ pillow
 python-dotenv
 pypdf
 fpdf
-bcrypt
+argon2-cffi
 requests
 scikit-learn
 numpy
+
