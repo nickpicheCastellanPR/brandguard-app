@@ -147,3 +147,21 @@ def get_all_logs():
     logs = conn.execute("SELECT username, timestamp, inputs_json, estimated_cost FROM generation_logs ORDER BY id DESC LIMIT 50").fetchall()
     conn.close()
     return logs
+
+# --- 6. SUBSCRIPTION HELPERS ---
+def get_user_status(username):
+    """Peeks at the current status without changing it."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT subscription_status FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    return result[0] if result else "trial"
+
+def update_user_status(username, new_status):
+    """Updates the user's subscription status."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET subscription_status = ? WHERE username = ?", (new_status, username))
+    conn.commit()
+    conn.close()
