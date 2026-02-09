@@ -721,9 +721,25 @@ def show_paywall():
 # 1. DASHBOARD
 if app_mode == "DASHBOARD":
     st.title("BRAND COMMAND CENTER")
-# 1. Determine if the user is "New" (Has no profiles yet)
+    
+    # --- TRIAL STATUS BANNER ---
+    # Only shows if user is NOT active. Doesn't block access, just reminds them.
+    if st.session_state.get('status') != 'active':
+        st.markdown("""
+            <div style='background-color: #1b2a2e; padding: 15px; border-radius: 4px; margin-bottom: 25px; border: 1px solid #3d3d3d; border-left: 5px solid #ab8f59;'>
+                <strong style='color: #ab8f59; letter-spacing: 1px;'>⚠️ TRIAL MODE ACTIVE</strong><br>
+                <span style='color: #a0a0a0; font-size: 0.9rem;'>
+                    You are operating on a restricted license. High-fidelity generation modules (Copy Editor, Visual Audit) are locked.<br>
+                    <a href="https://castellanpr.lemonsqueezy.com" target="_blank" style="color: #f5f5f0; text-decoration: underline; font-weight: bold;">Initialize Agency Subscription to unlock.</a>
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+    # ---------------------------
+
+    # 1. Determine if the user is "New" (Has no profiles yet)
     has_profiles = bool(st.session_state.get('profiles'))
-# 2. Render the Expander (Clean Title, No Emoji)
+    
+    # 2. Render the Expander (Clean Title, No Emoji)
     with st.expander("QUICK START GUIDE: OPERATIONAL WORKFLOW", expanded=not has_profiles):
         st.markdown("""
         <div style='font-family: sans-serif; color: #f5f5f0; font-size: 0.95rem; line-height: 1.6;'>
@@ -749,6 +765,7 @@ if app_mode == "DASHBOARD":
             </ol>
         </div>
         """, unsafe_allow_html=True)   
+
     # --- STYLE FOR ACTION BUTTONS ---
     st.markdown("""<style>
         div[data-testid*="Column"] .stButton button {
@@ -894,10 +911,15 @@ if app_mode == "DASHBOARD":
                             st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
-
 # 2. VISUAL COMPLIANCE
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
+
+    # --- AGENCY TIER CHECK ---
+    if st.session_state.get('status') != 'active':
+        show_paywall()
+    # -------------------------
+    
     if not active_profile: st.warning("NO PROFILE SELECTED.")
     else:
         uploaded_file = st.file_uploader("UPLOAD ASSET", type=["jpg", "png"])
@@ -1422,6 +1444,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
