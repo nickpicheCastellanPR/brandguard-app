@@ -985,23 +985,132 @@ if app_mode == "DASHBOARD":
                             st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
-# 2. VISUAL COMPLIANCE
+
+# 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
+    st.markdown("Upload a creative asset to test it against your Brand Profile.")
 
     # --- AGENCY TIER CHECK ---
-    if st.session_state.get('status') != 'active':
+    # Security Gate: Ensure only active subscribers can access this feature
+    if st.session_state.get('status', 'trial').lower() != 'active':
         show_paywall()
     # -------------------------
     
-    if not active_profile: st.warning("NO PROFILE SELECTED.")
+    # 1. Check if Profile is Active
+    active_profile_name = st.session_state.get('active_profile_name')
+    if not active_profile_name:
+        st.warning("⚠️ No Brand Profile Loaded. Please select one in the Sidebar.")
     else:
-        uploaded_file = st.file_uploader("UPLOAD ASSET", type=["jpg", "png"])
-        if uploaded_file and st.button("RUN AUDIT", type="primary"):
-            with st.spinner("ANALYZING PIXELS..."):
-                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                result = logic.run_visual_audit(Image.open(uploaded_file), prof_text)
-                st.markdown(result)
+        profile_data = st.session_state['profiles'][active_profile_name]
+        
+        # 2. Uploader
+        uploaded_file = st.file_uploader("UPLOAD ASSET (Image)", type=['png', 'jpg', 'jpeg'])
+        
+        if uploaded_file:
+            image = Image.open(uploaded_file)
+            st.image(image, caption="CANDIDATE ASSET", width=400)
+            st.divider()
+
+            # Run Analysis
+            if st.button("RUN COMPLIANCE CHECK", type="primary"):
+                with st.spinner("ANALYZING PIXELS, TEXT & CONTEXT..."):
+                    # robust retrieval of text rules
+                    final_rules = profile_data.get('final_text', '') if isinstance(profile_data, dict) else profile_data
+                    
+                    # Call the Logic Engine
+                    result = logic.run_visual_audit(image, final_rules)
+                    
+                    score = result.get('score', 0)
+                    bd = result.get('breakdown', {})
+                    
+                    # --- SCORECARD HEADER ---
+                    score_color = "#ff4b4b" # Red
+                    if score > 60: score_color = "#ffa421" # Orange
+                    if score > 85: score_color = "#09ab3b" # Green
+                    
+                    c1, c2 = st.columns([1, 2])
+                    with c1:
+                        st.markdown(f"""
+                            <div style="background-color: #1b2a2e; border: 1px solid {score_color}; padding: 30px; border-radius: 4px; text-align: center; height: 100%;">
+                                <h2 style="color: {score_color}; margin: 0; font-size: 3.5rem; font-weight: 800; letter-spacing: -2px;">{score}</h2>
+                                <p style="color: #5c6b61; margin: 0; letter-spacing: 2px; font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">{result.get('verdict')}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with c2:
+                        # PROGRESS BARS FOR CATEGORIES (5 Pillars)
+                        def render_bar(label, val, weight_txt):
+                            # Safety check for float/int conversion
+                            try: val = int(val) 
+                            except: val = 0
+                            
+                            color = "#09ab3b" if val > 80 else "#ffa421" if val > 50 else "#ff4b4b"
+                            st.markdown(f"""
+                                <div style="margin-bottom: 8px;">
+                                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:700; color:#a0a0a0;">
+                                        <span>{label} <span style="font-weight:400; font-style:italic;">{weight_txt}</span></span>
+                                        <span style="color:{color};">{val}/100</span>
+                                    </div>
+                                    <div style="width:100%; height:6px; background:#3d3d3d; border-radius:3px; overflow:hidden;">
+                                        <div style="width:{val}%; height:100%; background:{color};"></div>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        render_bar("COLOR FIDELITY", bd.get('color', {}).get('score', 0), "(25%)")
+                        render_bar("IDENTITY INTEGRITY", bd.get('identity', {}).get('score', 0), "(25%)")
+                        render_bar("TONE & COPY", bd.get('tone', {}).get('score', 0), "(20%)")
+                        render_bar("TYPOGRAPHY", bd.get('typography', {}).get('score', 0), "(15%)")
+                        render_bar("VIBE & ARCHETYPE", bd.get('vibe', {}).get('score', 0), "(15%)")
+
+                    st.divider()
+                    
+                    # --- FINDINGS (Geometric Style - No Emojis) ---
+                    col_crit, col_warn, col_win = st.columns(3)
+                    
+                    st.markdown("""
+                    <style>
+                        .geo-bullet-red { display: inline-block; width: 8px; height: 8px; background-color: #ff4b4b; margin-right: 8px; transform: rotate(45deg); }
+                        .geo-bullet-orange { display: inline-block; width: 8px; height: 8px; background-color: #ffa421; margin-right: 8px; border-radius: 50%; }
+                        .geo-bullet-green { display: inline-block; width: 8px; height: 8px; background-color: #09ab3b; margin-right: 8px; }
+                        .audit-item { font-size: 0.85rem; color: #f5f5f0; margin-bottom: 12px; border-left: 2px solid #3d3d3d; padding-left: 12px; line-height: 1.4; }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    with col_crit:
+                        st.markdown("<h5 style='color:#ff4b4b; letter-spacing:1px;'>VIOLATIONS</h5>", unsafe_allow_html=True)
+                        if result.get('critical_fixes'):
+                            for fix in result['critical_fixes']:
+                                st.markdown(f"<div class='audit-item' style='border-left-color: #ff4b4b;'><div class='geo-bullet-red'></div>{fix}</div>", unsafe_allow_html=True)
+                        else:
+                            st.caption("No critical errors.")
+
+                    with col_warn:
+                        st.markdown("<h5 style='color:#ffa421; letter-spacing:1px;'>REFINEMENTS</h5>", unsafe_allow_html=True)
+                        if result.get('minor_fixes'):
+                            for fix in result['minor_fixes']:
+                                st.markdown(f"<div class='audit-item' style='border-left-color: #ffa421;'><div class='geo-bullet-orange'></div>{fix}</div>", unsafe_allow_html=True)
+                        else:
+                            st.caption("No refinements needed.")
+
+                    with col_win:
+                        st.markdown("<h5 style='color:#09ab3b; letter-spacing:1px;'>SUCCESS</h5>", unsafe_allow_html=True)
+                        if result.get('brand_wins'):
+                            for win in result['brand_wins']:
+                                st.markdown(f"<div class='audit-item' style='border-left-color: #09ab3b;'><div class='geo-bullet-green'></div>{win}</div>", unsafe_allow_html=True)
+                        else:
+                            st.caption("No specific wins.")
+                    
+                    # --- DETAILED REASONING (Transparency) ---
+                    with st.expander("VIEW SCORING LOGIC (TRANSPARENCY REPORT)"):
+                        st.markdown(f"""
+                        **1. COLOR ANALYSIS:** {bd.get('color', {}).get('reason')}  
+                        **2. IDENTITY:** {bd.get('identity', {}).get('reason')}  
+                        **3. TONE & COPY:** {bd.get('tone', {}).get('reason')}
+                        **4. TYPOGRAPHY:** {bd.get('typography', {}).get('reason')}  
+                        **5. VIBE:** {bd.get('vibe', {}).get('reason')}
+                        """)
 
 # 3. COPY EDITOR
 elif app_mode == "COPY EDITOR":
@@ -1545,6 +1654,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
