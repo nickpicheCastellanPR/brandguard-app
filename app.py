@@ -620,12 +620,12 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Negative Margins, High-Contrast Buttons) ---
+# --- SIDEBAR (Fixed Gaps, Custom Divider, No Overlap) ---
 with st.sidebar:
     # 0. STYLE INJECTION
     st.markdown("""
         <style>
-        /* 1. Sidebar Nav Buttons (Gold Borders, Dark Text on Hover) */
+        /* 1. Sidebar Nav Buttons */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
             color: #ab8f59 !important;
@@ -642,8 +642,7 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* 2. Primary Action Buttons (e.g. Extract & Map) */
-        /* Force Dark Text (#1b2a2e) on Gold Background (#ab8f59) */
+        /* 2. Primary Action Buttons */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
@@ -651,22 +650,30 @@ with st.sidebar:
             font-weight: 800 !important;
         }
         button[kind="primary"] p {
-            color: #1b2a2e !important; /* Forces inner text color */
+            color: #1b2a2e !important;
         }
         button[kind="primary"]:hover {
-            background-color: #f0c05a !important; /* Brighter gold on hover */
+            background-color: #f0c05a !important;
             color: #1b2a2e !important;
         }
         
-        /* 3. Navigation Header - NEGATIVE MARGIN HACK */
-        /* Pulls the APPS header up to close the Streamlit gap */
+        /* 3. Navigation Header - CLEAN SPACING */
         .nav-header {
             font-size: 0.8rem;
             font-weight: 700;
             color: #5c6b61;
             letter-spacing: 1px;
-            margin-top: -20px !important; 
+            margin-top: 10px !important; /* Fixed: No overlap, small gap */
             margin-bottom: 5px;
+        }
+        
+        /* 4. Custom Divider */
+        .custom-hr {
+            border: 0;
+            border-top: 1px solid #5c6b61;
+            opacity: 0.3;
+            margin-top: 10px;
+            margin-bottom: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -677,7 +684,8 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    st.divider()
+    # Custom tight divider instead of st.divider()
+    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
 
     # 2. USER & STATUS BADGE
     raw_user = st.session_state.get('username', 'User').upper()
@@ -718,7 +726,6 @@ with st.sidebar:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
-        # Combined block with the Navigation Header
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
@@ -731,31 +738,32 @@ with st.sidebar:
                 <div class="sb-track"><div class="sb-fill"></div></div>
                 <div class="sb-status">{metrics['status_label'].upper()} ({metrics['score']}%)</div>
             </div>
-            <div class="nav-header">APPS</div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
-        st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
 
     # 4. NAVIGATION
+    st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
+
     def set_page(page):
         st.session_state['app_mode'] = page
         
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
-    
-    # Writing Tools
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    st.divider()
+    # Custom Tight Divider
+    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
+    
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
     if st.session_state.get('is_admin', False):
          st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
 
-    st.divider()
+    # Footer Divider
+    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
     
     # 5. TRUST FOOTER
     st.markdown("""
@@ -1765,6 +1773,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
