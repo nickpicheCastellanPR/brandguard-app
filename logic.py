@@ -80,7 +80,7 @@ def extract_dominant_colors(image, num_colors=4):
 # --- 2. MAIN LOGIC CLASS ---
 class SignetLogic:
     def __init__(self):
-        # FIX: Revert to the stable, globally available model name
+        # FIX: Use the stable model name to avoid 404 errors
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def run_visual_audit(self, image, profile_text):
@@ -190,7 +190,7 @@ class SignetLogic:
         import re
         import json
         
-        # 1. REGEX HUNT: Forcefully find hex codes (6 chars) before AI tries
+        # 1. REGEX HUNT: Forcefully find hex codes (6 chars)
         found_hexes = re.findall(r'#[0-9a-fA-F]{6}', pdf_text)
         unique_hexes = list(set(found_hexes))
         
@@ -201,7 +201,7 @@ class SignetLogic:
         CONTEXT: I have already mathematically detected these Hex Codes in the document: {unique_hexes}. 
         Please assign them correctly to 'palette_primary' and 'palette_secondary' based on the text context.
         
-        OUTPUT: Return a PURE JSON object (no markdown, no ```json tags) with these exact keys: 
+        OUTPUT: Return a PURE JSON object (no markdown) with these exact keys: 
         wiz_name, wiz_archetype, wiz_mission, wiz_values, wiz_tone, wiz_guardrails, palette_primary (list of hex), palette_secondary (list of hex), writing_sample.
         
         RAW TEXT: 
@@ -209,20 +209,18 @@ class SignetLogic:
         """
         try:
             response = self.model.generate_content(prompt)
-            # Clean possible markdown formatting
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
             
         except Exception as e:
-            # DEBUG MODE: We inject the ACTUAL error into the mission field so we can see it in the UI.
-            error_msg = str(e)
+            # DEBUG: PRINT THE ERROR IN THE MISSION FIELD
             return {
                  "wiz_name": "Error Logs", 
-                 "wiz_mission": f"SYSTEM FAILURE: {error_msg}", # <--- THIS WILL SHOW US THE ERROR
+                 "wiz_mission": f"SYSTEM FAILURE: {str(e)}", 
                  "wiz_archetype": "Error",
                  "palette_primary": unique_hexes[:5] if unique_hexes else ["#000000"],
                  "palette_secondary": [],
-                 "writing_sample": pdf_text[:500] # Show us what text was read (to check if PDF reading worked)
+                 "writing_sample": pdf_text[:500] 
              }
 
     def generate_brand_rules(self, prompt_text):
