@@ -396,7 +396,67 @@ def calculate_calibration_score(profile_data):
         "color": color,
         "message": msg
     }
+# --- HELPER: CONTEXT-AWARE CONFIDENCE ENGINE ---
+def calculate_content_confidence(profile_data, content_type):
+    """
+    Calculates confidence specifically for the requested CONTENT TYPE.
+    Returns: Score (0-100), Label, Color, and Missing Ingredients.
+    """
+    score = 0
+    required = []
+    
+    # Extract Ingredients
+    inputs = profile_data.get('inputs', {})
+    final_text = profile_data.get('final_text', '')
+    
+    # 1. BASELINE (All formats need these) - 40 pts
+    if inputs.get('wiz_mission'): score += 20
+    else: required.append("Mission")
+    
+    if inputs.get('wiz_tone'): score += 20
+    else: required.append("Tone")
+    
+    # 2. FORMAT SPECIFIC (60 pts)
+    
+    # A. HIGH STAKES (Crisis, Press Release) -> Needs Values & Guardrails
+    if content_type in ["Crisis Statement", "Press Release", "Executive Memo"]:
+        if inputs.get('wiz_values'): score += 20
+        else: required.append("Core Values")
+        
+        if inputs.get('wiz_guardrails'): score += 20
+        else: required.append("Guardrails")
+        
+        # specific check for length (depth of context)
+        if len(final_text) > 1000: score += 20
+        else: required.append("Deep Context")
 
+    # B. HUMAN CONNECTION (Email, Blog, Social) -> Needs Voice Samples
+    elif content_type in ["Internal Email", "Blog Post", "Social Campaign (Multi-Channel)"]:
+        if "Analysis:" in final_text: score += 40 # Proof of analyzed writing samples
+        else: required.append("Writing Samples")
+        
+        if inputs.get('wiz_values'): score += 20
+        else: required.append("Values")
+
+    # C. SPOKEN WORD (Speech) -> Needs Cadence/Rhetoric (Hardest to do)
+    elif content_type == "Speech / Script":
+        if "Analysis:" in final_text and len(final_text) > 2000: score += 60
+        elif "Analysis:" in final_text: score += 30; required.append("More Samples")
+        else: required.append("Voice Analysis")
+
+    # D. UTILITY (FAQ) -> Needs Facts
+    else:
+        # Default generous scoring for simple formats
+        score += 60
+
+    # 3. FORMATTING OUTPUT
+    if score >= 80:
+        return {"score": score, "label": "HIGH PRECISION", "color": "#09ab3b", "action": None}
+    elif score >= 50:
+        return {"score": score, "label": "CAPABLE", "color": "#ffa421", "action": f"Add {required[0] if required else 'Context'}"}
+    else:
+        return {"score": score, "label": "LOW DATA", "color": "#ff4b4b", "action": f"Needs {required[0]}"}
+        
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -1402,30 +1462,208 @@ elif app_mode == "COPY EDITOR":
                     st.caption("REWRITTEN")
                     st.success(st.session_state['ce_result'])
 
-# 4. CONTENT GENERATOR
+# 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
 elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
+    
+    # --- CSS INJECTION ---
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+        .rationale-box {
+            background-color: rgba(171, 143, 89, 0.1);
+            border-left: 3px solid #ab8f59;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+        }
+        .calibration-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-# --- AGENCY TIER CHECK (Admin Exempt) ---
+    # --- AGENCY TIER CHECK ---
     is_admin = st.session_state.get('is_admin', False)
     sub_status = st.session_state.get('status', 'trial').lower()
-    
-    # If NOT an admin AND NOT active, show paywall
     if not is_admin and sub_status != 'active':
         show_paywall()
-    # -------------------------
-    
-    c1, c2 = st.columns(2)
-    with c1: format_type = st.selectbox("TYPE", ["Press Release", "Email", "LinkedIn Post", "Article"])
-    with c2: topic = st.text_input("TOPIC")
-    audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Gen Z, Current Customers")
-    key_points = st.text_area("KEY POINTS", height=150, placeholder="- Key point 1\n- Key point 2")
-    if st.button("GENERATE DRAFT", type="primary"):
-        with st.spinner("DRAFTING..."):
-            prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-            full_prompt_topic = f"{topic} (Audience: {audience})"
-            result = logic.run_content_generator(full_prompt_topic, format_type, key_points, prof_text)
-            st.markdown(result)
+
+    if not active_profile:
+        st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
+    else:
+        # --- STATE INITIALIZATION ---
+        if 'cg_topic' not in st.session_state: st.session_state['cg_topic'] = ""
+        if 'cg_key_points' not in st.session_state: st.session_state['cg_key_points'] = ""
+        if 'cg_result' not in st.session_state: st.session_state['cg_result'] = None
+        if 'cg_rationale' not in st.session_state: st.session_state['cg_rationale'] = None
+
+        # --- 1. INPUTS & DYNAMIC CALIBRATION ---
+        c1, c2 = st.columns([2, 1])
+        
+        with c1:
+            # Topic
+            st.markdown("##### 1. CORE PARAMETERS")
+            cg_topic = st.text_input("TOPIC / HEADLINE", value=st.session_state['cg_topic'], placeholder="e.g. Q3 Financial Results")
+            st.session_state['cg_topic'] = cg_topic
+            
+            # Expanded Format List
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                # Trigger for Dynamic Calibration
+                content_type = st.selectbox("FORMAT", [
+                    "Press Release", "Internal Email", "Executive Memo", "Blog Post", 
+                    "Crisis Statement", "Speech / Script", "Social Campaign (Multi-Channel)"
+                ])
+            with cc2:
+                length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
+            
+            # Audience Context
+            cc3, cc4 = st.columns(2)
+            with cc3:
+                sender = st.text_input("VOICE / SENDER", placeholder="e.g. CEO")
+            with cc4:
+                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Public, Shareholders")
+
+            # Key Points
+            st.markdown("##### 2. MESSAGE DISCIPLINE")
+            cg_key_points = st.text_area(
+                "KEY MESSAGES (BULLET POINTS)", 
+                height=150, 
+                placeholder="- Revenue up 20%\n- New product launch in Q4\n- Focus on sustainability",
+                help="The AI will strictly adhere to these facts.",
+                value=st.session_state['cg_key_points']
+            )
+            st.session_state['cg_key_points'] = cg_key_points
+
+        with c2:
+            # --- DYNAMIC CALIBRATION METER ---
+            # We calculate this ON THE FLY based on the 'content_type' selected above
+            profile_data = st.session_state['profiles'][active_profile]
+            metrics = calculate_content_confidence(profile_data, content_type)
+            
+            st.markdown(f"""<div class="dashboard-card" style="padding: 15px; margin-top: 28px;">
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">TASK CONFIDENCE: {content_type.upper()}</div>
+                <div style="font-size:1.6rem; font-weight:800; color:{metrics['color']}; margin-top:5px;">{metrics['score']}%</div>
+                <div class="calibration-bar">
+                    <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
+                </div>
+                <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+            </div>""", unsafe_allow_html=True)
+            
+            # Dynamic Warning / Call to Action
+            if metrics['action']:
+                st.markdown(f"""
+                    <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
+                        <strong>Optimization Tip:</strong><br>
+                        This format requires strong <em>{metrics['action'].split(' ')[-1]}</em> data. 
+                        Consider updating the profile for better results.
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("GENERATE DRAFT", type="primary", use_container_width=True):
+                if cg_topic and cg_key_points:
+                    with st.spinner("ARCHITECTING CONTENT..."):
+                        # Get Rules
+                        prof_text = profile_data.get('final_text', str(profile_data))
+                        
+                        # Engineered Prompt (Constraint-Based)
+                        prompt_wrapper = f"""
+                        CONTEXT:
+                        - Type: {content_type}
+                        - Length: {length}
+                        - Sender: {sender}
+                        - Audience: {audience}
+                        
+                        CORE TASK: Write a {content_type} about "{cg_topic}".
+                        
+                        STRICT CONSTRAINTS:
+                        1. You must cover these KEY POINTS:
+                        {cg_key_points}
+                        2. Do NOT invent facts outside these points.
+                        3. Use the Brand Voice defined below.
+                        
+                        STEP 1: STRATEGY
+                        Briefly outline the tone and structure you will use to meet the audience's needs.
+                        
+                        STEP 2: DRAFT
+                        Write the content.
+                        
+                        OUTPUT FORMAT:
+                        STRATEGY:
+                        [Reasoning]
+                        DRAFT:
+                        [Content]
+                        """
+                        
+                        try:
+                            # Use content generator logic
+                            full_response = logic_engine.run_content_generator(cg_topic, content_type, cg_key_points, prof_text)
+                            
+                            # Heuristic Parsing
+                            if "DRAFT:" in full_response:
+                                parts = full_response.split("DRAFT:")
+                                rationale = parts[0].replace("STRATEGY:", "").strip()
+                                draft = parts[1].strip()
+                            else:
+                                rationale = "Generated based on key points."
+                                draft = full_response
+                            
+                            # Update State
+                            st.session_state['cg_result'] = draft
+                            st.session_state['cg_rationale'] = rationale
+                            
+                            # LOGGING
+                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
+                            from datetime import datetime
+                            
+                            log_entry = {
+                                "timestamp": datetime.now().strftime("%H:%M"),
+                                "type": "GENERATOR",
+                                "name": f"{content_type}: {cg_topic}",
+                                "score": metrics['score'], # Log the SPECIFIC confidence score
+                                "verdict": "CREATED",
+                                "result_data": draft,
+                                "image_data": None
+                            }
+                            st.session_state['activity_log'].insert(0, log_entry)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Topic and Key Points are required.")
+
+        # --- 3. OUTPUT DISPLAY ---
+        if st.session_state['cg_result']:
+            st.divider()
+            
+            if st.session_state['cg_rationale']:
+                st.markdown(f"""
+                    <div class="rationale-box">
+                        <strong>GENERATION STRATEGY:</strong><br>
+                        {st.session_state['cg_rationale']}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.subheader("FINAL DRAFT")
+            st.text_area("Copy to Clipboard", value=st.session_state['cg_result'], height=500)
 
 # 5. SOCIAL MEDIA ASSISTANT
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
@@ -1964,6 +2202,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
