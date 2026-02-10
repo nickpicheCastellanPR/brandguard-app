@@ -624,7 +624,6 @@ if not st.session_state['authenticated']:
 with st.sidebar:
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
-        # FIX: "auto" caused the crash. We use standard container width.
         st.image("Signet_Logo_Color.png", use_container_width=True) 
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
@@ -633,6 +632,7 @@ with st.sidebar:
 
     # 2. USER & STATUS BADGE
     raw_user = st.session_state.get('username', 'User').upper()
+    import html
     user_tag = html.escape(raw_user) 
     status_tag = st.session_state.get('status', 'trial').upper()
     
@@ -688,20 +688,19 @@ with st.sidebar:
 
     st.divider()
     
-    # 4. NAVIGATION (Log-Free)
+    # 4. NAVIGATION (Clean Text Only)
     st.markdown("### APPS")
     
     def set_page(page):
         st.session_state['app_mode'] = page
         
-    # use width="stretch" for buttons (standard in new Streamlit)
-    st.button("📊 DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
-    st.button("🏗️ BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
-    st.button("👁️ VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
-    st.button("✍️ COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
+    st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
+    st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
+    st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
+    st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     
     if st.session_state.get('is_admin', False):
-         st.button("🛡️ ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
+         st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
 
     st.divider()
     
@@ -719,6 +718,9 @@ with st.sidebar:
         st.session_state['username'] = None
         st.session_state['profiles'] = {}
         st.rerun()
+
+# --- BRIDGE VARIABLE ---
+app_mode = st.session_state.get('app_mode', 'DASHBOARD')
         
 def show_paywall():
     """Renders the Castellan Agency Tier Paywall."""
@@ -1645,6 +1647,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
