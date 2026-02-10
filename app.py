@@ -909,56 +909,30 @@ if app_mode == "DASHBOARD":
         </div>
         """, unsafe_allow_html=True)    
 
-    # --- STYLE FOR ACTION BUTTONS (RESTORED) ---
+    # --- EXACT CSS RESTORATION (USER PROVIDED) ---
     st.markdown("""<style>
-        /* Scoped to the Action Column area to avoid hitting the Activity Feed buttons */
-        div[data-testid="column"] .stButton button {
-            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; 
-            border: 1px solid #3a4b50 !important; 
-            height: 250px !important; 
-            width: 100% !important; 
-            display: flex !important; 
-            flex-direction: column !important; 
-            align-items: center !important; 
-            justify-content: center !important; 
-            color: #f5f5f0 !important; 
-            border-radius: 0px !important; 
-            box-shadow: none !important; 
-            padding-top: 50px !important; 
-            position: relative !important; 
-            white-space: pre-wrap !important;
+        div[data-testid*="Column"] .stButton button {
+            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
         }
-        div[data-testid="column"] .stButton button:hover { 
-            transform: translateY(-5px) !important; 
-            border-color: #ab8f59 !important; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; 
-            color: #ab8f59 !important; 
-        }
-        div[data-testid="column"] .stButton button p { 
-            font-size: 1rem !important; 
-            font-weight: 700 !important; 
-            letter-spacing: 0.1em; 
-        }
-        /* Custom Icon Pseudo-Elements */
-        div[data-testid="column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
-        div[data-testid="column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
-        div[data-testid="column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
+        div[data-testid*="Column"] .stButton button:hover { transform: translateY(-5px) !important; border-color: #ab8f59 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; color: #ab8f59 !important; }
+        div[data-testid*="Column"] .stButton button p { font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0.1em; }
+        div[data-testid*="Column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
+        div[data-testid*="Column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
+        div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
     </style>""", unsafe_allow_html=True)
 
-    # --- ACTION BUTTONS (The "Cool Cards") ---
+    # --- ACTION BUTTONS (Restored Text & Logic) ---
     c1, c2, c3 = st.columns(3)
     
-    # 1. Create Profile
     with c1: 
+        # Using set_page to match our sidebar logic
         st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=set_page, args=("BRAND ARCHITECT",))
     
-    # 2. Upload Guide
     with c2: 
         if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
             st.session_state['dashboard_upload_open'] = True
             st.rerun()
             
-    # 3. Load Demo
     with c3:
         if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
              demo_data = {
@@ -974,25 +948,23 @@ if app_mode == "DASHBOARD":
              st.session_state['active_profile_name'] = "Castellan PR (Demo)"
              st.rerun()
 
-    # --- UPLOAD SECTION (Conditional Logic) ---
+    # --- UPLOAD DRAWER (Conditional) ---
     if st.session_state.get('dashboard_upload_open'):
         st.markdown("<br>", unsafe_allow_html=True)
+        # Using a container (not columns) to avoid triggering the Button CSS
         with st.container():
-            st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0;"><h3 style="color: #f5f5f0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0; margin-bottom: 20px;"><h3 style="color: #f5f5f0; margin:0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0; margin:0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
             
             dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
-            col_sub, col_can = st.columns([1, 1])
             
-            with col_sub:
-                if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
+            # Using simple layout to avoid CSS collision
+            if dash_pdf:
+                if st.button("PROCESS & INGEST", type="primary"):
                     with st.spinner("ANALYZING PDF STRUCTURE..."):
                         try:
-                            # 1. Extract Text
                             raw_text = logic.extract_text_from_pdf(dash_pdf)
-                            # 2. Get Structured Data
                             extracted_data = logic.generate_brand_rules_from_pdf(raw_text)
                             
-                            # 3. Create the Profile Object
                             new_profile = {
                                 "inputs": {
                                     "wiz_name": extracted_data.get("wiz_name", "New Brand"),
@@ -1008,7 +980,6 @@ if app_mode == "DASHBOARD":
                                 "final_text": f"1. STRATEGY\nMission: {extracted_data.get('wiz_mission')}\nValues: {extracted_data.get('wiz_values')}\n\n2. VOICE\nTone: {extracted_data.get('wiz_tone')}\nSample: {extracted_data.get('writing_sample')}"
                             }
                             
-                            # 4. Save
                             profile_name = f"{extracted_data.get('wiz_name')} (PDF)"
                             db.save_profile(st.session_state['user_id'], profile_name, new_profile)
                             st.session_state['profiles'][profile_name] = new_profile
@@ -1017,50 +988,46 @@ if app_mode == "DASHBOARD":
                             st.success(f"SUCCESS: {profile_name} ingested.")
                             st.session_state['dashboard_upload_open'] = False
                             st.rerun()
-                            
                         except Exception as e:
                             st.error(f"Error: {e}")
-            with col_can:
-                if st.button("CANCEL"):
-                    st.session_state['dashboard_upload_open'] = False
-                    st.rerun()
+            
+            if st.button("CANCEL UPLOAD"):
+                st.session_state['dashboard_upload_open'] = False
+                st.rerun()
         st.divider()
 
-    # --- ACTIVITY FEED (The New Feature, styled to not conflict) ---
+    # --- ACTIVITY FEED (New Feature) ---
+    # NOTE: We avoid st.columns for buttons here to prevent the "Cool Card" CSS from affecting them.
     st.divider()
     st.markdown("### OPERATIONAL LOG")
     
     if 'activity_log' not in st.session_state or not st.session_state['activity_log']:
         st.info("No activity recorded yet.")
     else:
-        # We iterate through logs but use a cleaner layout that doesn't trigger the big card CSS
         for i, entry in enumerate(st.session_state['activity_log']):
-            with st.container():
-                # Simple Markdown row instead of columns to avoid CSS conflict with the big cards
-                # or we use a custom HTML block for the row
-                c_time, c_type, c_detail, c_result, c_action = st.columns([1, 2, 3, 2, 1])
-                
-                with c_time: st.caption(entry['timestamp'])
-                with c_type: st.markdown(f"**{entry['type']}**")
-                with c_detail: st.text(entry['name'])
-                with c_result:
-                    score = entry.get('score', 0)
-                    color = "#ff4b4b"
-                    if score > 60: color = "#ffa421"
-                    if score > 85: color = "#09ab3b"
-                    st.markdown(f"<span style='color:{color}; font-weight:bold;'>{entry['verdict']} ({score})</span>", unsafe_allow_html=True)
-                with c_action:
-                    # Using a small secondary button. Note: The CSS above targets ALL buttons in columns.
-                    # To fix the layout break, we might see the "Load" button look huge.
-                    # If so, we will need to wrap this in a container or use a form.
-                    # For now, we use a key to ensure uniqueness.
-                    if st.button("LOAD", key=f"restore_{i}"):
-                        if entry['type'] == "VISUAL AUDIT":
-                            st.session_state['active_audit_result'] = entry['result_data']
-                            st.session_state['active_audit_image'] = entry['image_data']
-                            st.session_state['app_mode'] = "VISUAL COMPLIANCE"
-                            st.rerun()
-            st.markdown("<hr style='margin: 5px 0; opacity: 0.1;'>", unsafe_allow_html=True)
+            # Render Row
+            score = entry.get('score', 0)
+            color = "#ff4b4b"
+            if score > 60: color = "#ffa421"
+            if score > 85: color = "#09ab3b"
+            
+            # Use HTML for the Data Grid
+            st.markdown(f"""
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; margin-bottom: 5px;">
+                    <div style="flex: 1; color: #5c6b61; font-size: 0.8rem;">{entry['timestamp']}</div>
+                    <div style="flex: 2; font-weight: bold; color: #f5f5f0;">{entry['type']}</div>
+                    <div style="flex: 3; color: #a0a0a0;">{entry['name']}</div>
+                    <div style="flex: 2; color: {color}; font-weight: 800;">{entry['verdict']} ({score})</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Action Button (Outside of columns to stay small)
+            if st.button("LOAD SNAPSHOT", key=f"restore_{i}"):
+                if entry['type'] == "VISUAL AUDIT":
+                    st.session_state['active_audit_result'] = entry['result_data']
+                    st.session_state['active_audit_image'] = entry['image_data']
+                    st.session_state['app_mode'] = "VISUAL COMPLIANCE"
+                    st.rerun()
             
 # 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
 elif app_mode == "VISUAL COMPLIANCE":
@@ -1866,6 +1833,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
