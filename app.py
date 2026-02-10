@@ -620,7 +620,7 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Precision Spacing, Dark/Gold Buttons) ---
+# --- SIDEBAR (Clean Order, No Spacers, Standard Spacing) ---
 with st.sidebar:
     # 0. STYLE INJECTION
     st.markdown("""
@@ -675,7 +675,6 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    # Clean spacer 
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
     # 2. USER & STATUS BADGE
@@ -716,7 +715,7 @@ with st.sidebar:
     active_profile_selection = st.selectbox("ACTIVE PROFILE", selector_options, index=default_ix)
     
     if active_profile_selection == "Create New...":
-        pass # Stays on page, waiting for generation
+        pass 
     elif active_profile_selection != st.session_state.get('active_profile_name'):
         st.session_state['active_profile_name'] = active_profile_selection
         st.rerun()
@@ -745,16 +744,14 @@ with st.sidebar:
     def set_page(page):
         st.session_state['app_mode'] = page
         
+    # DAILY TOOLS
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # --- THE VACUUM FIX ---
-    # -20px specifically cancels the 1rem padding of the stElementContainer
-    st.markdown('<div style="margin-top: -20px;"></div>', unsafe_allow_html=True)
-    
+    # ADMIN TOOLS (Directly following, no spacers)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
     if st.session_state.get('is_admin', False) or raw_user == "NICK_ADMIN":
@@ -1808,6 +1805,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
