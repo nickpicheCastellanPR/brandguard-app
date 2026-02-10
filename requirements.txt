@@ -3,9 +3,9 @@ google-generativeai
 pillow
 python-dotenv
 pypdf
+PyPDF2
 fpdf
 argon2-cffi
 requests
 scikit-learn
 numpy
-
