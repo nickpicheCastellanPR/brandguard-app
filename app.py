@@ -1473,6 +1473,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
         with tab_users:
             if users:
+                # SECURITY NOTE: st.dataframe is 'Safe by Design'. It renders scripts as text, preventing XSS.
                 df_users = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "SUB STATUS", "CREATED AT"])
                 # Clean up the view
                 df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "🛡️ ADMIN" if x else "USER")
@@ -1482,7 +1483,9 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
         with tab_logs:
             if logs:
-                df_logs = pd.DataFrame(logs, columns=["OPERATIVE", "TIMESTAMP", "INPUTS (JSON)", "EST. COST", "OUTPUT"])
+                # FIX: Matched columns to the 4 returned by the Database (Username, Time, Inputs, Cost)
+                # This prevents the "Shape mismatch" crash.
+                df_logs = pd.DataFrame(logs, columns=["OPERATIVE", "TIMESTAMP", "INPUTS (JSON)", "EST. COST"])
                 
                 # Filter for readability
                 display_cols = ["TIMESTAMP", "OPERATIVE", "EST. COST"]
@@ -1500,19 +1503,16 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                     row_idx = selection.selection.rows[0]
                     selected_log = df_logs.iloc[row_idx]
                     
-                    c_in, c_out = st.columns(2)
-                    with c_in:
-                        st.caption("INPUT DATA")
-                        st.json(selected_log["INPUTS (JSON)"])
-                    with c_out:
-                        st.caption("OUTPUT GENERATION")
-                        st.code(selected_log["OUTPUT"], language="markdown", line_numbers=True)
+                    st.caption("INPUT DATA")
+                    st.json(selected_log["INPUTS (JSON)"])
+                    
                 else:
                     st.caption("Select a log entry above to inspect payload.")
             else:
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
