@@ -620,11 +620,12 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Secure, Polished, & Log-Free) ---
+# --- SIDEBAR ---
 with st.sidebar:
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
-        st.image("Signet_Logo_Color.png", width="auto") # 'auto' is safe/standard
+        # FIX: "auto" caused the crash. We use standard container width.
+        st.image("Signet_Logo_Color.png", use_container_width=True) 
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
@@ -655,21 +656,17 @@ with st.sidebar:
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
-        # Smart Indexing
         default_ix = 0
         current = st.session_state.get('active_profile_name')
         if current in profile_names:
             default_ix = profile_names.index(current)
 
-        # Profile Selector
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
         
-        # Persist Change
         if active_profile != st.session_state.get('active_profile_name'):
             st.session_state['active_profile_name'] = active_profile
             st.rerun()
         
-        # Calibration Meter
         current_rules = st.session_state['profiles'][active_profile]
         metrics = calculate_calibration_score(current_rules)
         
@@ -691,20 +688,18 @@ with st.sidebar:
 
     st.divider()
     
-    # 4. NAVIGATION (Sticky Buttons + Log Fix)
+    # 4. NAVIGATION (Log-Free)
     st.markdown("### APPS")
     
-    # Helper to switch pages
     def set_page(page):
         st.session_state['app_mode'] = page
         
-    # We use 'width="stretch"' to satisfy the logs and look professional
+    # use width="stretch" for buttons (standard in new Streamlit)
     st.button("📊 DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("🏗️ BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("👁️ VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
     st.button("✍️ COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     
-    # Admin Link
     if st.session_state.get('is_admin', False):
          st.button("🛡️ ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
 
@@ -1650,6 +1645,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
