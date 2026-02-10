@@ -77,11 +77,11 @@ def extract_dominant_colors(image, num_colors=4):
         print(f"Color Logic Error: {e}")
         return []
 
-# --- 2. MAIN LOGIC CLASS ---
-# --- 2. MAIN LOGIC CLASS ---
+# --- 2. MAIN LOGIC CLASS --- #
+
 class SignetLogic:
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.model = genai.GenerativeModel('gemini-flash-latest')
 
     def run_visual_audit(self, image, profile_text):
         """
