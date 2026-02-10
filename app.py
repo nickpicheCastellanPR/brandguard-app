@@ -1320,7 +1320,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
-    # --- CSS INJECTION FOR VISIBILITY (Local Override) ---
+    # --- CSS INJECTION FOR VISIBILITY ---
     st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -1344,6 +1344,7 @@ elif app_mode == "BRAND ARCHITECT":
         uploaded_file = st.session_state.get('arch_pdf_uploader')
         if uploaded_file:
             try:
+                # USE logic_engine (The Class Instance), not logic (The Module)
                 raw_text = logic_engine.extract_text_from_pdf(uploaded_file)
                 data = logic_engine.generate_brand_rules_from_pdf(raw_text)
                 
@@ -1352,18 +1353,17 @@ elif app_mode == "BRAND ARCHITECT":
                 st.session_state['wiz_mission'] = data.get('wiz_mission', '')
                 
                 # --- HEX CODE EXTRACTION (OVERWRITE MODE) ---
-                # 1. Clear Defaults (Removes Castellan Gold)
+                # 1. Clear Defaults
                 st.session_state['palette_primary'] = []
                 st.session_state['palette_secondary'] = []
                 st.session_state['palette_accent'] = [] 
 
                 # 2. Map Primary
                 if 'palette_primary' in data and isinstance(data['palette_primary'], list):
-                    # Take up to 5, filter for valid hex strings
                     valid_hex = [c for c in data['palette_primary'] if isinstance(c, str) and c.startswith('#')]
                     st.session_state['palette_primary'] = valid_hex[:5]
                 
-                # If empty after extraction, fallback to black so picker doesn't crash
+                # Fallback to black if empty
                 if not st.session_state['palette_primary']:
                     st.session_state['palette_primary'] = ["#000000"]
 
@@ -1371,10 +1371,9 @@ elif app_mode == "BRAND ARCHITECT":
                 if 'palette_secondary' in data and isinstance(data['palette_secondary'], list):
                     valid_hex = [c for c in data['palette_secondary'] if isinstance(c, str) and c.startswith('#')]
                     st.session_state['palette_secondary'] = valid_hex[:5]
-                
                 # -------------------------------
                 
-                # Sanitize List Fields (Tone, Values, Guardrails)
+                # Sanitize List Fields
                 raw_tone = data.get('wiz_tone', '')
                 if isinstance(raw_tone, list):
                     st.session_state['wiz_tone'] = ", ".join([str(t) for t in raw_tone])
@@ -1536,10 +1535,14 @@ elif app_mode == "BRAND ARCHITECT":
                 with st.spinner("CALIBRATING..."):
                     try:
                         palette_str = f"Primary: {', '.join(st.session_state['palette_primary'])}. Secondary: {', '.join(st.session_state['palette_secondary'])}. Accents: {', '.join(st.session_state['palette_accent'])}."
-                        logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
+                        
+                        # FIX: Use logic_engine for logo and social analysis
+                        logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic_engine.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
                         logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
-                        social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
+                        
+                        social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic_engine.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
                         social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
+                        
                         all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                         
                         prompt = f"""
@@ -1550,7 +1553,9 @@ elif app_mode == "BRAND ARCHITECT":
                         4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
                         
-                        final_text_out = logic.generate_brand_rules(prompt)
+                        # FIX: Use logic_engine for final generation
+                        final_text_out = logic_engine.generate_brand_rules(prompt)
+                        
                         profile_data = {
                             "final_text": final_text_out,
                             "inputs": {
@@ -1805,6 +1810,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
