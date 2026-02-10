@@ -620,21 +620,21 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Gap Finally Fixed) ---
+# --- SIDEBAR (Gap Fixed, Buttons Legible, Admin Status) ---
 with st.sidebar:
-    # 0. STYLE INJECTION
+    # 0. STYLE INJECTION (Fixing the Legibility Issues)
     st.markdown("""
         <style>
-        /* 1. Standard Sidebar Buttons */
+        /* 1. Sidebar Nav Buttons (Standard) */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
-            color: #ab8f59 !important;
+            color: #ab8f59 !important; /* Gold text default */
             border-width: 1px !important;
             background-color: transparent !important;
         }
         div[data-testid="stButton"] button:hover {
             border-color: #ab8f59 !important;
-            color: #1b2a2e !important;
+            color: #1b2a2e !important; /* Dark text on hover */
             background-color: #ab8f59 !important;
         }
         div[data-testid="stButton"] button:active {
@@ -642,37 +642,30 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* 2. Primary Action Buttons */
+        /* 2. PRIMARY BUTTONS (Extract, Generate, etc.) - THE FIX */
+        /* We force Dark Text (#1b2a2e) on Gold Background (#ab8f59) ALWAYS */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
             border: none !important;
             font-weight: 800 !important;
         }
+        /* Fix for the inner paragraph tag inside buttons */
         button[kind="primary"] p {
             color: #1b2a2e !important;
         }
         button[kind="primary"]:hover {
-            background-color: #f0c05a !important;
+            background-color: #f0c05a !important; /* Brighter gold hover */
             color: #1b2a2e !important;
         }
         
-        /* 3. Navigation Header */
+        /* 3. Sidebar Header Styling */
         .nav-header {
             font-size: 0.8rem;
             font-weight: 700;
             color: #5c6b61;
             letter-spacing: 1px;
             margin-top: 10px !important;
-            margin-bottom: 5px;
-        }
-        
-        /* 4. Custom Divider */
-        .custom-hr {
-            border: 0;
-            border-top: 1px solid #5c6b61;
-            opacity: 0.3;
-            margin-top: 5px;
             margin-bottom: 5px;
         }
         </style>
@@ -684,12 +677,18 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
+    # Clean spacer instead of line
+    st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
-    # 2. USER & STATUS BADGE
+    # 2. USER & STATUS BADGE (GOD MODE FIX)
     raw_user = st.session_state.get('username', 'User').upper()
     import html
     user_tag = html.escape(raw_user) 
+    
+    # Force Agency Status for Admin
+    if raw_user == "NICK_ADMIN":
+        st.session_state['status'] = "ACTIVE"
+        
     status_tag = st.session_state.get('status', 'trial').upper()
     
     st.caption(f"OPERATIVE: {user_tag}")
@@ -710,18 +709,26 @@ with st.sidebar:
     # 3. ACTIVE PROFILE & CONFIDENCE METER
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
-    if profile_names:
-        default_ix = 0
-        current = st.session_state.get('active_profile_name')
-        if current in profile_names:
-            default_ix = profile_names.index(current)
+    # Add "NEW PROFILE" Option so you aren't stuck
+    selector_options = ["Create New..."] + profile_names
+    
+    default_ix = 0
+    current = st.session_state.get('active_profile_name')
+    if current in profile_names:
+        default_ix = selector_options.index(current)
 
-        active_profile_selection = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
-        
-        if active_profile_selection != st.session_state.get('active_profile_name'):
-            st.session_state['active_profile_name'] = active_profile_selection
-            st.rerun()
-        
+    active_profile_selection = st.selectbox("ACTIVE PROFILE", selector_options, index=default_ix)
+    
+    # Handle Selection Logic
+    if active_profile_selection == "Create New...":
+        # Do nothing, just let them go to Brand Architect
+        pass
+    elif active_profile_selection != st.session_state.get('active_profile_name'):
+        st.session_state['active_profile_name'] = active_profile_selection
+        st.rerun()
+    
+    # Only show meter if a real profile is selected
+    if active_profile_selection != "Create New..." and active_profile_selection in st.session_state['profiles']:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
@@ -738,8 +745,6 @@ with st.sidebar:
                 <div class="sb-status">{metrics['status_label'].upper()} ({metrics['score']}%)</div>
             </div>
         """, unsafe_allow_html=True)
-    else:
-        st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
@@ -753,19 +758,17 @@ with st.sidebar:
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # --- THE FIX: We remove the divider and rely on CSS to compress the space ---
-    # We use a markdown spacer with negative margin to pull the next element up
-    st.markdown("""
-        <div style="margin-top: 15px; border-top: 1px solid rgba(92, 107, 97, 0.3); margin-bottom: 15px;"></div>
-    """, unsafe_allow_html=True)
+    # --- THE VACUUM FIX: Negative Margin Spacer ---
+    # This invisible div sucks the space up between Social Media and Brand Architect
+    st.markdown('<div style="margin-top: -15px;"></div>', unsafe_allow_html=True)
     
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
-    if st.session_state.get('is_admin', False):
+    if st.session_state.get('is_admin', False) or raw_user == "NICK_ADMIN":
          st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
 
-    # Footer Divider
-    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
+    # Footer Spacer
+    st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
     
     # 5. TRUST FOOTER
     st.markdown("""
@@ -782,7 +785,7 @@ with st.sidebar:
         st.session_state['profiles'] = {}
         st.rerun()
 
-# --- CRITICAL BRIDGE VARIABLES ---
+# --- BRIDGE VARIABLES ---
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
     
@@ -1775,6 +1778,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
