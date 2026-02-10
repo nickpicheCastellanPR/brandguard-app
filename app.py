@@ -456,7 +456,42 @@ def calculate_content_confidence(profile_data, content_type):
         return {"score": score, "label": "CAPABLE", "color": "#ffa421", "action": f"Add {required[0] if required else 'Context'}"}
     else:
         return {"score": score, "label": "LOW DATA", "color": "#ff4b4b", "action": f"Needs {required[0]}"}
+
+# --- HELPER: SOCIAL CALIBRATION ---
+def calculate_social_confidence(profile_data, platform):
+    """
+    Checks if the profile contains specific examples for the target platform.
+    """
+    score = 0
+    missing = []
+    
+    # We scan the 'final_text' because that's where the analyzed social samples live
+    # format from Architect is: "Platform: LinkedIn. Analysis: ..."
+    final_text = profile_data.get('final_text', '')
+    
+    # 1. PLATFORM SPECIFICITY (50 pts)
+    # Does the profile actually contain analyzed posts for this platform?
+    if f"Platform: {platform}" in final_text:
+        score += 50
+    else:
+        missing.append(f"{platform} Examples")
         
+    # 2. BRAND VOICE FOUNDATION (30 pts)
+    inputs = profile_data.get('inputs', {})
+    if inputs.get('wiz_tone'): score += 15
+    if inputs.get('wiz_values'): score += 15
+    
+    # 3. VISUALS (20 pts) - Important for Insta/LinkedIn
+    if inputs.get('palette_primary'): score += 20
+    
+    # Formatting
+    if score >= 80:
+        return {"score": score, "label": "DIALECT MATCHED", "color": "#09ab3b", "action": None}
+    elif score >= 50:
+        return {"score": score, "label": "GENERIC VOICE", "color": "#ffa421", "action": f"Add {missing[0]}"}
+    else:
+        return {"score": score, "label": "UNINITIATED", "color": "#ff4b4b", "action": "Upload Social Screenshots"}
+
 def convert_to_html_brand_card(brand_name, content):
     content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -1691,48 +1726,181 @@ elif app_mode == "CONTENT GENERATOR":
             st.subheader("FINAL DRAFT")
             st.text_area("Copy to Clipboard", value=st.session_state['cg_result'], height=500)
 
-# 5. SOCIAL MEDIA ASSISTANT
+# 5. SOCIAL MEDIA ASSISTANT (Platform-Aware, Goal-Oriented, Trend-Aware)
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
+    
+    # --- CSS INJECTION ---
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+        .calibration-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-# --- AGENCY TIER CHECK (Admin Exempt) ---
+    # --- AGENCY TIER CHECK ---
     is_admin = st.session_state.get('is_admin', False)
     sub_status = st.session_state.get('status', 'trial').lower()
-    
-    # If NOT an admin AND NOT active, show paywall
     if not is_admin and sub_status != 'active':
         show_paywall()
-    # -------------------------
-    
-    if not active_profile: st.warning("NO PROFILE SELECTED.")
+
+    if not active_profile:
+        st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
-        c1, c2 = st.columns([1, 1])
+        # --- STATE INITIALIZATION ---
+        if 'sm_topic' not in st.session_state: st.session_state['sm_topic'] = ""
+        if 'sm_results' not in st.session_state: st.session_state['sm_results'] = None
+        
+        # --- INPUTS & CALIBRATION ---
+        c1, c2 = st.columns([2, 1])
+        
         with c1:
-            platform = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "TikTok", "Facebook"])
-            topic_social = st.text_area("TOPIC / CAPTION INTENT", height=100, placeholder="What is this post about?")
-        with c2:
-            social_img = st.file_uploader("UPLOAD VISUAL (Optional)", type=["jpg", "png"])
+            st.markdown("##### 1. PLATFORM STRATEGY")
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                # Trigger Calibration
+                platform = st.selectbox("NETWORK", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"])
+            with cc2:
+                goal = st.selectbox("OBJECTIVE", ["Reach (Awareness)", "Engagement (Comments)", "Conversion (Clicks)"])
             
-        if st.button("GENERATE POST", type="primary"):
-            with st.spinner("ANALYZING & DRAFTING..."):
-                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                img_context = ""
-                if social_img:
-                    desc = logic.analyze_social_post(Image.open(social_img))
-                    img_context = f"IMAGE CONTEXT: The post includes an image described as: {desc}"
-                
-                social_prompt = f"""
-                TASK: Write a social media post for {platform}.
-                TOPIC: {topic_social}
-                {img_context}
-                INSTRUCTIONS:
-                1. Apply the 'Social Media' rules from the Brand Profile.
-                2. Use the 'High Performing Posts' in the profile as a benchmark for tone/length.
-                3. Adhere to platform best practices for {platform} (hashtags, emoji usage, length).
-                4. Provide a 'Rationale' section explaining why you chose this angle.
-                """
-                result = logic.run_content_generator(social_prompt, f"{platform} Post", "See prompt", prof_text)
-                st.markdown(result)
+            st.markdown("##### 2. CONTENT CONTEXT")
+            sm_topic = st.text_input("TOPIC / HOOK", value=st.session_state['sm_topic'], placeholder="e.g. Launching our new sustainability initiative")
+            st.session_state['sm_topic'] = sm_topic
+            
+            # Image Uploader (Crucial for Visual Platforms)
+            uploaded_image = st.file_uploader("ATTACH VISUAL (Optional but Recommended)", type=['png', 'jpg', 'jpeg'])
+            
+        with c2:
+            # --- DYNAMIC CALIBRATION METER ---
+            profile_data = st.session_state['profiles'][active_profile]
+            metrics = calculate_social_confidence(profile_data, platform)
+            
+            st.markdown(f"""<div class="dashboard-card" style="padding: 15px; margin-top: 28px;">
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">DIALECT CONFIDENCE: {platform.upper()}</div>
+                <div style="font-size:1.6rem; font-weight:800; color:{metrics['color']}; margin-top:5px;">{metrics['score']}%</div>
+                <div class="calibration-bar">
+                    <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
+                </div>
+                <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+            </div>""", unsafe_allow_html=True)
+            
+            # Warning Logic
+            if metrics['action']:
+                st.markdown(f"""
+                    <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
+                        <strong>Calibration Required:</strong><br>
+                        The engine has not analyzed any previous {platform} posts for this brand. Output will be generic.
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button("UPLOAD SAMPLES", type="secondary"):
+                    st.session_state['app_mode'] = "BRAND ARCHITECT"
+                    st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("GENERATE OPTIONS", type="primary", use_container_width=True):
+                if sm_topic:
+                    with st.spinner("SCANNING TRENDS & DRAFTING..."):
+                        # 1. Image Analysis (if present)
+                        image_desc = "No image provided."
+                        if uploaded_image:
+                            img = Image.open(uploaded_image)
+                            image_desc = logic.analyze_social_post(img)
+                        
+                        # 2. Get Rules
+                        prof_text = profile_data.get('final_text', str(profile_data))
+                        
+                        # 3. Prompt Engineering (Strictly formatted for highlighter safety)
+                        prompt = (
+                            f"ROLE: Expert Social Media Manager for the brand defined below.\n"
+                            f"PLATFORM: {platform} (Adhere strictly to character limits and cultural norms).\n"
+                            f"GOAL: {goal}\n"
+                            f"TOPIC: {sm_topic}\n"
+                            f"IMAGE CONTEXT: {image_desc}\n\n"
+                            
+                            "STEP 0: TREND CHECK (CRITICAL)\n"
+                            f"Using Google Search, identify 3 currently trending hashtags or conversation topics related to '{sm_topic}' on {platform}. "
+                            "If relevant, integrate these into the posts to maximize visibility.\n\n"
+                            
+                            "TASK: Generate 3 distinct post options.\n\n"
+                            
+                            "OPTION 1: THE STORYTELLER\n"
+                            "- Focus: Narrative, emotive, connects topic to brand values.\n"
+                            "- Structure: Long-form (if platform allows), spacing for readability.\n\n"
+                            
+                            "OPTION 2: THE PROVOCATEUR\n"
+                            "- Focus: Pattern interrupt, hot take, or question.\n"
+                            "- Structure: Short, punchy, designed to stop the scroll.\n\n"
+                            
+                            "OPTION 3: THE VALUE-ADD\n"
+                            "- Focus: Educational, utility, 'Save this post'.\n"
+                            "- Structure: Bullet points or actionable advice.\n\n"
+                            
+                            "OUTPUT FORMAT:\n"
+                            "Strictly separate options with '|||'.\n"
+                            "Example: Option 1 Content ||| Option 2 Content ||| Option 3 Content\n"
+                            "IMPORTANT: Append the 'Trending Hashtags' you found to the bottom of the best-suited option."
+                        )
+                        
+                        try:
+                            # We use the content generator method as a wrapper (it now uses the Search Model)
+                            response = logic.run_content_generator("Social Post", platform, prompt, prof_text)
+                            
+                            # Parse
+                            options = response.split("|||")
+                            # Fallback if split fails
+                            if len(options) < 3: options = [response, "Option 2 Generation Failed", "Option 3 Generation Failed"]
+                            
+                            st.session_state['sm_results'] = options
+                            
+                            # Log
+                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
+                            from datetime import datetime
+                            log_entry = {
+                                "timestamp": datetime.now().strftime("%H:%M"),
+                                "type": "SOCIAL GEN",
+                                "name": f"{platform}: {sm_topic}",
+                                "score": metrics['score'],
+                                "verdict": "CREATED",
+                                "result_data": response,
+                                "image_data": None
+                            }
+                            st.session_state['activity_log'].insert(0, log_entry)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Please enter a topic.")
+
+        # --- OUTPUT DISPLAY ---
+        if st.session_state['sm_results']:
+            st.divider()
+            st.subheader("CAMPAIGN OPTIONS")
+            
+            t1, t2, t3 = st.tabs(["THE STORYTELLER", "THE PROVOCATEUR", "THE VALUE-ADD"])
+            
+            with t1:
+                st.text_area("Narrative Focus", value=st.session_state['sm_results'][0].strip(), height=400)
+            with t2:
+                st.text_area("Engagement Focus", value=st.session_state['sm_results'][1].strip(), height=400)
+            with t3:
+                st.text_area("Utility Focus", value=st.session_state['sm_results'][2].strip(), height=400)
 
 # 6. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
@@ -2228,6 +2396,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
