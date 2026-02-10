@@ -78,9 +78,10 @@ def extract_dominant_colors(image, num_colors=4):
         return []
 
 # --- 2. MAIN LOGIC CLASS ---
+# --- 2. MAIN LOGIC CLASS ---
 class SignetLogic:
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
 
     def run_visual_audit(self, image, profile_text):
         """
