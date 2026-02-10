@@ -772,8 +772,8 @@ with st.sidebar:
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
     
-    def set_page(page):
-        st.session_state['app_mode'] = page
+def set_page(page):
+    st.session_state['app_mode'] = page
         
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
@@ -1736,6 +1736,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
