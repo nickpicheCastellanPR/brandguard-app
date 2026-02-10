@@ -1008,27 +1008,55 @@ elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     
     # --- AGENCY TIER CHECK ---
-    if st.session_state.get('status') != 'active':
+    # Security Gate: Ensure only active subscribers can access this feature
+    if st.session_state.get('status', 'trial').lower() != 'active':
         show_paywall()
     # -------------------------
     
-    if not active_profile: st.warning("NO PROFILE SELECTED.")
+    if not active_profile: 
+        st.warning("NO PROFILE SELECTED.")
     else:
         c1, c2 = st.columns([2, 1])
+        
         with c1: 
             text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
+            
+            # Context Inputs
             cc1, cc2, cc3 = st.columns(3)
-            with cc1: content_type = st.selectbox("CONTENT TYPE", ["Internal Email", "Press Release", "Blog Post", "Executive Memo", "Website Copy"])
-            with cc2: sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
-            with cc3: audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Employees")
-        with c2: st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{active_profile}</h3></div>""", unsafe_allow_html=True)
+            with cc1: 
+                content_type = st.selectbox("CONTENT TYPE", ["Internal Email", "Press Release", "Blog Post", "Executive Memo", "Website Copy"])
+            with cc2: 
+                sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
+            with cc3: 
+                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Employees")
+                
+        with c2: 
+            # Profile Card (Safe to use html here as active_profile is internal, but escaping is good practice)
+            safe_profile_name = html.escape(active_profile)
+            st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{safe_profile_name}</h3></div>""", unsafe_allow_html=True)
         
-        if text_input and st.button("ANALYZE & REWRITE", type="primary"):
-            with st.spinner("REWRITING..."):
-                prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                context_wrapper = f"CONTEXT: Type: {content_type}, Sender: {sender}, Audience: {audience}\nDRAFT CONTENT: {text_input}"
-                result = logic.run_copy_editor(context_wrapper, prof_text)
-                st.markdown(result)
+        if st.button("ANALYZE & REWRITE", type="primary"):
+            if text_input:
+                with st.spinner("REWRITING..."):
+                    # Prepare Data
+                    prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
+                    context_wrapper = f"CONTEXT: Type: {content_type}, Sender: {sender}, Audience: {audience}\nDRAFT CONTENT: {text_input}"
+                    
+                    # AI Processing
+                    result = logic.run_copy_editor(context_wrapper, prof_text)
+                    
+                    st.divider()
+                    st.subheader("REWRITTEN DRAFT")
+                    
+                    # 🛡️ SECURITY FIX: 
+                    # We remove 'unsafe_allow_html=True'.
+                    # This renders Markdown (Bold, Italic, Lists) but ESCAPES any <script> tags.
+                    st.markdown(result)
+                    
+                    # Helper for copying
+                    st.text_area("COPYABLE VERSION", value=result, height=300)
+            else:
+                st.warning("Please enter text to rewrite.")
 
 # 4. CONTENT GENERATOR
 elif app_mode == "CONTENT GENERATOR":
@@ -1517,6 +1545,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
