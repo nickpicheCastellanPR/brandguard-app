@@ -867,71 +867,77 @@ def show_paywall():
 if app_mode == "DASHBOARD":
     st.title("BRAND COMMAND CENTER")
     
+    # --- CSS FOR DASHBOARD METRICS & LOGS ---
+    st.markdown("""
+        <style>
+        .metric-card {
+            background-color: #1b2a2e;
+            border: 1px solid #3d3d3d;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .metric-val { font-size: 1.8rem; font-weight: 800; color: #ab8f59; }
+        .metric-label { font-size: 0.75rem; font-weight: 700; color: #5c6b61; letter-spacing: 1px; margin-top: 5px; }
+        
+        /* Action Button Styling */
+        div[data-testid*="Column"] .stButton button {
+            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; 
+            border: 1px solid #3a4b50 !important; 
+            height: 100px !important; /* Compact height */
+            width: 100% !important; 
+            color: #f5f5f0 !important; 
+            border-radius: 4px !important;
+        }
+        div[data-testid*="Column"] .stButton button:hover { 
+            border-color: #ab8f59 !important; 
+            color: #ab8f59 !important; 
+            transform: translateY(-2px);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- TRIAL STATUS BANNER ---
-    # Only shows if user is NOT active. Doesn't block access, just reminds them.
     if st.session_state.get('status') != 'active':
         st.markdown("""
             <div style='background-color: #1b2a2e; padding: 15px; border-radius: 4px; margin-bottom: 25px; border: 1px solid #3d3d3d; border-left: 5px solid #ab8f59;'>
                 <strong style='color: #ab8f59; letter-spacing: 1px;'>⚠️ TRIAL MODE ACTIVE</strong><br>
                 <span style='color: #a0a0a0; font-size: 0.9rem;'>
-                    You are operating on a restricted license. High-fidelity generation modules (Copy Editor, Visual Audit) are locked.<br>
-                    <a href="https://castellanpr.lemonsqueezy.com" target="_blank" style="color: #f5f5f0; text-decoration: underline; font-weight: bold;">Initialize Agency Subscription to unlock.</a>
+                    Restricted Access: High-fidelity modules are locked. 
+                    <a href="https://castellanpr.lemonsqueezy.com" target="_blank" style="color: #f5f5f0; text-decoration: underline; font-weight: bold;">Upgrade to Agency Tier.</a>
                 </span>
             </div>
         """, unsafe_allow_html=True)
-    # ---------------------------
 
-    # 1. Determine if the user is "New" (Has no profiles yet)
-    has_profiles = bool(st.session_state.get('profiles'))
-    
-    # 2. Render the Expander (Clean Title, No Emoji)
-    with st.expander("QUICK START GUIDE: OPERATIONAL WORKFLOW", expanded=not has_profiles):
-        st.markdown("""
-        <div style='font-family: sans-serif; color: #f5f5f0; font-size: 0.95rem; line-height: 1.6;'>
-            <p><strong>Signet</strong> acts as your brand's digital gatekeeper. Here is the workflow:</p>
-            <ol style='margin-left: 20px;'>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>INITIALIZE:</strong> Create a Brand Profile using the 
-                    <em>Wizard</em> (for new brands) or <em>Upload Guide</em> (for existing PDFs).
-                </li>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>CALIBRATE:</strong> The engine scores your profile confidence. 
-                    <em>Note:</em> You can generate content immediately, but adding more samples increases the precision of the engine's audits and copy generation.
-                </li>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>EXECUTE:</strong> Once a profile is active, use the sidebar modules:
-                    <ul>
-                        <li><strong>Copy Editor:</strong> Paste a draft to rewrite it in your executive voice.</li>
-                        <li><strong>Visual Compliance:</strong> Upload an image to check hex codes against your palette.</li>
-                        <li><strong>Content Generator:</strong> Create new content from scratch.</li>
-                        <li><strong>Social Media Assistant:</strong> Generate platform-specific captions and hashtags.</li>
-                    </ul>
-                </li>
-            </ol>
-        </div>
-        """, unsafe_allow_html=True)   
-
-    # --- STYLE FOR ACTION BUTTONS ---
-    st.markdown("""<style>
-        div[data-testid*="Column"] .stButton button {
-            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
-        }
-        div[data-testid*="Column"] .stButton button:hover { transform: translateY(-5px) !important; border-color: #ab8f59 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; color: #ab8f59 !important; }
-        div[data-testid*="Column"] .stButton button p { font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0.1em; }
-        div[data-testid*="Column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
-        div[data-testid*="Column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
-        div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
-    </style>""", unsafe_allow_html=True)
-
-    # --- ACTION BUTTONS ---
+    # --- 1. QUICK STATS (THE NEW HEADS-UP DISPLAY) ---
     c1, c2, c3 = st.columns(3)
-    with c1: st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=nav_to, args=("BRAND ARCHITECT",))
+    
+    log_count = len(st.session_state.get('activity_log', []))
+    active_prof = st.session_state.get('active_profile_name', 'None')
+    status_display = st.session_state.get('status', 'Trial').upper()
+
+    with c1:
+        st.markdown(f"""<div class="metric-card"><div class="metric-val">{log_count}</div><div class="metric-label">OPERATIONS LOGGED</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div class="metric-card"><div class="metric-val" style="font-size: 1.2rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">{active_prof}</div><div class="metric-label">ACTIVE SIGNAL</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div class="metric-card"><div class="metric-val">{status_display}</div><div class="metric-label">LICENSE STATUS</div></div>""", unsafe_allow_html=True)
+    
+    st.divider()
+
+    # --- 2. ACTION SHORTCUTS (Preserved from your code) ---
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("➕ CREATE PROFILE", on_click=nav_to, args=("BRAND ARCHITECT",), use_container_width=True)
     with c2: 
-        if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
+        if st.button("📂 UPLOAD GUIDE", use_container_width=True):
             st.session_state['dashboard_upload_open'] = True
             st.rerun()
     with c3:
-        if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
+        if st.button("🚀 LOAD DEMO DATA", use_container_width=True):
              demo_data = {
                  "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
                  "inputs": {
@@ -942,26 +948,29 @@ if app_mode == "DASHBOARD":
              }
              st.session_state['profiles']["Castellan PR (Demo)"] = demo_data
              db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
+             st.session_state['active_profile_name'] = "Castellan PR (Demo)" # Auto-switch
              st.rerun()
 
-    # --- UPLOAD SECTION (Conditional) ---
-    if st.session_state['dashboard_upload_open']:
+    # --- 3. UPLOAD DRAWER (Conditional) ---
+    if st.session_state.get('dashboard_upload_open'):
         with st.container():
-            st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0;"><h3 style="color: #f5f5f0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
-            dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
-            col_sub, col_can = st.columns([1, 1])
+            st.markdown("""<div style="background: #24363b; padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid #5c6b61;">
+            <h4 style="color: #f5f5f0; margin-top:0;">INGEST BRAND GUIDELINES (PDF)</h4>
+            </div>""", unsafe_allow_html=True)
+            
+            dash_pdf = st.file_uploader("Select PDF", type=["pdf"], key="dash_pdf_uploader")
+            col_sub, col_can = st.columns([1, 4])
+            
             with col_sub:
-                if dash_pdf and st.button("PROCESS & INGEST", type="primary"):
-                    with st.spinner("ANALYZING PDF STRUCTURE..."):
+                if dash_pdf and st.button("PROCESS PDF", type="primary"):
+                    with st.spinner("EXTRACTING DNA..."):
                         try:
-                            # 1. Extract Text
+                            # 1. Extract
                             raw_text = logic.extract_text_from_pdf(dash_pdf)
-                            
-                            # 2. Get Structured Data (The New Function)
+                            # 2. Analyze
                             extracted_data = logic.generate_brand_rules_from_pdf(raw_text)
                             
-                            # 3. Create the Profile Object (Matching the Wizard Structure)
-                            # map the AI's JSON directly to 'inputs' dictionary
+                            # 3. Map to Profile
                             new_profile = {
                                 "inputs": {
                                     "wiz_name": extracted_data.get("wiz_name", "New Brand"),
@@ -970,98 +979,62 @@ if app_mode == "DASHBOARD":
                                     "wiz_mission": extracted_data.get("wiz_mission", ""),
                                     "wiz_values": extracted_data.get("wiz_values", ""),
                                     "wiz_guardrails": extracted_data.get("wiz_guardrails", ""),
-                                    "palette_primary": extracted_data.get("palette_primary", ["#24363b"]),
-                                    "palette_secondary": extracted_data.get("palette_secondary", ["#ab8f59"]),
-                                    "palette_accent": ["#f5f5f0"] # Default
+                                    "palette_primary": extracted_data.get("palette_primary", ["#000000"]),
+                                    "palette_secondary": extracted_data.get("palette_secondary", ["#888888"]),
+                                    "palette_accent": ["#f5f5f0"]
                                 },
-                                # generate the "Master Rules" text for the engine to read
                                 "final_text": f"1. STRATEGY\nMission: {extracted_data.get('wiz_mission')}\nValues: {extracted_data.get('wiz_values')}\n\n2. VOICE\nTone: {extracted_data.get('wiz_tone')}\nSample: {extracted_data.get('writing_sample')}"
                             }
                             
-                            # 4. Save
                             profile_name = f"{extracted_data.get('wiz_name')} (PDF)"
                             db.save_profile(st.session_state['user_id'], profile_name, new_profile)
                             st.session_state['profiles'][profile_name] = new_profile
+                            st.session_state['active_profile_name'] = profile_name # Auto-switch
                             
-                            st.success(f"SUCCESS: {profile_name} ingested.")
+                            st.success(f"IMPORTED: {profile_name}")
+                            st.session_state['dashboard_upload_open'] = False
                             st.rerun()
-                            
                         except Exception as e:
                             st.error(f"Error: {e}")
             with col_can:
-                if st.button("CANCEL"):
+                if st.button("Close"):
                     st.session_state['dashboard_upload_open'] = False
                     st.rerun()
-        st.divider()
 
-    # --- THE LIBRARY GRID (ALWAYS VISIBLE) ---
     st.divider()
-    st.markdown("### BRAND SIGNAL LIBRARY")
+
+    # --- 4. RECENT ACTIVITY LOG (THE NEW FEATURE) ---
+    st.markdown("### 📜 ACTIVITY FEED")
     
-    profiles = db.get_profiles(st.session_state['user_id'])
-    
-    if not profiles:
-        st.info("No active signals found. Initialize a profile above.")
+    if 'activity_log' not in st.session_state or not st.session_state['activity_log']:
+        st.info("No activity recorded yet. Run a Visual Audit or Generate Content to see logs here.")
     else:
-        # Sort keys to ensure consistent order
-        profile_names = sorted(list(profiles.keys()))
-        
-# Grid Logic
-        for i in range(0, len(profile_names), 3):
-            cols = st.columns(3)
-            for j in range(3):
-                if i + j < len(profile_names):
-                    raw_p_name = profile_names[i+j]
-                    
-                    # 🛡️ SECURITY: Sanitize the name for display to prevent HTML injection
-                    p_name = html.escape(raw_p_name)
-                    
-                    # Use raw name for database lookup
-                    p_data = profiles[raw_p_name] 
-                    
-                    with cols[j]:
-                        with st.container():
-                            # START CARD
-                            st.markdown(f"<div class='dashboard-card'>", unsafe_allow_html=True)
-                            
-                            # HEADER (Now Safe)
-                            st.markdown(f"#### {p_name}")
-                            
-                            # METER
-                            metrics = calculate_calibration_score(p_data)
-                            st.markdown(f"""
-                                <style>
-                                    .metric-container {{ font-family: 'Source Sans Pro', sans-serif; margin-bottom: 15px; }}
-                                    .metric-header {{ display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }}
-                                    .metric-label {{ font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #5c6b61; }}
-                                    .metric-value {{ font-size: 0.85rem; font-weight: 800; color: {metrics['color']}; }}
-                                    .progress-track {{ width: 100%; height: 5px; background-color: #dcdcd9; border-radius: 999px; overflow: hidden; }}
-                                    .progress-fill {{ height: 100%; width: {metrics['score']}%; background-color: {metrics['color']}; border-radius: 999px; transition: width 0.8s ease; }}
-                                    .metric-hint {{ font-size: 0.75rem; color: #5c6b61; margin-top: 6px; font-style: italic; opacity: 0.9; min-height: 2.4em; }}
-                                </style>
-                                <div class="metric-container">
-                                    <div class="metric-header">
-                                        <span class="metric-label">{metrics['status_label']}</span>
-                                        <span class="metric-value">{metrics['score']}%</span>
-                                    </div>
-                                    <div class="progress-track">
-                                        <div class="progress-fill"></div>
-                                    </div>
-                                    <div class="metric-hint">{metrics['message']}</div>
-                                </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # ACTION BUTTON (Uses raw_p_name for logic key)
-                            st.button("ACTIVATE SIGNAL", 
-                                      key=f"open_{raw_p_name}", 
-                                      on_click=activate_profile, 
-                                      args=(raw_p_name,), 
-                                      width="stretch")
-
-                            st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("<br><div style='background-color: rgba(36, 54, 59, 0.5); border-top: 1px solid #3a4b50; padding: 20px; text-align: center; border-radius: 4px;'><h3 style='color: #ab8f59; margin-bottom: 10px; font-size: 1rem; letter-spacing: 0.1em;'>INTELLIGENT BRAND GOVERNANCE</h3><p style='color: #a0a0a0; font-family: sans-serif; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto;'>Signet is a proprietary engine...</p></div>", unsafe_allow_html=True)
-
+        for i, entry in enumerate(st.session_state['activity_log']):
+            with st.container():
+                # Layout: Time | Type | Name | Result | Button
+                c_time, c_type, c_detail, c_result, c_action = st.columns([1, 2, 3, 2, 2])
+                
+                with c_time: st.caption(entry['timestamp'])
+                with c_type: st.markdown(f"**{entry['type']}**")
+                with c_detail: st.text(entry['name'])
+                
+                with c_result:
+                    score = entry.get('score', 0)
+                    color = "#ff4b4b" # Red
+                    if score > 60: color = "#ffa421" # Orange
+                    if score > 85: color = "#09ab3b" # Green
+                    st.markdown(f"<span style='color:{color}; font-weight:bold;'>{entry['verdict']} ({score})</span>", unsafe_allow_html=True)
+                
+                with c_action:
+                    # RESTORE SNAPSHOT Logic
+                    if st.button("📂 LOAD", key=f"restore_{i}"):
+                        if entry['type'] == "VISUAL AUDIT":
+                            st.session_state['active_audit_result'] = entry['result_data']
+                            st.session_state['active_audit_image'] = entry['image_data']
+                            st.session_state['app_mode'] = "VISUAL COMPLIANCE"
+                            st.rerun()
+            st.markdown("<hr style='margin: 5px 0; opacity: 0.1;'>", unsafe_allow_html=True)
+            
 # 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
@@ -1835,6 +1808,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
