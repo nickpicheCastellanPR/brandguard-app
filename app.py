@@ -1213,63 +1213,194 @@ elif app_mode == "VISUAL COMPLIANCE":
                         except Exception as e:
                             st.error(f"System Error: {e}")
 
-# 3. COPY EDITOR
+# 3. COPY EDITOR (Stateful, Diff View, Rationale)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     
-# --- AGENCY TIER CHECK (Admin Exempt) ---
+    # --- CSS INJECTION ---
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+        .rationale-box {
+            background-color: rgba(171, 143, 89, 0.1);
+            border-left: 3px solid #ab8f59;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- AGENCY TIER CHECK ---
     is_admin = st.session_state.get('is_admin', False)
     sub_status = st.session_state.get('status', 'trial').lower()
-    
-    # If NOT an admin AND NOT active, show paywall
     if not is_admin and sub_status != 'active':
         show_paywall()
-    # -------------------------
-    
+
     if not active_profile: 
-        st.warning("NO PROFILE SELECTED.")
+        st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
+        # --- STATE INITIALIZATION ---
+        if 'ce_draft' not in st.session_state: st.session_state['ce_draft'] = ""
+        if 'ce_result' not in st.session_state: st.session_state['ce_result'] = None
+        if 'ce_rationale' not in st.session_state: st.session_state['ce_rationale'] = None
+
+        # --- INPUT SECTION ---
         c1, c2 = st.columns([2, 1])
         
         with c1: 
-            text_input = st.text_area("DRAFT TEXT", height=300, placeholder="PASTE DRAFT COPY HERE...")
+            # Bind text area to session state variable for persistence
+            draft_input = st.text_area(
+                "DRAFT TEXT", 
+                height=350, 
+                placeholder="Paste your rough draft here...",
+                value=st.session_state['ce_draft']
+            )
+            # Update state on change
+            st.session_state['ce_draft'] = draft_input
             
-            # Context Inputs
+            # Context Inputs (No Social Caption)
             cc1, cc2, cc3 = st.columns(3)
             with cc1: 
-                content_type = st.selectbox("CONTENT TYPE", ["Internal Email", "Press Release", "Blog Post", "Executive Memo", "Website Copy"])
+                content_type = st.selectbox("CONTENT TYPE", [
+                    "Internal Email", 
+                    "Press Release", 
+                    "Blog Post", 
+                    "Executive Memo", 
+                    "Website Copy",
+                    "Crisis Statement",     
+                    "Speech / Script",      
+                    "FAQ / Knowledge Base"  
+                ])
             with cc2: 
                 sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
             with cc3: 
-                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Employees")
+                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Staff")
                 
         with c2: 
-            # Profile Card (Safe to use html here as active_profile is internal, but escaping is good practice)
-            safe_profile_name = html.escape(active_profile)
-            st.markdown(f"""<div class="dashboard-card"><h4>TARGET VOICE</h4><h3>{safe_profile_name}</h3></div>""", unsafe_allow_html=True)
-        
-        if st.button("ANALYZE & REWRITE", type="primary"):
-            if text_input:
-                with st.spinner("REWRITING..."):
-                    # Prepare Data
-                    prof_text = current_rules['final_text'] if isinstance(current_rules, dict) else current_rules
-                    context_wrapper = f"CONTEXT: Type: {content_type}, Sender: {sender}, Audience: {audience}\nDRAFT CONTENT: {text_input}"
-                    
-                    # AI Processing
-                    result = logic.run_copy_editor(context_wrapper, prof_text)
-                    
-                    st.divider()
-                    st.subheader("REWRITTEN DRAFT")
-                    
-                    # 🛡️ SECURITY FIX: 
-                    # We remove 'unsafe_allow_html=True'.
-                    # This renders Markdown (Bold, Italic, Lists) but ESCAPES any <script> tags.
-                    st.markdown(result)
-                    
-                    # Helper for copying
-                    st.text_area("COPYABLE VERSION", value=result, height=300)
-            else:
-                st.warning("Please enter text to rewrite.")
+            # Control Panel
+            st.markdown(f"""<div class="dashboard-card" style="padding: 15px;">
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">ACTIVE VOICE</div>
+                <div style="font-size:1.1rem; color:#ab8f59; font-weight:800; margin-bottom:10px;">{html.escape(active_profile)}</div>
+            </div>""", unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            edit_intensity = st.select_slider(
+                "EDIT INTENSITY", 
+                options=["Polish", "Standard", "Aggressive"], 
+                value="Standard",
+                help="Polish: Fixes typos/minor tone. Aggressive: Total structural rewrite."
+            )
+            
+            if st.button("REWRITE AND ALIGN", type="primary", use_container_width=True):
+                if draft_input:
+                    with st.spinner("CALIBRATING TONE & SYNTAX..."):
+                        # Get Rules
+                        profile_data = st.session_state['profiles'][active_profile]
+                        prof_text = profile_data.get('final_text', str(profile_data))
+                        
+                        # Engineered Prompt using "Chain of Thought"
+                        prompt_wrapper = f"""
+                        CONTEXT: 
+                        - Type: {content_type} (Use appropriate formatting/structure)
+                        - Sender: {sender} (Adopt this persona's authority level)
+                        - Audience: {audience} (Adjust vocabulary and empathy to match)
+                        - Intensity: {edit_intensity}
+                        
+                        TASK: Rewrite the draft below to match the Brand Rules.
+                        
+                        STEP 1: RATIONALE
+                        Analyze the draft against the brand voice. Explain 3 key changes you are making and why (e.g. "Changed X to Y to sound more authoritative").
+                        
+                        STEP 2: REWRITE
+                        Provide the rewritten text.
+                        
+                        OUTPUT FORMAT:
+                        RATIONALE:
+                        [Your explanation]
+                        REWRITE:
+                        [The new text]
+                        
+                        DRAFT CONTENT: 
+                        {draft_input}
+                        """
+                        
+                        # Call Logic
+                        try:
+                            full_response = logic_engine.run_copy_editor(prompt_wrapper, prof_text)
+                            
+                            # Parse Split (Heuristic)
+                            if "REWRITE:" in full_response:
+                                parts = full_response.split("REWRITE:")
+                                rationale = parts[0].replace("RATIONALE:", "").strip()
+                                rewrite = parts[1].strip()
+                            else:
+                                rationale = "Automated alignment to brand voice."
+                                rewrite = full_response
+                            
+                            # Update State
+                            st.session_state['ce_result'] = rewrite
+                            st.session_state['ce_rationale'] = rationale
+                            
+                            # LOG TO DASHBOARD
+                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
+                            from datetime import datetime
+                            
+                            score = 85 if edit_intensity == "Polish" else 92
+                            
+                            log_entry = {
+                                "timestamp": datetime.now().strftime("%H:%M"),
+                                "type": "COPY EDIT",
+                                "name": f"{content_type} ({audience})",
+                                "score": score,
+                                "verdict": "REWRITTEN",
+                                "result_data": rewrite,
+                                "image_data": None
+                            }
+                            st.session_state['activity_log'].insert(0, log_entry)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Please enter text to rewrite.")
+
+        # --- OUTPUT SECTION (Stateful) ---
+        if st.session_state['ce_result']:
+            st.divider()
+            
+            # Rationale Box
+            if st.session_state['ce_rationale']:
+                st.markdown(f"""
+                    <div class="rationale-box">
+                        <strong>STRATEGIC RATIONALE:</strong><br>
+                        {st.session_state['ce_rationale']}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # View Toggle
+            t1, t2 = st.tabs(["FINAL DRAFT", "DIFF VIEW"])
+            
+            with t1:
+                st.text_area("FINAL COPY (Ready to Ship)", value=st.session_state['ce_result'], height=400)
+            
+            with t2:
+                # Side-by-side comparison
+                d1, d2 = st.columns(2)
+                with d1:
+                    st.caption("ORIGINAL")
+                    st.info(st.session_state['ce_draft'])
+                with d2:
+                    st.caption("REWRITTEN")
+                    st.success(st.session_state['ce_result'])
 
 # 4. CONTENT GENERATOR
 elif app_mode == "CONTENT GENERATOR":
@@ -1833,6 +1964,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
