@@ -185,10 +185,25 @@ class SignetLogic:
         except Exception as e:
             return f"Error reading PDF: {e}"
 
-    def generate_brand_rules_from_pdf(self, pdf_text):
-        """Extracts structured brand data from raw PDF text."""
+def generate_brand_rules_from_pdf(self, pdf_text):
+        """Extracts structured brand data from raw PDF text with Regex Backup."""
+        import re
+        import json
+        
+        # 1. REGEX HUNT: Forcefully find hex codes (6 chars) before AI tries
+        # This catches #F45D0D even if the AI misses it.
+        found_hexes = re.findall(r'#[0-9a-fA-F]{6}', pdf_text)
+        
+        # Clean duplicates
+        unique_hexes = list(set(found_hexes))
+        
+        # 2. AI EXTRACTION WITH HINTS
         prompt = f"""
         TASK: Extract Brand Rules from this PDF text.
+        
+        CONTEXT: I have already mathematically detected these Hex Codes in the document: {unique_hexes}. 
+        Please assign them correctly to 'palette_primary' and 'palette_secondary' based on the text context.
+        
         OUTPUT: Return a JSON object (no markdown) with these exact keys: 
         wiz_name, wiz_archetype, wiz_mission, wiz_values, wiz_tone, wiz_guardrails, palette_primary (list of hex), palette_secondary (list of hex), writing_sample.
         
@@ -200,10 +215,12 @@ class SignetLogic:
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
         except Exception as e:
+            # Fallback using the found hexes so the user isn't left with nothing
              return {
                  "wiz_name": "Extracted Brand", 
-                 "wiz_mission": "Could not extract.",
-                 "palette_primary": ["#000000"],
+                 "wiz_mission": "Could not extract details.",
+                 "palette_primary": unique_hexes[:5] if unique_hexes else ["#000000"],
+                 "palette_secondary": [],
                  "writing_sample": pdf_text[:500]
              }
 
