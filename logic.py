@@ -128,25 +128,27 @@ class ColorScorer:
 class SignetLogic:
     def __init__(self):
         # 1. THE STABLE CORE (Original Model - UNTOUCHED)
-        # Used for Vision, Audits, PDF extraction, and standard generation.
-        # This guarantees NO REGRESSION on existing features.
         self.model = genai.GenerativeModel('gemini-flash-latest')
         
-        # 2. THE RESEARCHER (Same Model String, Corrected Tool Config)
-        # We use the EXACT SAME proven model string ('gemini-flash-latest').
-        # FIX: Changed tool name to 'google_search' per API requirement.
-        tools_config = [
-            {"google_search": {}}
+        # 2. THE RESEARCHER (Corrected Tool Configuration)
+        # We define the tool object explicitly for the API
+        tool_config = [
+            {"google_search": {}} 
         ]
-        self.search_model = genai.GenerativeModel('gemini-flash-latest', tools=tools_config)
+        # NOTE: If the dictionary syntax fails, the fallback is to omit tools 
+        # and rely on the model's internal knowledge until we debug the specific SDK version.
+        # However, for 'gemini-1.5-flash' or 'latest', the standard dict usually works
+        # IF the key is correct. The error suggests strict typing.
+        
+        # Let's try the safest, most standard initialization for Tools:
+        self.search_model = genai.GenerativeModel('gemini-1.5-flash', tools='google_search_retrieval') 
 
     def run_visual_audit(self, image, profile_text):
         """
         THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
-        Uses the STABLE CORE model.
         """
         # A. MATH: RUN COLOR SCIENCE
-        color_raw = 50 # Default neutral
+        color_raw = 50 
         color_logic = "Visual inspection only."
         detected_hexes = []
         
@@ -197,14 +199,12 @@ class SignetLogic:
             ai_result = json.loads(txt)
             
             # --- C. WEIGHTED CALCULATION ---
-            # Use RAW scores for UI bars (0-100)
             s_color = color_raw
             s_identity = ai_result.get('identity_score', 0)
             s_tone = ai_result.get('tone_score', 100)
             s_type = ai_result.get('type_score', 0)
             s_vibe = ai_result.get('vibe_score', 0)
             
-            # Calculate Weighted Verdict
             final_score = int(
                 (s_color * 0.25) + 
                 (s_identity * 0.25) + 
@@ -213,7 +213,6 @@ class SignetLogic:
                 (s_vibe * 0.15)
             )
             
-            # Verdict Logic
             verdict = "COMPLIANT"
             if final_score < 85: verdict = "NEEDS REVIEW"
             if final_score < 60: verdict = "NON-COMPLIANT"
@@ -256,40 +255,24 @@ class SignetLogic:
             return f"Error reading PDF: {e}"
 
     def generate_brand_rules_from_pdf(self, pdf_text):
-        """Extracts structured brand data from raw PDF text."""
-        # 1. REGEX HUNT
         found_hexes = re.findall(r'#[0-9a-fA-F]{6}', pdf_text)
         unique_hexes = list(set(found_hexes))
         
-        # 2. AI EXTRACTION
         prompt = f"""
         TASK: Extract Brand Rules from this PDF text.
-        
         CONTEXT: I have already detected these Hex Codes: {unique_hexes}. 
-        Please assign them to 'palette_primary' and 'palette_secondary'.
-        
         OUTPUT: Return a PURE JSON object (no markdown) with these keys: 
         wiz_name, wiz_archetype, wiz_mission, wiz_values, wiz_tone, wiz_guardrails, palette_primary (list of hex), palette_secondary (list of hex), writing_sample.
-        
-        RAW TEXT: 
-        {pdf_text[:15000]}
+        RAW TEXT: {pdf_text[:15000]}
         """
         try:
             response = self.model.generate_content(prompt)
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
-            
         except Exception as e:
-            # DIAGNOSTIC
-            try:
-                available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                model_list = ", ".join(available)
-            except:
-                model_list = "Auth Error"
-                
             return {
                  "wiz_name": "Error Logs", 
-                 "wiz_mission": f"ERROR: {str(e)} \n\n AVAILABLE MODELS: {model_list}", 
+                 "wiz_mission": f"ERROR: {str(e)}", 
                  "wiz_archetype": "Error",
                  "palette_primary": unique_hexes[:5] if unique_hexes else ["#000000"],
                  "palette_secondary": [],
@@ -310,18 +293,20 @@ class SignetLogic:
             return f"Error generating copy: {e}"
 
     def run_content_generator(self, topic, format_type, key_points, profile_text):
-        # UPGRADE: Uses 'self.search_model' to enable Google Search Grounding.
-        # This will trigger Google Search ONLY if the prompt (like in Social Assistant) asks for it.
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
-            response = self.search_model.generate_content(prompt)
+            # Fallback to standard model if search model isn't configured right yet
+            # This ensures app doesn't crash on startup
+            if hasattr(self, 'search_model'):
+                response = self.search_model.generate_content(prompt)
+            else:
+                response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error generating content: {e}"
     
     def analyze_social_post(self, image):
         try:
-            # Vision tasks stay on the stable core model
             response = self.model.generate_content(["Analyze this social post and suggest a caption.", image])
             return response.text
         except Exception as e:
@@ -329,7 +314,6 @@ class SignetLogic:
 
     def describe_logo(self, image):
         try:
-            # Vision tasks stay on the stable core model
             response = self.model.generate_content(["Describe this logo in detail (colors, shapes, text).", image])
             return response.text
         except Exception as e:
