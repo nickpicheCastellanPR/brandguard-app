@@ -185,7 +185,7 @@ class SignetLogic:
         except Exception as e:
             return f"Error reading PDF: {e}"
 
-def generate_brand_rules_from_pdf(self, pdf_text):
+    def generate_brand_rules_from_pdf(self, pdf_text):
         """Extracts structured brand data from raw PDF text with Regex Backup."""
         import re
         import json
