@@ -620,112 +620,94 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR ---
+# --- SIDEBAR (Secure, Polished, & Log-Free) ---
 with st.sidebar:
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
-        st.image("Signet_Logo_Color.png", width="stretch")
+        st.image("Signet_Logo_Color.png", width="auto") # 'auto' is safe/standard
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
     st.divider()
 
-    # --- USER & STATUS BADGE (SECURE & POLISHED) ---
-    # 1. Sanitize: Prevent XSS attacks from usernames
+    # 2. USER & STATUS BADGE
     raw_user = st.session_state.get('username', 'User').upper()
     user_tag = html.escape(raw_user) 
-    
     status_tag = st.session_state.get('status', 'trial').upper()
     
     st.caption(f"OPERATIVE: {user_tag}")
     
-    # 2. BADGE FIX (Double-Layer Color Enforcement)
-    # We use a container DIV for the box, and a SPAN for the text to force the color.
+    # Agency Badge Logic
     if status_tag == "ACTIVE":
-        st.markdown(
-            """
+        st.markdown("""
             <div style='background-color: #ab8f59; border: 1px solid #1b2a2e; padding: 6px 12px; border-radius: 4px; display: inline-block; margin-bottom: 10px;'>
                 <span style='color: #1b2a2e !important; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; -webkit-text-fill-color: #1b2a2e;'>AGENCY TIER</span>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
     else:
-        # High Contrast: Cream Text on Dark Gray Box
-        # Added '-webkit-text-fill-color' to override stubborn browser defaults
-        st.markdown(
-            """
+        st.markdown("""
             <div style='background-color: #3d3d3d; border: 1px solid #5c6b61; padding: 6px 12px; border-radius: 4px; display: inline-block; margin-bottom: 10px;'>
                 <span style='color: #f5f5f0 !important; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; -webkit-text-fill-color: #f5f5f0;'>TRIAL LICENSE</span>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
     
-    # 3. ACTIVE PROFILE CALIBRATION
+    # 3. ACTIVE PROFILE & CONFIDENCE METER
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
-        # Check if active_profile is in session state, default to first if not
+        # Smart Indexing
         default_ix = 0
-        if 'active_profile_name' in st.session_state and st.session_state['active_profile_name'] in profile_names:
-             default_ix = profile_names.index(st.session_state['active_profile_name'])
+        current = st.session_state.get('active_profile_name')
+        if current in profile_names:
+            default_ix = profile_names.index(current)
 
+        # Profile Selector
         active_profile = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
-        st.session_state['active_profile_name'] = active_profile # Persist selection
         
+        # Persist Change
+        if active_profile != st.session_state.get('active_profile_name'):
+            st.session_state['active_profile_name'] = active_profile
+            st.rerun()
+        
+        # Calibration Meter
         current_rules = st.session_state['profiles'][active_profile]
-        
         metrics = calculate_calibration_score(current_rules)
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # CONFIDENCE METER
         st.markdown(f"""
             <style>
-                .sb-container {{ margin-bottom: 10px; }}
-                .sb-label {{ font-size: 0.7rem; font-weight: 700; color: #5c6b61; letter-spacing: 1px; margin-bottom: 4px; display: block; }}
+                .sb-container {{ margin-bottom: 10px; margin-top: 10px; }}
                 .sb-track {{ width: 100%; height: 6px; background: #dcdcd9; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }}
-                .sb-fill {{ height: 100%; width: {metrics['score']}%; background: {metrics['color']}; border-radius: 999px; transition: width 0.8s ease; }}
+                .sb-fill {{ height: 100%; width: {metrics['score']}%; background: {metrics['color']}; border-radius: 999px; }}
                 .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {metrics['color']}; }}
             </style>
             <div class="sb-container">
-                <span class="sb-label">ENGINE CONFIDENCE</span>
-                <div class="sb-track">
-                    <div class="sb-fill"></div>
-                </div>
-                <div class="sb-status">
-                     {metrics['status_label'].upper()} ({metrics['score']}%)
-                </div>
+                <span style="font-size: 0.7rem; font-weight: 700; color: #5c6b61;">ENGINE CONFIDENCE</span>
+                <div class="sb-track"><div class="sb-fill"></div></div>
+                <div class="sb-status">{metrics['status_label'].upper()} ({metrics['score']}%)</div>
             </div>
         """, unsafe_allow_html=True)
     else:
-        active_profile = None
-        current_rules = ""
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
     st.divider()
     
-    # 4. NAVIGATION
-    # Standard Module List
-    nav_options = ["DASHBOARD", "BRAND ARCHITECT", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT"]
+    # 4. NAVIGATION (Sticky Buttons + Log Fix)
+    st.markdown("### APPS")
     
-    # Add Admin Console only for Admins
-    if st.session_state.get('is_admin', False):
-        nav_options.append("ADMIN CONSOLE")
+    # Helper to switch pages
+    def set_page(page):
+        st.session_state['app_mode'] = page
         
-    # Sync navigation with session state (Safe Fallback)
-    current_mode = st.session_state.get('app_mode', 'DASHBOARD')
-    if current_mode not in nav_options: 
-        current_mode = "DASHBOARD"
+    # We use 'width="stretch"' to satisfy the logs and look professional
+    st.button("📊 DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
+    st.button("🏗️ BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
+    st.button("👁️ VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
+    st.button("✍️ COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
+    
+    # Admin Link
+    if st.session_state.get('is_admin', False):
+         st.button("🛡️ ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
 
-    app_mode = st.radio("MODULES", nav_options, index=nav_options.index(current_mode), label_visibility="collapsed", key="nav_selection")
-    
-    # Update App Mode if changed
-    if app_mode != st.session_state.get('app_mode'):
-        st.session_state['app_mode'] = app_mode
-        st.rerun()
-    
     st.divider()
     
     # 5. TRUST FOOTER
@@ -742,7 +724,7 @@ with st.sidebar:
         st.session_state['username'] = None
         st.session_state['profiles'] = {}
         st.rerun()
-
+        
 def show_paywall():
     """Renders the Castellan Agency Tier Paywall."""
     st.markdown("""
@@ -1668,6 +1650,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
