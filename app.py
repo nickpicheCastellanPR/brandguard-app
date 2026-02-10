@@ -620,8 +620,28 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR ---
+# --- SIDEBAR (Restored, Reordered, & Styled) ---
 with st.sidebar:
+    # 0. STYLE INJECTION (Force Gold Borders, Kill Red)
+    st.markdown("""
+        <style>
+        div[data-testid="stButton"] button {
+            border-color: #ab8f59 !important;
+            color: #ab8f59 !important;
+            border-width: 1px !important;
+        }
+        div[data-testid="stButton"] button:hover {
+            border-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            background-color: #ab8f59 !important;
+        }
+        div[data-testid="stButton"] button:active {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
         st.image("Signet_Logo_Color.png", use_container_width=True) 
@@ -638,7 +658,6 @@ with st.sidebar:
     
     st.caption(f"OPERATIVE: {user_tag}")
     
-    # Agency Badge Logic
     if status_tag == "ACTIVE":
         st.markdown("""
             <div style='background-color: #ab8f59; border: 1px solid #1b2a2e; padding: 6px 12px; border-radius: 4px; display: inline-block; margin-bottom: 10px;'>
@@ -661,13 +680,14 @@ with st.sidebar:
         if current in profile_names:
             default_ix = profile_names.index(current)
 
-        active_profile = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
+        active_profile_selection = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
         
-        if active_profile != st.session_state.get('active_profile_name'):
-            st.session_state['active_profile_name'] = active_profile
+        # Persist selection
+        if active_profile_selection != st.session_state.get('active_profile_name'):
+            st.session_state['active_profile_name'] = active_profile_selection
             st.rerun()
         
-        current_rules = st.session_state['profiles'][active_profile]
+        current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
         st.markdown(f"""
@@ -688,16 +708,20 @@ with st.sidebar:
 
     st.divider()
     
-    # 4. NAVIGATION (Clean Text Only)
+    # 4. NAVIGATION (Restored Order & Missing Tools)
     st.markdown("### APPS")
     
     def set_page(page):
         st.session_state['app_mode'] = page
         
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
-    st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
+    st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
+    
+    # Brand Architect moved to bottom
+    st.divider()
+    st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
     if st.session_state.get('is_admin', False):
          st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
@@ -719,8 +743,10 @@ with st.sidebar:
         st.session_state['profiles'] = {}
         st.rerun()
 
-# --- BRIDGE VARIABLE ---
+# --- BRIDGE VARIABLES (Fixes 'NameError' crash) ---
+# These variables expose the state to the rest of the script running below
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
+active_profile = st.session_state.get('active_profile_name')
         
 def show_paywall():
     """Renders the Castellan Agency Tier Paywall."""
@@ -1647,6 +1673,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
