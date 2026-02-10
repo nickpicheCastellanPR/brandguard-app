@@ -620,12 +620,12 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Fixed Gaps, Custom Divider, No Overlap) ---
+# --- SIDEBAR (Gap Finally Fixed) ---
 with st.sidebar:
     # 0. STYLE INJECTION
     st.markdown("""
         <style>
-        /* 1. Sidebar Nav Buttons */
+        /* 1. Standard Sidebar Buttons */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
             color: #ab8f59 !important;
@@ -657,13 +657,13 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* 3. Navigation Header - CLEAN SPACING */
+        /* 3. Navigation Header */
         .nav-header {
             font-size: 0.8rem;
             font-weight: 700;
             color: #5c6b61;
             letter-spacing: 1px;
-            margin-top: 10px !important; /* Fixed: No overlap, small gap */
+            margin-top: 10px !important;
             margin-bottom: 5px;
         }
         
@@ -672,8 +672,8 @@ with st.sidebar:
             border: 0;
             border-top: 1px solid #5c6b61;
             opacity: 0.3;
-            margin-top: 10px;
-            margin-bottom: 10px;
+            margin-top: 5px;
+            margin-bottom: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -684,7 +684,6 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    # Custom tight divider instead of st.divider()
     st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
 
     # 2. USER & STATUS BADGE
@@ -754,8 +753,11 @@ with st.sidebar:
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # Custom Tight Divider
-    st.markdown('<hr class="custom-hr">', unsafe_allow_html=True)
+    # --- THE FIX: We remove the divider and rely on CSS to compress the space ---
+    # We use a markdown spacer with negative margin to pull the next element up
+    st.markdown("""
+        <div style="margin-top: 15px; border-top: 1px solid rgba(92, 107, 97, 0.3); margin-bottom: 15px;"></div>
+    """, unsafe_allow_html=True)
     
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
@@ -1773,6 +1775,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
