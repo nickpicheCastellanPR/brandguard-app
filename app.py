@@ -620,15 +620,18 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Restored, Reordered, & Styled) ---
+# --- SIDEBAR (Fixed: CSS Legibility, Missing Tool, Logic Bridge) ---
 with st.sidebar:
-    # 0. STYLE INJECTION (Force Gold Borders, Kill Red)
+    # 0. STYLE INJECTION (The "Illegible Button" Fix)
+    # We force the button text to be Dark Gunmetal (#1b2a2e) on Gold background
     st.markdown("""
         <style>
+        /* Sidebar Buttons */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
             color: #ab8f59 !important;
             border-width: 1px !important;
+            background-color: transparent !important;
         }
         div[data-testid="stButton"] button:hover {
             border-color: #ab8f59 !important;
@@ -637,6 +640,19 @@ with st.sidebar:
         }
         div[data-testid="stButton"] button:active {
             background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+        }
+        
+        /* Primary Buttons (Like "Extract & Map") */
+        /* Forces Dark Text on Gold Background so it's readable */
+        button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important; 
+            border: none !important;
+            font-weight: 800 !important;
+        }
+        button[kind="primary"]:hover {
+            background-color: #f0c05a !important; /* Lighter gold on hover */
             color: #1b2a2e !important;
         }
         </style>
@@ -682,7 +698,6 @@ with st.sidebar:
 
         active_profile_selection = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
         
-        # Persist selection
         if active_profile_selection != st.session_state.get('active_profile_name'):
             st.session_state['active_profile_name'] = active_profile_selection
             st.rerun()
@@ -708,7 +723,7 @@ with st.sidebar:
 
     st.divider()
     
-    # 4. NAVIGATION (Restored Order & Missing Tools)
+    # 4. NAVIGATION (Full Suite)
     st.markdown("### APPS")
     
     def set_page(page):
@@ -716,10 +731,13 @@ with st.sidebar:
         
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
+    
+    # Writing Tools
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
+    st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # Brand Architect moved to bottom
+    # Admin Tools (Bottom)
     st.divider()
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
@@ -743,8 +761,8 @@ with st.sidebar:
         st.session_state['profiles'] = {}
         st.rerun()
 
-# --- BRIDGE VARIABLES (Fixes 'NameError' crash) ---
-# These variables expose the state to the rest of the script running below
+# --- CRITICAL BRIDGE VARIABLES ---
+# This fixes the Copy Editor crash
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
         
@@ -1673,6 +1691,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
