@@ -639,39 +639,21 @@ with st.sidebar:
     
     st.caption(f"OPERATIVE: {user_tag}")
     
-    # 2. CSS HACK: Nuclear Option for Badge Colors
-    st.markdown("""
-        <style>
-            .trial-badge {
-                background-color: #3d3d3d !important;
-                color: #f5f5f0 !important;
-                border: 1px solid #5c6b61 !important;
-                padding: 4px 10px;
-                border-radius: 4px;
-                font-size: 0.75rem;
-                font-weight: 800;
-                letter-spacing: 1px;
-                display: inline-block;
-            }
-            .agency-badge {
-                background-color: #ab8f59 !important;
-                color: #1b2a2e !important;
-                padding: 4px 10px;
-                border-radius: 4px;
-                font-size: 0.75rem;
-                font-weight: 800;
-                letter-spacing: 1px;
-                display: inline-block;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
+    # 2. INLINE STYLE FIX (The "Bulletproof" Method)
+    # We use direct style attributes to override any framework defaults
     if status_tag == "ACTIVE":
-        st.markdown('<div class="agency-badge">AGENCY TIER</div>', unsafe_allow_html=True)
+        st.markdown(
+            """<span style='background-color: #ab8f59; color: #1b2a2e; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; border: 1px solid #1b2a2e; display: inline-block; margin-bottom: 10px;'>AGENCY TIER</span>""", 
+            unsafe_allow_html=True
+        )
     else:
-        st.markdown('<div class="trial-badge">TRIAL LICENSE</div>', unsafe_allow_html=True)
+        # High Contrast: Cream text on Dark Gray with Sage Border
+        st.markdown(
+            """<span style='background-color: #3d3d3d; color: #f5f5f0; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; border: 1px solid #5c6b61; display: inline-block; margin-bottom: 10px;'>TRIAL LICENSE</span>""", 
+            unsafe_allow_html=True
+        )
     
-    # 3. ACTIVE PROFILE CALIBRATION (Preserved)
+    # 3. ACTIVE PROFILE CALIBRATION
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
@@ -716,14 +698,15 @@ with st.sidebar:
     st.divider()
     
     # 4. NAVIGATION
-    # Updated list to include BRAND MANAGER if needed, or keep your existing list
+    # Standard Module List
     nav_options = ["DASHBOARD", "BRAND ARCHITECT", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT"]
+    
+    # Add Admin Console only for Admins
     if st.session_state.get('is_admin', False):
         nav_options.append("ADMIN CONSOLE")
         
-    # Sync navigation with session state
+    # Sync navigation with session state (Safe Fallback)
     current_mode = st.session_state.get('app_mode', 'DASHBOARD')
-    # Handle case where current mode might not be in options (e.g. slight name change)
     if current_mode not in nav_options: 
         current_mode = "DASHBOARD"
 
@@ -736,7 +719,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 5. TRUST FOOTER 
+    # 5. TRUST FOOTER
     st.markdown("""
         <div style='font-size: 0.7rem; color: #5c6b61; margin-top: 10px; margin-bottom: 20px;'>
             <strong>SECURE INSTANCE</strong><br>
@@ -1521,6 +1504,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
