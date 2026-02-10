@@ -1330,6 +1330,26 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
+    # --- CSS INJECTION FOR VISIBILITY ---
+    # Ensures the buttons in this specific module are legible (Dark Text on Gold)
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            background-color: #f0c05a !important;
+            color: #1b2a2e !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     def extract_and_map_pdf():
         # This runs BEFORE the page redraws
         uploaded_file = st.session_state.get('arch_pdf_uploader')
@@ -1342,10 +1362,22 @@ elif app_mode == "BRAND ARCHITECT":
                 st.session_state['wiz_name'] = data.get('wiz_name', '')
                 st.session_state['wiz_mission'] = data.get('wiz_mission', '')
                 
-                # --- SANITIZATION FIX (Prevents List vs String Crash) ---
-                # The AI often returns lists for these fields. We must convert them 
-                # to comma-separated strings for the text inputs to work.
+                # --- HEX CODE EXTRACTION FIX ---
+                # 1. Primary Palette
+                if 'palette_primary' in data and isinstance(data['palette_primary'], list):
+                    for i, hex_code in enumerate(data['palette_primary']):
+                        # Ensure we don't exceed the number of pickers (5)
+                        if i < len(st.session_state['palette_primary']):
+                            st.session_state['palette_primary'][i] = hex_code
+
+                # 2. Secondary Palette
+                if 'palette_secondary' in data and isinstance(data['palette_secondary'], list):
+                    for i, hex_code in enumerate(data['palette_secondary']):
+                        if i < len(st.session_state['palette_secondary']):
+                            st.session_state['palette_secondary'][i] = hex_code
+                # -------------------------------
                 
+                # --- SANITIZATION FIX (Prevents List vs String Crash) ---
                 # 1. Sanitize Tone
                 raw_tone = data.get('wiz_tone', '')
                 if isinstance(raw_tone, list):
@@ -1548,6 +1580,9 @@ elif app_mode == "BRAND ARCHITECT":
                         # SAVE TO DB
                         db.save_profile(st.session_state['user_id'], profile_name, profile_data)
                         
+                        # FORCE SWITCH TO NEW PROFILE
+                        st.session_state['active_profile_name'] = profile_name
+
                         st.session_state['wiz_samples_list'] = []
                         st.session_state['wiz_social_list'] = []
                         st.session_state['wiz_logo_list'] = []
@@ -1778,6 +1813,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
