@@ -1,6 +1,8 @@
 import google.generativeai as genai
 import os
 import json
+import re
+import math
 from PIL import Image
 import numpy as np
 from sklearn.cluster import KMeans
@@ -10,52 +12,86 @@ api_key = os.environ.get("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
 
-# --- 1. BIOMETRIC EYE (Math Engine) ---
-def rgb_to_hex(rgb):
-    """Converts a tuple (R, G, B) to HEX string."""
-    return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+# --- 1. BIOMETRIC MATH ENGINE (Color Science) ---
+class ColorScorer:
+    @staticmethod
+    def hex_to_rgb(hex_code):
+        """Converts #RRGGBB to (R, G, B) tuple."""
+        hex_code = hex_code.lstrip('#')
+        return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
 
-def extract_dominant_colors(image, num_colors=5):
-    """
-    Mathematically extracts the top N dominant colors from an image using K-Means Clustering.
-    Returns a list of HEX codes.
-    """
+    @staticmethod
+    def rgb_to_hex(rgb):
+        return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+
+    @staticmethod
+    def calculate_distance(color1, color2):
+        """Calculates Euclidean distance between two RGB colors."""
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(color1, color2)))
+
+    @staticmethod
+    def grade_color_match(detected_hexes, profile_text):
+        """
+        Comparing Detected Colors vs. Profile Colors mathematically.
+        Returns a score (0-100) and a logic string.
+        """
+        # 1. Extract Target Hexes from Profile Text (Regex)
+        target_hexes = re.findall(r'#[0-9a-fA-F]{6}', profile_text)
+        if not target_hexes:
+            return 100, "No strict color palette defined in profile. Passed by default."
+
+        target_rgbs = [ColorScorer.hex_to_rgb(h) for h in target_hexes]
+        detected_rgbs = [ColorScorer.hex_to_rgb(h) for h in detected_hexes]
+        
+        # 2. Find the best match for each detected color
+        matches = []
+        scores = []
+        
+        for d_rgb in detected_rgbs:
+            # Find closest brand color
+            distances = [ColorScorer.calculate_distance(d_rgb, t_rgb) for t_rgb in target_rgbs]
+            min_dist = min(distances)
+            
+            # SCORING LOGIC (Granular Option A)
+            # Distance 0 (Exact) = 100%
+            # Distance 50 (Distinctly Different) = 50%
+            # Distance 100+ (Wrong Color) = 0%
+            match_score = max(0, 100 - (min_dist * 2)) # Slope: -2 points per distance unit
+            scores.append(match_score)
+            matches.append(f"{ColorScorer.rgb_to_hex(d_rgb)}->{int(match_score)}%")
+
+        # Average score of the top dominant colors
+        final_score = int(sum(scores) / len(scores)) if scores else 0
+        return final_score, f"Math Analysis: {final_score}/100 match against {target_hexes[:3]}..."
+
+def extract_dominant_colors(image, num_colors=4):
+    """Uses K-Means clustering to find exact hex codes."""
     try:
-        # Resize image for speed (don't process 4k pixels)
         image = image.resize((150, 150))
         img_array = np.array(image)
-        
-        # Reshape to a list of pixels (Height * Width, 3 RGB channels)
         pixels = img_array.reshape(-1, 3)
-        
-        # Use K-Means Clustering to find "centers" of color groups
         kmeans = KMeans(n_clusters=num_colors, n_init=10)
         kmeans.fit(pixels)
-        
-        # Get the dominant colors and convert to HEX
-        colors = kmeans.cluster_centers_
-        hex_colors = [rgb_to_hex(color) for color in colors]
-        return hex_colors
-        
+        return [ColorScorer.rgb_to_hex(c) for c in kmeans.cluster_centers_]
     except Exception as e:
-        print(f"Color Extraction Error: {e}")
+        print(f"Color Logic Error: {e}")
         return []
 
 # --- 2. MAIN LOGIC CLASS ---
 class SignetLogic:
     def __init__(self):
-        # Using Flash for speed/cost, Pro for depth if needed
+        # Using Flash for speed/cost
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def run_visual_audit(self, image, profile_text):
         """
-        THE JUDGE: Scans image, compares to profile, returns Score + Analysis.
+        THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
         """
-        # A. MATHEMATICAL COLOR SCAN
-        hex_codes = extract_dominant_colors(image)
-        hex_str = ", ".join(hex_codes)
+        # A. MATH: RUN COLOR SCIENCE
+        detected_hexes = extract_dominant_colors(image)
+        color_score, color_logic = ColorScorer.grade_color_match(detected_hexes, profile_text)
         
-        # B. AI VIBE CHECK & SCORING
+        # B. AI: RUN VISION & TEXT ANALYSIS
         prompt = f"""
         ROLE: Chief Brand Officer.
         TASK: Audit this image against the Brand Profile.
@@ -63,31 +99,78 @@ class SignetLogic:
         BRAND PROFILE:
         {profile_text}
         
-        EVIDENCE (MATHEMATICAL):
-        - DOMINANT HEX CODES FOUND IN IMAGE: {hex_str}
+        DETECTED HEX CODES: {", ".join(detected_hexes)}
         
-        OUTPUT FORMAT:
-        Return a PURE JSON object (no markdown, no extra text) with these keys:
-        - "score": (Integer 0-100 based on strictness. 100 = Perfect Match).
-        - "verdict": (String) "COMPLIANT", "NON-COMPLIANT", or "NEEDS REVIEW".
-        - "color_analysis": (String) Specific analysis of the Hex codes found vs. the Approved Palette.
-        - "style_analysis": (String) Analysis of the visual style/archetype match.
-        - "recommendations": (List of Strings) 3 actionable bullet points to fix or improve.
+        INSTRUCTIONS:
+        1. READ ANY TEXT visible in the image. Check for spelling, grammar, tone, and forbidden words.
+        2. ANALYZE VISUALS (Logo, Typography, Vibe).
+        
+        SCORING RUBRIC (0-100 per category):
+        - IDENTITY (25%): Logo usage, placement, distortion. If no logo but valid asset (e.g. pattern), score high.
+        - COLOR (25%): (Already calculated via Math, but verify context).
+        - TYPOGRAPHY (15%): Font family, hierarchy, legibility.
+        - VIBE (15%): Archetype match (e.g. Ruler vs Jester).
+        - TONE & COPY (20%): Does the text match the brand voice? Are there forbidden words? Is it typo-free?
+        
+        OUTPUT FORMAT: Return a PURE JSON object (no markdown) with these exact keys:
+        - "identity_score": (int)
+        - "identity_reason": (string)
+        - "type_score": (int)
+        - "type_reason": (string)
+        - "vibe_score": (int)
+        - "vibe_reason": (string)
+        - "tone_score": (int)
+        - "tone_reason": (string) If no text found, give 100 (Neutral).
+        - "critical_fixes": (List of strings) Absolute failures (e.g. Wrong Logo).
+        - "minor_fixes": (List of strings) Polish items.
+        - "brand_wins": (List of strings) What is working well.
         """
         
         try:
             response = self.model.generate_content([prompt, image])
-            # Clean response to ensure valid JSON
             txt = response.text.replace("```json", "").replace("```", "").strip()
-            return json.loads(txt)
-        except Exception as e:
-            # Fallback if AI fails to generate valid JSON
+            ai_result = json.loads(txt)
+            
+            # --- C. WEIGHTED CALCULATION (5 Pillars) ---
+            # Color (25%) + Identity (25%) + Tone (20%) + Type (15%) + Vibe (15%)
+            
+            c_score = color_score * 0.25
+            i_score = ai_result.get('identity_score', 0) * 0.25
+            txt_score = ai_result.get('tone_score', 100) * 0.20
+            t_score = ai_result.get('type_score', 0) * 0.15
+            v_score = ai_result.get('vibe_score', 0) * 0.15
+            
+            final_score = int(c_score + i_score + txt_score + t_score + v_score)
+            
+            # Verdict Logic
+            verdict = "COMPLIANT"
+            if final_score < 85: verdict = "NEEDS REVIEW"
+            if final_score < 60: verdict = "NON-COMPLIANT"
+            
             return {
-                "score": 0,
-                "verdict": "ERROR",
-                "color_analysis": f"AI Parsing Error: {e}",
-                "style_analysis": "N/A",
-                "recommendations": ["Please try again."]
+                "score": final_score,
+                "verdict": verdict,
+                "breakdown": {
+                    "color": {"score": color_score, "reason": color_logic},
+                    "identity": {"score": ai_result.get('identity_score'), "reason": ai_result.get('identity_reason')},
+                    "tone": {"score": txt_score, "reason": ai_result.get('tone_reason')},
+                    "typography": {"score": ai_result.get('type_score'), "reason": ai_result.get('type_reason')},
+                    "vibe": {"score": ai_result.get('vibe_score'), "reason": ai_result.get('vibe_reason')}
+                },
+                "critical_fixes": ai_result.get('critical_fixes', []),
+                "minor_fixes": ai_result.get('minor_fixes', []),
+                "brand_wins": ai_result.get('brand_wins', [])
+            }
+            
+        except Exception as e:
+            # Fallback for errors
+            return {
+                "score": 0, 
+                "verdict": "ERROR", 
+                "breakdown": {}, 
+                "critical_fixes": [f"System Error: {str(e)}"], 
+                "minor_fixes": [], 
+                "brand_wins": []
             }
 
     # --- WIZARD & PDF TOOLS (Preserved) ---
@@ -117,7 +200,6 @@ class SignetLogic:
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
         except Exception as e:
-            # Fallback for empty extraction
              return {
                  "wiz_name": "Extracted Brand", 
                  "wiz_mission": "Could not extract.",
