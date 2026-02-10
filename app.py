@@ -582,7 +582,7 @@ if not st.session_state['authenticated']:
             l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("ENTER", type="primary", use_container_width=True):
+            if st.button("ENTER", type="primary", width="stretch"):
                 # 1. CHECK CREDENTIALS
                 user_data = db.check_login(l_user, l_pass) 
                 
@@ -611,7 +611,7 @@ if not st.session_state['authenticated']:
             r_email = st.text_input("EMAIL", key="r_email") 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("CREATE ACCOUNT", use_container_width=True):
+            if st.button("CREATE ACCOUNT", width="stretch"):
                 if db.create_user(r_user, r_email, r_pass):
                     st.success("Account created! Please log in.")
                 else:
@@ -624,7 +624,7 @@ if not st.session_state['authenticated']:
 with st.sidebar:
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
-        st.image("Signet_Logo_Color.png", use_container_width=True)
+        st.image("Signet_Logo_Color.png", width="stretch")
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
@@ -737,7 +737,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("LOGOUT", use_container_width=True):
+    if st.button("LOGOUT", width="stretch"):
         st.session_state['authenticated'] = False
         st.session_state['username'] = None
         st.session_state['profiles'] = {}
@@ -980,7 +980,7 @@ if app_mode == "DASHBOARD":
                                       key=f"open_{raw_p_name}", 
                                       on_click=activate_profile, 
                                       args=(raw_p_name,), 
-                                      use_container_width=True)
+                                      width="stretch")
 
                             st.markdown("</div>", unsafe_allow_html=True)
     
@@ -1482,7 +1482,7 @@ elif app_mode == "BRAND MANAGER":
         final_text_view = profile_obj['final_text'] if is_structured else profile_obj
         
         html_data = convert_to_html_brand_card(target, final_text_view)
-        st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", use_container_width=True)
+        st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", width="stretch")
         
         st.divider()
         
@@ -1633,7 +1633,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 df_users = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "SUB STATUS", "CREATED AT"])
                 # Clean up the view
                 df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "ADMIN" if x else "USER")
-                st.dataframe(df_users, use_container_width=True, hide_index=True)
+                st.dataframe(df_users, width="stretch", hide_index=True)
             else:
                 st.info("No users found.")
 
@@ -1647,7 +1647,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 display_cols = ["TIMESTAMP", "OPERATIVE", "EST. COST"]
                 selection = st.dataframe(
                     df_logs[display_cols], 
-                    use_container_width=True, 
+                    width="stretch", 
                     hide_index=True,
                     on_select="rerun", 
                     selection_mode="single-row"
@@ -1668,6 +1668,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
