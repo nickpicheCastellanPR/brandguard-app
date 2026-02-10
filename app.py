@@ -7,7 +7,20 @@ from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
 import html
-
+# --- TEMPORARY DIAGNOSTIC BLOCK ---
+# Paste this near the top of app.py to find your exact model name
+with st.sidebar.expander("🛠️ ENGINE DIAGNOSTICS", expanded=True):
+    if st.button("LIST AVAILABLE MODELS"):
+        try:
+            import google.generativeai as genai
+            st.write("### AVAILABLE MODELS:")
+            for m in genai.list_models():
+                # We only want models that generate content (text/vision)
+                if 'generateContent' in m.supported_generation_methods:
+                    st.code(m.name)
+        except Exception as e:
+            st.error(f"API Error: {e}")
+# ----------------------------------
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
 if os.path.exists(icon_path):
@@ -2430,6 +2443,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
