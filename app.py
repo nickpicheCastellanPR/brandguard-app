@@ -620,12 +620,12 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Zero Gap, Gold Buttons, Crash Proof) ---
+# --- SIDEBAR (Negative Margins, High-Contrast Buttons) ---
 with st.sidebar:
     # 0. STYLE INJECTION
     st.markdown("""
         <style>
-        /* Sidebar Buttons */
+        /* 1. Sidebar Nav Buttons (Gold Borders, Dark Text on Hover) */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
             color: #ab8f59 !important;
@@ -642,27 +642,31 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* Primary Buttons */
+        /* 2. Primary Action Buttons (e.g. Extract & Map) */
+        /* Force Dark Text (#1b2a2e) on Gold Background (#ab8f59) */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
             border: none !important;
             font-weight: 800 !important;
         }
+        button[kind="primary"] p {
+            color: #1b2a2e !important; /* Forces inner text color */
+        }
         button[kind="primary"]:hover {
-            background-color: #f0c05a !important;
+            background-color: #f0c05a !important; /* Brighter gold on hover */
             color: #1b2a2e !important;
         }
         
-        /* Navigation Header Styling - GAP REMOVED */
+        /* 3. Navigation Header - NEGATIVE MARGIN HACK */
+        /* Pulls the APPS header up to close the Streamlit gap */
         .nav-header {
             font-size: 0.8rem;
             font-weight: 700;
             color: #5c6b61;
             letter-spacing: 1px;
-            margin-top: 0px !important; /* <--- FIXED: No more 25px gap */
+            margin-top: -20px !important; 
             margin-bottom: 5px;
-            padding-top: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -696,7 +700,7 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
     
-    # 3. ACTIVE PROFILE & CONFIDENCE METER (Combined)
+    # 3. ACTIVE PROFILE & CONFIDENCE METER
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
@@ -714,7 +718,7 @@ with st.sidebar:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
-        # COMBINED BLOCK TO PREVENT GAP
+        # Combined block with the Navigation Header
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
@@ -740,6 +744,7 @@ with st.sidebar:
     st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
     st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
     
+    # Writing Tools
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
@@ -1760,6 +1765,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
