@@ -620,21 +620,21 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Gap Fixed, Buttons Legible, Admin Status) ---
+# --- SIDEBAR (Precision Spacing, Dark/Gold Buttons) ---
 with st.sidebar:
-    # 0. STYLE INJECTION (Fixing the Legibility Issues)
+    # 0. STYLE INJECTION
     st.markdown("""
         <style>
-        /* 1. Sidebar Nav Buttons (Standard) */
+        /* 1. Sidebar Nav Buttons */
         div[data-testid="stButton"] button {
             border-color: #ab8f59 !important;
-            color: #ab8f59 !important; /* Gold text default */
+            color: #ab8f59 !important;
             border-width: 1px !important;
             background-color: transparent !important;
         }
         div[data-testid="stButton"] button:hover {
             border-color: #ab8f59 !important;
-            color: #1b2a2e !important; /* Dark text on hover */
+            color: #1b2a2e !important;
             background-color: #ab8f59 !important;
         }
         div[data-testid="stButton"] button:active {
@@ -642,24 +642,22 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* 2. PRIMARY BUTTONS (Extract, Generate, etc.) - THE FIX */
-        /* We force Dark Text (#1b2a2e) on Gold Background (#ab8f59) ALWAYS */
+        /* 2. Primary Action Buttons */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
             border: none !important;
             font-weight: 800 !important;
         }
-        /* Fix for the inner paragraph tag inside buttons */
         button[kind="primary"] p {
             color: #1b2a2e !important;
         }
         button[kind="primary"]:hover {
-            background-color: #f0c05a !important; /* Brighter gold hover */
+            background-color: #f0c05a !important;
             color: #1b2a2e !important;
         }
         
-        /* 3. Sidebar Header Styling */
+        /* 3. Navigation Header */
         .nav-header {
             font-size: 0.8rem;
             font-weight: 700;
@@ -677,15 +675,15 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-    # Clean spacer instead of line
+    # Clean spacer 
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
-    # 2. USER & STATUS BADGE (GOD MODE FIX)
+    # 2. USER & STATUS BADGE
     raw_user = st.session_state.get('username', 'User').upper()
     import html
     user_tag = html.escape(raw_user) 
     
-    # Force Agency Status for Admin
+    # GOD MODE: Auto-Grant Agency Tier to Admin
     if raw_user == "NICK_ADMIN":
         st.session_state['status'] = "ACTIVE"
         
@@ -708,26 +706,21 @@ with st.sidebar:
     
     # 3. ACTIVE PROFILE & CONFIDENCE METER
     profile_names = list(st.session_state.get('profiles', {}).keys())
-    
-    # Add "NEW PROFILE" Option so you aren't stuck
     selector_options = ["Create New..."] + profile_names
     
     default_ix = 0
     current = st.session_state.get('active_profile_name')
-    if current in profile_names:
+    if current in selector_options:
         default_ix = selector_options.index(current)
 
     active_profile_selection = st.selectbox("ACTIVE PROFILE", selector_options, index=default_ix)
     
-    # Handle Selection Logic
     if active_profile_selection == "Create New...":
-        # Do nothing, just let them go to Brand Architect
-        pass
+        pass # Stays on page, waiting for generation
     elif active_profile_selection != st.session_state.get('active_profile_name'):
         st.session_state['active_profile_name'] = active_profile_selection
         st.rerun()
     
-    # Only show meter if a real profile is selected
     if active_profile_selection != "Create New..." and active_profile_selection in st.session_state['profiles']:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
@@ -758,9 +751,9 @@ with st.sidebar:
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # --- THE VACUUM FIX: Negative Margin Spacer ---
-    # This invisible div sucks the space up between Social Media and Brand Architect
-    st.markdown('<div style="margin-top: -15px;"></div>', unsafe_allow_html=True)
+    # --- THE VACUUM FIX ---
+    # -20px specifically cancels the 1rem padding of the stElementContainer
+    st.markdown('<div style="margin-top: -20px;"></div>', unsafe_allow_html=True)
     
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     
@@ -1330,8 +1323,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
-    # --- CSS INJECTION FOR VISIBILITY ---
-    # Ensures the buttons in this specific module are legible (Dark Text on Gold)
+    # --- CSS INJECTION FOR VISIBILITY (Local Override) ---
     st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -1362,43 +1354,47 @@ elif app_mode == "BRAND ARCHITECT":
                 st.session_state['wiz_name'] = data.get('wiz_name', '')
                 st.session_state['wiz_mission'] = data.get('wiz_mission', '')
                 
-                # --- HEX CODE EXTRACTION FIX ---
-                # 1. Primary Palette
-                if 'palette_primary' in data and isinstance(data['palette_primary'], list):
-                    for i, hex_code in enumerate(data['palette_primary']):
-                        # Ensure we don't exceed the number of pickers (5)
-                        if i < len(st.session_state['palette_primary']):
-                            st.session_state['palette_primary'][i] = hex_code
+                # --- HEX CODE EXTRACTION (OVERWRITE MODE) ---
+                # 1. Clear Defaults (Removes Castellan Gold)
+                st.session_state['palette_primary'] = []
+                st.session_state['palette_secondary'] = []
+                st.session_state['palette_accent'] = [] 
 
-                # 2. Secondary Palette
+                # 2. Map Primary
+                if 'palette_primary' in data and isinstance(data['palette_primary'], list):
+                    # Take up to 5, filter for valid hex strings
+                    valid_hex = [c for c in data['palette_primary'] if isinstance(c, str) and c.startswith('#')]
+                    st.session_state['palette_primary'] = valid_hex[:5]
+                
+                # If empty after extraction, fallback to black so picker doesn't crash
+                if not st.session_state['palette_primary']:
+                    st.session_state['palette_primary'] = ["#000000"]
+
+                # 3. Map Secondary
                 if 'palette_secondary' in data and isinstance(data['palette_secondary'], list):
-                    for i, hex_code in enumerate(data['palette_secondary']):
-                        if i < len(st.session_state['palette_secondary']):
-                            st.session_state['palette_secondary'][i] = hex_code
+                    valid_hex = [c for c in data['palette_secondary'] if isinstance(c, str) and c.startswith('#')]
+                    st.session_state['palette_secondary'] = valid_hex[:5]
+                
                 # -------------------------------
                 
-                # --- SANITIZATION FIX (Prevents List vs String Crash) ---
-                # 1. Sanitize Tone
+                # Sanitize List Fields (Tone, Values, Guardrails)
                 raw_tone = data.get('wiz_tone', '')
                 if isinstance(raw_tone, list):
                     st.session_state['wiz_tone'] = ", ".join([str(t) for t in raw_tone])
                 else:
                     st.session_state['wiz_tone'] = str(raw_tone) if raw_tone else ""
 
-                # 2. Sanitize Values
                 raw_values = data.get('wiz_values', '')
                 if isinstance(raw_values, list):
                     st.session_state['wiz_values'] = ", ".join([str(v) for v in raw_values])
                 else:
                     st.session_state['wiz_values'] = str(raw_values) if raw_values else ""
 
-                # 3. Sanitize Guardrails
                 raw_guard = data.get('wiz_guardrails', '')
                 if isinstance(raw_guard, list):
                     st.session_state['wiz_guardrails'] = "\n".join([str(g) for g in raw_guard])
                 else:
                     st.session_state['wiz_guardrails'] = str(raw_guard) if raw_guard else ""
-                # -------------------------------------------------------
 
                 # Match Archetype
                 suggested_arch = data.get('wiz_archetype')
@@ -1432,7 +1428,6 @@ elif app_mode == "BRAND ARCHITECT":
                     key="wiz_archetype",
                     format_func=format_archetype
                 )
-            # Dynamic Info Card (Appears below the columns)
             if selected_arch:
                 info = ARCHETYPE_INFO[selected_arch]
                 st.markdown(f"""
@@ -1813,6 +1808,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
