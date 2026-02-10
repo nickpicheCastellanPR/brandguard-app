@@ -189,7 +189,7 @@ class SignetLogic:
         import re
         import json
         
-        # 1. REGEX HUNT: Forcefully find hex codes (6 chars)
+        # 1. REGEX HUNT
         found_hexes = re.findall(r'#[0-9a-fA-F]{6}', pdf_text)
         unique_hexes = list(set(found_hexes))
         
@@ -212,10 +212,17 @@ class SignetLogic:
             return json.loads(cleaned)
             
         except Exception as e:
-            # DEBUG: PRINT THE ERROR IN THE MISSION FIELD
+            # DIAGNOSTIC: List available models to solve the 404 mystery
+            try:
+                import google.generativeai as genai
+                available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                model_list = ", ".join(available)
+            except:
+                model_list = "Could not list models (Auth Error?)"
+                
             return {
                  "wiz_name": "Error Logs", 
-                 "wiz_mission": f"SYSTEM FAILURE: {str(e)}", 
+                 "wiz_mission": f"ERROR: {str(e)} \n\n AVAILABLE MODELS ON SERVER: {model_list}", 
                  "wiz_archetype": "Error",
                  "palette_primary": unique_hexes[:5] if unique_hexes else ["#000000"],
                  "palette_secondary": [],
