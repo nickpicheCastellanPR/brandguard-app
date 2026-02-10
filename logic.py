@@ -127,15 +127,23 @@ class ColorScorer:
 
 class SignetLogic:
     def __init__(self):
-        # Using the stable Flash model to avoid Rate Limits
+        # 1. THE STABLE CORE (Kept exactly as is for PDF/Vision stability)
         self.model = genai.GenerativeModel('gemini-flash-latest')
+        
+        # 2. THE RESEARCHER (New instance specifically for Search/Trends)
+        # We isolate this so "Tools" don't interfere with standard vision/text tasks.
+        tools_config = [
+            {"google_search_retrieval": {}}
+        ]
+        self.search_model = genai.GenerativeModel('gemini-1.5-flash', tools=tools_config)
 
     def run_visual_audit(self, image, profile_text):
         """
         THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
+        Uses the STABLE CORE model.
         """
         # A. MATH: RUN COLOR SCIENCE
-        color_raw = 50 # Default neutral
+        color_raw = 50 
         color_logic = "Visual inspection only."
         detected_hexes = []
         
@@ -186,14 +194,12 @@ class SignetLogic:
             ai_result = json.loads(txt)
             
             # --- C. WEIGHTED CALCULATION ---
-            # Use RAW scores for UI bars (0-100)
             s_color = color_raw
             s_identity = ai_result.get('identity_score', 0)
             s_tone = ai_result.get('tone_score', 100)
             s_type = ai_result.get('type_score', 0)
             s_vibe = ai_result.get('vibe_score', 0)
             
-            # Calculate Weighted Verdict
             final_score = int(
                 (s_color * 0.25) + 
                 (s_identity * 0.25) + 
@@ -202,7 +208,6 @@ class SignetLogic:
                 (s_vibe * 0.15)
             )
             
-            # Verdict Logic
             verdict = "COMPLIANT"
             if final_score < 85: verdict = "NEEDS REVIEW"
             if final_score < 60: verdict = "NON-COMPLIANT"
@@ -269,13 +274,11 @@ class SignetLogic:
             return json.loads(cleaned)
             
         except Exception as e:
-            # DIAGNOSTIC
             try:
                 available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 model_list = ", ".join(available)
             except:
                 model_list = "Auth Error"
-                
             return {
                  "wiz_name": "Error Logs", 
                  "wiz_mission": f"ERROR: {str(e)} \n\n AVAILABLE MODELS: {model_list}", 
@@ -299,15 +302,18 @@ class SignetLogic:
             return f"Error generating copy: {e}"
 
     def run_content_generator(self, topic, format_type, key_points, profile_text):
+        # UPGRADE: Switches to 'self.search_model' to enable Google Search Grounding.
+        # This allows the Social Media assistant to find live trends.
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
-            response = self.model.generate_content(prompt)
+            response = self.search_model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error generating content: {e}"
     
     def analyze_social_post(self, image):
         try:
+            # Vision tasks stay on the stable core model
             response = self.model.generate_content(["Analyze this social post and suggest a caption.", image])
             return response.text
         except Exception as e:
