@@ -80,8 +80,8 @@ def extract_dominant_colors(image, num_colors=4):
 # --- 2. MAIN LOGIC CLASS ---
 class SignetLogic:
     def __init__(self):
-        # FIX: Use the stable model name to avoid 404 errors
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # FIX: Use the specific version tag to resolve the 404 error
+        self.model = genai.GenerativeModel('gemini-1.5-flash-001')
 
     def run_visual_audit(self, image, profile_text):
         """
