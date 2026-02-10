@@ -125,8 +125,6 @@ class ColorScorer:
 
 # --- 2. MAIN LOGIC CLASS --- #
 
-# --- 2. MAIN LOGIC CLASS --- #
-
 class SignetLogic:
     def __init__(self):
         # 1. THE STABLE CORE (Original Model - UNTOUCHED)
@@ -134,11 +132,11 @@ class SignetLogic:
         # This guarantees NO REGRESSION on existing features.
         self.model = genai.GenerativeModel('gemini-flash-latest')
         
-        # 2. THE RESEARCHER (Same Model String, Different Config)
+        # 2. THE RESEARCHER (Same Model String, Corrected Tool Config)
         # We use the EXACT SAME proven model string ('gemini-flash-latest').
-        # But we enable the Search Tool only on this specific instance.
+        # FIX: Changed tool name to 'google_search' per API requirement.
         tools_config = [
-            {"google_search_retrieval": {}}
+            {"google_search": {}}
         ]
         self.search_model = genai.GenerativeModel('gemini-flash-latest', tools=tools_config)
 
@@ -312,7 +310,7 @@ class SignetLogic:
             return f"Error generating copy: {e}"
 
     def run_content_generator(self, topic, format_type, key_points, profile_text):
-        # UPGRADE: Uses 'self.search_model' which now uses the SAFE 'gemini-flash-latest' string.
+        # UPGRADE: Uses 'self.search_model' to enable Google Search Grounding.
         # This will trigger Google Search ONLY if the prompt (like in Social Assistant) asks for it.
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
@@ -331,6 +329,7 @@ class SignetLogic:
 
     def describe_logo(self, image):
         try:
+            # Vision tasks stay on the stable core model
             response = self.model.generate_content(["Describe this logo in detail (colors, shapes, text).", image])
             return response.text
         except Exception as e:
