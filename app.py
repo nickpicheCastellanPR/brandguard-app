@@ -1311,6 +1311,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 # 6. BRAND ARCHITECT
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
+    
     def extract_and_map_pdf():
         # This runs BEFORE the page redraws
         uploaded_file = st.session_state.get('arch_pdf_uploader')
@@ -1321,11 +1322,34 @@ elif app_mode == "BRAND ARCHITECT":
                 
                 # Update Session State safely
                 st.session_state['wiz_name'] = data.get('wiz_name', '')
-                st.session_state['wiz_tone'] = data.get('wiz_tone', '')
                 st.session_state['wiz_mission'] = data.get('wiz_mission', '')
-                st.session_state['wiz_values'] = data.get('wiz_values', '')
-                st.session_state['wiz_guardrails'] = data.get('wiz_guardrails', '')
                 
+                # --- SANITIZATION FIX (Prevents List vs String Crash) ---
+                # The AI often returns lists for these fields. We must convert them 
+                # to comma-separated strings for the text inputs to work.
+                
+                # 1. Sanitize Tone
+                raw_tone = data.get('wiz_tone', '')
+                if isinstance(raw_tone, list):
+                    st.session_state['wiz_tone'] = ", ".join([str(t) for t in raw_tone])
+                else:
+                    st.session_state['wiz_tone'] = str(raw_tone) if raw_tone else ""
+
+                # 2. Sanitize Values
+                raw_values = data.get('wiz_values', '')
+                if isinstance(raw_values, list):
+                    st.session_state['wiz_values'] = ", ".join([str(v) for v in raw_values])
+                else:
+                    st.session_state['wiz_values'] = str(raw_values) if raw_values else ""
+
+                # 3. Sanitize Guardrails
+                raw_guard = data.get('wiz_guardrails', '')
+                if isinstance(raw_guard, list):
+                    st.session_state['wiz_guardrails'] = "\n".join([str(g) for g in raw_guard])
+                else:
+                    st.session_state['wiz_guardrails'] = str(raw_guard) if raw_guard else ""
+                # -------------------------------------------------------
+
                 # Match Archetype
                 suggested_arch = data.get('wiz_archetype')
                 if suggested_arch in ARCHETYPES:
@@ -1534,6 +1558,7 @@ elif app_mode == "BRAND ARCHITECT":
             if st.session_state.get('extraction_error'):
                 st.error(f"Extraction Error: {st.session_state['extraction_error']}")
                 st.session_state['extraction_error'] = None
+
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
@@ -1735,6 +1760,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
