@@ -991,9 +991,12 @@ elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
     st.markdown("Upload a creative asset to test it against your Brand Profile.")
 
-    # --- AGENCY TIER CHECK ---
-    # Security Gate: Ensure only active subscribers can access this feature
-    if st.session_state.get('status', 'trial').lower() != 'active':
+# --- AGENCY TIER CHECK ---
+    # Security Gate: Active subscribers OR Admins can access
+    is_admin = st.session_state.get('is_admin', False)
+    sub_status = st.session_state.get('status', 'trial').lower()
+    
+    if not is_admin and sub_status != 'active':
         show_paywall()
     # -------------------------
     
@@ -1116,9 +1119,12 @@ elif app_mode == "VISUAL COMPLIANCE":
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     
-    # --- AGENCY TIER CHECK ---
-    # Security Gate: Ensure only active subscribers can access this feature
-    if st.session_state.get('status', 'trial').lower() != 'active':
+# --- AGENCY TIER CHECK (Admin Exempt) ---
+    is_admin = st.session_state.get('is_admin', False)
+    sub_status = st.session_state.get('status', 'trial').lower()
+    
+    # If NOT an admin AND NOT active, show paywall
+    if not is_admin and sub_status != 'active':
         show_paywall()
     # -------------------------
     
@@ -1171,8 +1177,12 @@ elif app_mode == "COPY EDITOR":
 elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
 
-    # --- AGENCY TIER CHECK ---
-    if st.session_state.get('status') != 'active':
+# --- AGENCY TIER CHECK (Admin Exempt) ---
+    is_admin = st.session_state.get('is_admin', False)
+    sub_status = st.session_state.get('status', 'trial').lower()
+    
+    # If NOT an admin AND NOT active, show paywall
+    if not is_admin and sub_status != 'active':
         show_paywall()
     # -------------------------
     
@@ -1192,8 +1202,12 @@ elif app_mode == "CONTENT GENERATOR":
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
 
-    # --- AGENCY TIER CHECK ---
-    if st.session_state.get('status') != 'active':
+# --- AGENCY TIER CHECK (Admin Exempt) ---
+    is_admin = st.session_state.get('is_admin', False)
+    sub_status = st.session_state.get('status', 'trial').lower()
+    
+    # If NOT an admin AND NOT active, show paywall
+    if not is_admin and sub_status != 'active':
         show_paywall()
     # -------------------------
     
@@ -1654,6 +1668,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
