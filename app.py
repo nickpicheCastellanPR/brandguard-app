@@ -1509,7 +1509,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 # SECURITY NOTE: st.dataframe is 'Safe by Design'. It renders scripts as text, preventing XSS.
                 df_users = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "SUB STATUS", "CREATED AT"])
                 # Clean up the view
-                df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "🛡️ ADMIN" if x else "USER")
+                df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "ADMIN" if x else "USER")
                 st.dataframe(df_users, use_container_width=True, hide_index=True)
             else:
                 st.info("No users found.")
@@ -1545,6 +1545,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
