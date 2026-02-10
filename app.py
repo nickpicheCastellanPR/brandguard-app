@@ -930,20 +930,25 @@ if app_mode == "DASHBOARD":
         # Sort keys to ensure consistent order
         profile_names = sorted(list(profiles.keys()))
         
-        # Grid Logic
+# Grid Logic
         for i in range(0, len(profile_names), 3):
             cols = st.columns(3)
             for j in range(3):
                 if i + j < len(profile_names):
-                    p_name = profile_names[i+j]
-                    p_data = profiles[p_name]
+                    raw_p_name = profile_names[i+j]
+                    
+                    # 🛡️ SECURITY: Sanitize the name for display to prevent HTML injection
+                    p_name = html.escape(raw_p_name)
+                    
+                    # Use raw name for database lookup
+                    p_data = profiles[raw_p_name] 
                     
                     with cols[j]:
                         with st.container():
                             # START CARD
                             st.markdown(f"<div class='dashboard-card'>", unsafe_allow_html=True)
                             
-                            # HEADER
+                            # HEADER (Now Safe)
                             st.markdown(f"#### {p_name}")
                             
                             # METER
@@ -970,11 +975,11 @@ if app_mode == "DASHBOARD":
                                 </div>
                             """, unsafe_allow_html=True)
                             
-                            # ACTION BUTTON
+                            # ACTION BUTTON (Uses raw_p_name for logic key)
                             st.button("ACTIVATE SIGNAL", 
-                                      key=f"open_{p_name}", 
+                                      key=f"open_{raw_p_name}", 
                                       on_click=activate_profile, 
-                                      args=(p_name,), 
+                                      args=(raw_p_name,), 
                                       use_container_width=True)
 
                             st.markdown("</div>", unsafe_allow_html=True)
@@ -1512,6 +1517,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
