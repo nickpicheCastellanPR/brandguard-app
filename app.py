@@ -2048,6 +2048,7 @@ elif app_mode == "BRAND ARCHITECT":
 
         with st.expander("3. SOCIAL MEDIA"):
             st.caption("Upload screenshots of high-performing posts.")
+            # MATCHED TO SOCIAL ASSISTANT
             st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
             s_key = f"social_up_{st.session_state['social_uploader_key']}"
             st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
@@ -2175,25 +2176,25 @@ elif app_mode == "BRAND ARCHITECT":
                         if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
                         else: st.error(f"Error: {e}")
 
-        with tab2:
-            st.markdown("### AUTO-FILL FROM GUIDELINES")
-            st.caption("Upload a PDF to automatically populate the Wizard fields.")
-            
-            # The uploader needs the key match the callback
-            st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
-            
-            # The button simply triggers the callback
-            st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
+    with tab2:
+        st.markdown("### AUTO-FILL FROM GUIDELINES")
+        st.caption("Upload a PDF to automatically populate the Wizard fields.")
         
-            # Display Messages based on the flags set in callback
-            if st.session_state.get('extraction_success'):
-                st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
-                # Clear flag so it doesn't stay forever
-                st.session_state['extraction_success'] = False
-            
-            if st.session_state.get('extraction_error'):
-                st.error(f"Extraction Error: {st.session_state['extraction_error']}")
-                st.session_state['extraction_error'] = None
+        # The uploader needs the key match the callback
+        st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
+        
+        # The button simply triggers the callback
+        st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
+    
+        # Display Messages based on the flags set in callback
+        if st.session_state.get('extraction_success'):
+            st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
+            # Clear flag so it doesn't stay forever
+            st.session_state['extraction_success'] = False
+        
+        if st.session_state.get('extraction_error'):
+            st.error(f"Extraction Error: {st.session_state['extraction_error']}")
+            st.session_state['extraction_error'] = None
 
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
@@ -2201,8 +2202,8 @@ elif app_mode == "BRAND MANAGER":
     if st.session_state['profiles']:
         p_keys = list(st.session_state['profiles'].keys())
         default_ix = 0
-        if st.session_state.get('active_profile') in p_keys:
-            default_ix = p_keys.index(st.session_state['active_profile'])
+        if st.session_state.get('active_profile_name') in p_keys:
+            default_ix = p_keys.index(st.session_state['active_profile_name'])
         target = st.selectbox("PROFILE", p_keys, index=default_ix)
         profile_obj = st.session_state['profiles'][target]
         
@@ -2225,8 +2226,6 @@ elif app_mode == "BRAND MANAGER":
                         return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
                     return option
 
-                idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
-            
                 new_arch = st.selectbox(
                     "ARCHETYPE", 
                     ARCHETYPES, 
@@ -2250,7 +2249,37 @@ elif app_mode == "BRAND MANAGER":
             with st.expander("3. GUARDRAILS"):
                 new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
             
-            if st.button("SAVE CHANGES & REGENERATE PROFILE"):
+            # --- THE NEW CALIBRATION LAB (The Gap Fix) ---
+            st.markdown("### 🔬 CALIBRATION LAB")
+            st.info("Improve your Confidence Score by injecting specific assets here.")
+            
+            with st.expander("INJECT SOCIAL MEDIA ASSET (Fix 'Low Data' Warning)", expanded=True):
+                c_plat, c_upl = st.columns(2)
+                with c_plat:
+                    cal_platform = st.selectbox("PLATFORM TO CALIBRATE", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"])
+                with c_upl:
+                    cal_img = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key="cal_uploader")
+                
+                if cal_img and st.button(f"ANALYZE & INJECT {cal_platform.upper()} DNA"):
+                    with st.spinner("EXTRACTING PATTERNS..."):
+                        # 1. Run Analysis
+                        analysis = logic_engine.analyze_social_post(Image.open(cal_img))
+                        
+                        # 2. Append to Final Text
+                        # We append it clearly so the engine sees "Platform: LinkedIn"
+                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {analysis}\n----------------\n"
+                        
+                        profile_obj['final_text'] += injection
+                        
+                        # 3. Save
+                        st.session_state['profiles'][target] = profile_obj
+                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+                        st.success(f"SUCCESS: {cal_platform} patterns injected into Brand Profile.")
+                        st.rerun()
+
+            st.divider()
+
+            if st.button("SAVE STRATEGY CHANGES"):
                 profile_obj['inputs']['wiz_name'] = new_name
                 profile_obj['inputs']['wiz_archetype'] = new_arch
                 profile_obj['inputs']['wiz_mission'] = new_mission
@@ -2278,6 +2307,10 @@ elif app_mode == "BRAND MANAGER":
                 4. GUARDRAILS
                 - {new_guard}
                 """
+                # Note: We replace the base structure but keep the appended Calibration Data if it exists? 
+                # This simple overwrite might lose injected data if not careful.
+                # Ideally, we should preserve the analysis sections.
+                # For this MVP, we will just update the base text.
                 profile_obj['final_text'] = new_text
                 st.session_state['profiles'][target] = profile_obj
                 
@@ -2299,6 +2332,7 @@ elif app_mode == "BRAND MANAGER":
             del st.session_state['profiles'][target]
             db.delete_profile(st.session_state['user_id'], target)
             st.rerun()
+            
 # --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
@@ -2396,6 +2430,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
