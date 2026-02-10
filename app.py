@@ -620,7 +620,7 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Gap Fixed, Crash Proof, Gold Buttons) ---
+# --- SIDEBAR (Gap Destroyed, Gold Buttons, Crash Proof) ---
 with st.sidebar:
     # 0. STYLE INJECTION (Dark Text on Gold Buttons)
     st.markdown("""
@@ -642,7 +642,7 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* Primary Buttons (Like "Extract & Map") */
+        /* Primary Buttons */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
@@ -654,14 +654,14 @@ with st.sidebar:
             color: #1b2a2e !important;
         }
         
-        /* Remove extra top margin from APPS header */
-        .apps-header {
-            margin-top: 20px;
-            margin-bottom: 5px;
+        /* Navigation Header Styling */
+        .nav-header {
+            font-size: 0.8rem;
             font-weight: 700;
             color: #5c6b61;
-            font-size: 0.8rem;
             letter-spacing: 1px;
+            margin-top: 25px; /* Precise control over gap */
+            margin-bottom: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -695,7 +695,7 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
     
-    # 3. ACTIVE PROFILE & CONFIDENCE METER
+    # 3. ACTIVE PROFILE & CONFIDENCE METER (Combined with Nav Header to kill gap)
     profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
@@ -706,7 +706,6 @@ with st.sidebar:
 
         active_profile_selection = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
         
-        # Persist selection
         if active_profile_selection != st.session_state.get('active_profile_name'):
             st.session_state['active_profile_name'] = active_profile_selection
             st.rerun()
@@ -714,7 +713,7 @@ with st.sidebar:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
-        # NOTE: Margin bottom set to 0 to fix the gap
+        # WE COMBINE THE METER AND THE "APPS" HEADER HERE
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
@@ -727,12 +726,51 @@ with st.sidebar:
                 <div class="sb-track"><div class="sb-fill"></div></div>
                 <div class="sb-status">{metrics['status_label'].upper()} ({metrics['score']}%)</div>
             </div>
+            <div class="nav-header">APPS</div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
+        st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
 
-    # 4. NAVIGATION (No Divider, Tight Spacing)
-    st.markdown('<div class="apps-header">APPS</div>', unsafe_allow_html=True)
+    # 4. NAVIGATION BUTTONS
+    def set_page(page):
+        st.session_state['app_mode'] = page
+        
+    st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
+    st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
+    
+    # Writing Tools
+    st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
+    st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
+    st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
+    
+    # Admin Tools (Bottom)
+    st.divider()
+    st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
+    
+    if st.session_state.get('is_admin', False):
+         st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
+
+    st.divider()
+    
+    # 5. TRUST FOOTER
+    st.markdown("""
+        <div style='font-size: 0.7rem; color: #5c6b61; margin-top: 10px; margin-bottom: 20px;'>
+            <strong>SECURE INSTANCE</strong><br>
+            Data isolated to Castellan PR.<br>
+            End-to-End Encrypted.
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("LOGOUT", width="stretch"):
+        st.session_state['authenticated'] = False
+        st.session_state['username'] = None
+        st.session_state['profiles'] = {}
+        st.rerun()
+
+# --- CRITICAL BRIDGE VARIABLES ---
+app_mode = st.session_state.get('app_mode', 'DASHBOARD')
+active_profile = st.session_state.get('active_profile_name')
     
     def set_page(page):
         st.session_state['app_mode'] = page
@@ -1698,6 +1736,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
