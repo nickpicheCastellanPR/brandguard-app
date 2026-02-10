@@ -6,6 +6,7 @@ import json
 from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
+import html
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -627,13 +628,18 @@ with st.sidebar:
     else:
         st.markdown('<div style="font-size: 2rem; color: #24363b; font-weight: 900; letter-spacing: 0.1em; text-align: center; margin-bottom: 20px;">SIGNET</div>', unsafe_allow_html=True)
     
-# USER & STATUS BADGE
-    user_tag = st.session_state.get('username', 'User').upper()
+    st.divider()
+
+    # --- USER & STATUS BADGE (SECURE & POLISHED) ---
+    # 1. Sanitize: Prevent XSS attacks from usernames
+    raw_user = st.session_state.get('username', 'User').upper()
+    user_tag = html.escape(raw_user) 
+    
     status_tag = st.session_state.get('status', 'trial').upper()
     
     st.caption(f"OPERATIVE: {user_tag}")
     
-    # CSS HACK: Define global classes to force the colors
+    # 2. CSS HACK: Nuclear Option for Badge Colors
     st.markdown("""
         <style>
             .trial-badge {
@@ -664,19 +670,26 @@ with st.sidebar:
         st.markdown('<div class="agency-badge">AGENCY TIER</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="trial-badge">TRIAL LICENSE</div>', unsafe_allow_html=True)
-        
-    # 2. ACTIVE PROFILE CALIBRATION
-    profile_names = list(st.session_state['profiles'].keys())
+    
+    # 3. ACTIVE PROFILE CALIBRATION (Preserved)
+    profile_names = list(st.session_state.get('profiles', {}).keys())
     
     if profile_names:
-        active_profile = st.selectbox("ACTIVE PROFILE", profile_names)
+        # Check if active_profile is in session state, default to first if not
+        default_ix = 0
+        if 'active_profile_name' in st.session_state and st.session_state['active_profile_name'] in profile_names:
+             default_ix = profile_names.index(st.session_state['active_profile_name'])
+
+        active_profile = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
+        st.session_state['active_profile_name'] = active_profile # Persist selection
+        
         current_rules = st.session_state['profiles'][active_profile]
         
         metrics = calculate_calibration_score(current_rules)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # CASTELLAN SIDEBAR METER
+        # CONFIDENCE METER
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 10px; }}
@@ -702,13 +715,40 @@ with st.sidebar:
 
     st.divider()
     
-    # 3. NAVIGATION
-    # This is the primary way to get back to the Dashboard
-    app_mode = st.radio("MODULES", ["DASHBOARD", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT", "BRAND ARCHITECT", "BRAND MANAGER"], label_visibility="collapsed", key="nav_selection")
+    # 4. NAVIGATION
+    # Updated list to include BRAND MANAGER if needed, or keep your existing list
+    nav_options = ["DASHBOARD", "BRAND ARCHITECT", "VISUAL COMPLIANCE", "COPY EDITOR", "CONTENT GENERATOR", "SOCIAL MEDIA ASSISTANT"]
+    if st.session_state.get('is_admin', False):
+        nav_options.append("ADMIN CONSOLE")
+        
+    # Sync navigation with session state
+    current_mode = st.session_state.get('app_mode', 'DASHBOARD')
+    # Handle case where current mode might not be in options (e.g. slight name change)
+    if current_mode not in nav_options: 
+        current_mode = "DASHBOARD"
+
+    app_mode = st.radio("MODULES", nav_options, index=nav_options.index(current_mode), label_visibility="collapsed", key="nav_selection")
+    
+    # Update App Mode if changed
+    if app_mode != st.session_state.get('app_mode'):
+        st.session_state['app_mode'] = app_mode
+        st.rerun()
     
     st.divider()
-    if st.button("LOGOUT"):
+    
+    # 5. TRUST FOOTER 
+    st.markdown("""
+        <div style='font-size: 0.7rem; color: #5c6b61; margin-top: 10px; margin-bottom: 20px;'>
+            <strong>SECURE INSTANCE</strong><br>
+            Data isolated to Castellan PR.<br>
+            End-to-End Encrypted.
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("LOGOUT", use_container_width=True):
         st.session_state['authenticated'] = False
+        st.session_state['username'] = None
+        st.session_state['profiles'] = {}
         st.rerun()
 
 def show_paywall():
@@ -1481,6 +1521,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
