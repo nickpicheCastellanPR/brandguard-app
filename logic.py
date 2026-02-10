@@ -90,16 +90,14 @@ class SignetLogic:
         """
         # A. MATH: RUN COLOR SCIENCE (Safety Wrapper)
         # We try to use the ColorScorer if it exists, otherwise we skip math
-        color_score = 100 # Default neutral
+        color_raw = 100 # Default neutral
         color_logic = "Color analysis relied on visual inspection."
         detected_hexes = []
         
         try:
-            # Assumes extract_dominant_colors and ColorScorer are defined globally in logic.py
             detected_hexes = extract_dominant_colors(image)
-            color_score, color_logic = ColorScorer.grade_color_match(detected_hexes, profile_text)
+            color_raw, color_logic = ColorScorer.grade_color_match(detected_hexes, profile_text)
         except Exception:
-            # Fallback if helpers are missing or fail
             pass
         
         # B. AI: RUN VISION & TEXT ANALYSIS
@@ -117,24 +115,24 @@ class SignetLogic:
         2. ANALYZE VISUALS (Logo, Typography, Vibe).
         
         SCORING RUBRIC (0-100 per category):
-        - IDENTITY (25%): Logo usage, placement, distortion. If no logo but valid asset (e.g. pattern), score high.
-        - COLOR (25%): (Already calculated via Math, but verify context).
+        - IDENTITY (25%): Logo usage, placement, distortion.
+        - COLOR (25%): (Contextual check).
         - TYPOGRAPHY (15%): Font family, hierarchy, legibility.
-        - VIBE (15%): Archetype match (e.g. Ruler vs Jester).
-        - TONE & COPY (20%): Does the text match the brand voice? Are there forbidden words? Is it typo-free?
+        - VIBE (15%): Archetype match.
+        - TONE & COPY (20%): Voice match, forbidden words.
         
-        OUTPUT FORMAT: Return a PURE JSON object (no markdown) with these exact keys:
-        - "identity_score": (int)
+        OUTPUT FORMAT: Return a PURE JSON object (no markdown):
+        - "identity_score": (int 0-100)
         - "identity_reason": (string)
-        - "type_score": (int)
+        - "type_score": (int 0-100)
         - "type_reason": (string)
-        - "vibe_score": (int)
+        - "vibe_score": (int 0-100)
         - "vibe_reason": (string)
-        - "tone_score": (int)
-        - "tone_reason": (string) If no text found, give 100 (Neutral).
-        - "critical_fixes": (List of strings) Absolute failures (e.g. Wrong Logo).
-        - "minor_fixes": (List of strings) Polish items.
-        - "brand_wins": (List of strings) What is working well.
+        - "tone_score": (int 0-100)
+        - "tone_reason": (string)
+        - "critical_fixes": (List of strings)
+        - "minor_fixes": (List of strings)
+        - "brand_wins": (List of strings)
         """
         
         try:
@@ -142,16 +140,22 @@ class SignetLogic:
             txt = response.text.replace("```json", "").replace("```", "").strip()
             ai_result = json.loads(txt)
             
-            # --- C. WEIGHTED CALCULATION (5 Pillars) ---
-            # Color (25%) + Identity (25%) + Tone (20%) + Type (15%) + Vibe (15%)
+            # --- C. WEIGHTED CALCULATION (The Fix) ---
+            # 1. Get RAW Scores (0-100) for UI
+            s_color = color_raw
+            s_identity = ai_result.get('identity_score', 0)
+            s_tone = ai_result.get('tone_score', 100)
+            s_type = ai_result.get('type_score', 0)
+            s_vibe = ai_result.get('vibe_score', 0)
             
-            c_score = color_score * 0.25
-            i_score = ai_result.get('identity_score', 0) * 0.25
-            txt_score = ai_result.get('tone_score', 100) * 0.20
-            t_score = ai_result.get('type_score', 0) * 0.15
-            v_score = ai_result.get('vibe_score', 0) * 0.15
-            
-            final_score = int(c_score + i_score + txt_score + t_score + v_score)
+            # 2. Calculate WEIGHTED Scores for Verdict
+            final_score = int(
+                (s_color * 0.25) + 
+                (s_identity * 0.25) + 
+                (s_tone * 0.20) + 
+                (s_type * 0.15) + 
+                (s_vibe * 0.15)
+            )
             
             # Verdict Logic
             verdict = "COMPLIANT"
@@ -162,11 +166,12 @@ class SignetLogic:
                 "score": final_score,
                 "verdict": verdict,
                 "breakdown": {
-                    "color": {"score": color_score, "reason": color_logic},
-                    "identity": {"score": ai_result.get('identity_score'), "reason": ai_result.get('identity_reason')},
-                    "tone": {"score": txt_score, "reason": ai_result.get('tone_reason')},
-                    "typography": {"score": ai_result.get('type_score'), "reason": ai_result.get('type_reason')},
-                    "vibe": {"score": ai_result.get('vibe_score'), "reason": ai_result.get('vibe_reason')}
+                    # BUG FIX: Sending RAW scores to UI, not weighted
+                    "color": {"score": s_color, "reason": color_logic},
+                    "identity": {"score": s_identity, "reason": ai_result.get('identity_reason')},
+                    "tone": {"score": s_tone, "reason": ai_result.get('tone_reason')},
+                    "typography": {"score": s_type, "reason": ai_result.get('type_reason')},
+                    "vibe": {"score": s_vibe, "reason": ai_result.get('vibe_reason')}
                 },
                 "critical_fixes": ai_result.get('critical_fixes', []),
                 "minor_fixes": ai_result.get('minor_fixes', []),
@@ -174,7 +179,6 @@ class SignetLogic:
             }
             
         except Exception as e:
-            # Fallback for errors
             return {
                 "score": 0, 
                 "verdict": "ERROR", 
@@ -186,7 +190,6 @@ class SignetLogic:
 
     # --- WIZARD & PDF TOOLS ---
     def extract_text_from_pdf(self, uploaded_file):
-        # We keep this import local just in case you don't have it at the top
         import PyPDF2
         try:
             reader = PyPDF2.PdfReader(uploaded_file)
@@ -198,41 +201,31 @@ class SignetLogic:
             return f"Error reading PDF: {e}"
 
     def generate_brand_rules_from_pdf(self, pdf_text):
-        """Extracts structured brand data from raw PDF text with Regex Backup."""
-        
-        # 1. REGEX HUNT (Backup for colors)
+        import re
+        import json
         found_hexes = re.findall(r'#[0-9a-fA-F]{6}', pdf_text)
         unique_hexes = list(set(found_hexes))
         
-        # 2. AI EXTRACTION
         prompt = f"""
         TASK: Extract Brand Rules from this PDF text.
-        
-        CONTEXT: I have already mathematically detected these Hex Codes in the document: {unique_hexes}. 
-        Please assign them correctly to 'palette_primary' and 'palette_secondary' based on the text context.
-        
-        OUTPUT: Return a PURE JSON object (no markdown) with these exact keys: 
+        CONTEXT: I have already detected these Hex Codes: {unique_hexes}. 
+        OUTPUT: Return a PURE JSON object (no markdown) with these keys: 
         wiz_name, wiz_archetype, wiz_mission, wiz_values, wiz_tone, wiz_guardrails, palette_primary (list of hex), palette_secondary (list of hex), writing_sample.
-        
-        RAW TEXT: 
-        {pdf_text[:15000]}
+        RAW TEXT: {pdf_text[:15000]}
         """
         try:
             response = self.model.generate_content(prompt)
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
-            
         except Exception as e:
-            # DIAGNOSTIC: List available models if this fails
             try:
                 available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 model_list = ", ".join(available)
             except:
-                model_list = "Could not list models (Auth Error?)"
-                
+                model_list = "Auth Error"
             return {
                  "wiz_name": "Error Logs", 
-                 "wiz_mission": f"ERROR: {str(e)} \n\n AVAILABLE MODELS ON SERVER: {model_list}", 
+                 "wiz_mission": f"ERROR: {str(e)} \n\n AVAILABLE MODELS: {model_list}", 
                  "wiz_archetype": "Error",
                  "palette_primary": unique_hexes[:5] if unique_hexes else ["#000000"],
                  "palette_secondary": [],
@@ -240,13 +233,11 @@ class SignetLogic:
              }
 
     def generate_brand_rules(self, prompt_text):
-        """Standard text generation helper"""
         response = self.model.generate_content(prompt_text)
         return response.text
 
     # --- COPY EDITOR & GENERATOR ---
     def run_copy_editor(self, user_draft, profile_text):
-        """Rewrites text to match voice."""
         prompt = f"Rewrite this draft to match the brand voice:\n\nBRAND RULES:\n{profile_text}\n\nDRAFT:\n{user_draft}"
         try:
             response = self.model.generate_content(prompt)
@@ -255,7 +246,6 @@ class SignetLogic:
             return f"Error generating copy: {e}"
 
     def run_content_generator(self, topic, format_type, key_points, profile_text):
-        """Generates fresh content."""
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
             response = self.model.generate_content(prompt)
@@ -264,7 +254,6 @@ class SignetLogic:
             return f"Error generating content: {e}"
     
     def analyze_social_post(self, image):
-        """Simple image analysis for captions."""
         try:
             response = self.model.generate_content(["Analyze this social post and suggest a caption.", image])
             return response.text
@@ -272,7 +261,6 @@ class SignetLogic:
             return "Error analyzing image."
 
     def describe_logo(self, image):
-        """Generates a text description of a logo for the prompt. REQUIRED FOR BRAND ARCHITECT."""
         try:
             response = self.model.generate_content(["Describe this logo in detail (colors, shapes, text).", image])
             return response.text
