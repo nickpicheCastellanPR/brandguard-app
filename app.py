@@ -1451,7 +1451,7 @@ elif app_mode == "BRAND MANAGER":
 # --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
-    with st.expander("Show Admin Dashboard 🛡️"):
+    with st.expander("Show Admin Dashboard"):
         # Custom CSS for the Admin Panel to match the Theme
         st.markdown("""
         <style>
@@ -1545,6 +1545,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
