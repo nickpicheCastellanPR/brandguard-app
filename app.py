@@ -620,10 +620,9 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Fixed: CSS Legibility, Missing Tool, Logic Bridge) ---
+# --- SIDEBAR (Gap Fixed, Crash Proof, Gold Buttons) ---
 with st.sidebar:
-    # 0. STYLE INJECTION (The "Illegible Button" Fix)
-    # We force the button text to be Dark Gunmetal (#1b2a2e) on Gold background
+    # 0. STYLE INJECTION (Dark Text on Gold Buttons)
     st.markdown("""
         <style>
         /* Sidebar Buttons */
@@ -644,7 +643,6 @@ with st.sidebar:
         }
         
         /* Primary Buttons (Like "Extract & Map") */
-        /* Forces Dark Text on Gold Background so it's readable */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important; 
@@ -652,8 +650,18 @@ with st.sidebar:
             font-weight: 800 !important;
         }
         button[kind="primary"]:hover {
-            background-color: #f0c05a !important; /* Lighter gold on hover */
+            background-color: #f0c05a !important;
             color: #1b2a2e !important;
+        }
+        
+        /* Remove extra top margin from APPS header */
+        .apps-header {
+            margin-top: 20px;
+            margin-bottom: 5px;
+            font-weight: 700;
+            color: #5c6b61;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -698,6 +706,7 @@ with st.sidebar:
 
         active_profile_selection = st.selectbox("ACTIVE PROFILE", profile_names, index=default_ix)
         
+        # Persist selection
         if active_profile_selection != st.session_state.get('active_profile_name'):
             st.session_state['active_profile_name'] = active_profile_selection
             st.rerun()
@@ -705,9 +714,10 @@ with st.sidebar:
         current_rules = st.session_state['profiles'][active_profile_selection]
         metrics = calculate_calibration_score(current_rules)
         
+        # NOTE: Margin bottom set to 0 to fix the gap
         st.markdown(f"""
             <style>
-                .sb-container {{ margin-bottom: 10px; margin-top: 10px; }}
+                .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
                 .sb-track {{ width: 100%; height: 6px; background: #dcdcd9; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }}
                 .sb-fill {{ height: 100%; width: {metrics['score']}%; background: {metrics['color']}; border-radius: 999px; }}
                 .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {metrics['color']}; }}
@@ -721,10 +731,8 @@ with st.sidebar:
     else:
         st.markdown("<div style='text-align:center; color:#5c6b61; font-size:0.8rem; margin-bottom:20px; font-weight:700;'>NO PROFILE LOADED</div>", unsafe_allow_html=True)
 
-    st.divider()
-    
-    # 4. NAVIGATION (Full Suite)
-    st.markdown("### APPS")
+    # 4. NAVIGATION (No Divider, Tight Spacing)
+    st.markdown('<div class="apps-header">APPS</div>', unsafe_allow_html=True)
     
     def set_page(page):
         st.session_state['app_mode'] = page
@@ -761,8 +769,7 @@ with st.sidebar:
         st.session_state['profiles'] = {}
         st.rerun()
 
-# --- CRITICAL BRIDGE VARIABLES ---
-# This fixes the Copy Editor crash
+# --- CRITICAL VARIABLES (Must be defined for other modules) ---
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
         
@@ -1691,6 +1698,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
