@@ -1273,7 +1273,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                         except Exception as e:
                             st.error(f"System Error: {e}")
 
-# 3. COPY EDITOR (Stateful, Diff View, Rationale)
+# 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     
@@ -1295,6 +1295,15 @@ elif app_mode == "COPY EDITOR":
             margin-bottom: 20px;
             font-size: 0.9rem;
             color: #e0e0e0;
+        }
+        .calibration-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            overflow: hidden;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1327,9 +1336,10 @@ elif app_mode == "COPY EDITOR":
             # Update state on change
             st.session_state['ce_draft'] = draft_input
             
-            # Context Inputs (No Social Caption)
+            # Context Inputs (No Social Caption - Moved to separate module)
             cc1, cc2, cc3 = st.columns(3)
             with cc1: 
+                # TRIGGER: Changing this updates the Confidence Meter
                 content_type = st.selectbox("CONTENT TYPE", [
                     "Internal Email", 
                     "Press Release", 
@@ -1346,11 +1356,29 @@ elif app_mode == "COPY EDITOR":
                 audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Staff")
                 
         with c2: 
-            # Control Panel
+            # --- DYNAMIC CALIBRATION METER (The Fix) ---
+            # We check if the profile is actually trained for the selected task
+            profile_data = st.session_state['profiles'][active_profile]
+            metrics = calculate_content_confidence(profile_data, content_type)
+            
             st.markdown(f"""<div class="dashboard-card" style="padding: 15px;">
-                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">ACTIVE VOICE</div>
-                <div style="font-size:1.1rem; color:#ab8f59; font-weight:800; margin-bottom:10px;">{html.escape(active_profile)}</div>
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">TASK CONFIDENCE: {content_type.upper()}</div>
+                <div style="font-size:1.6rem; font-weight:800; color:{metrics['color']}; margin-top:5px;">{metrics['score']}%</div>
+                <div class="calibration-bar">
+                    <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
+                </div>
+                <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
             </div>""", unsafe_allow_html=True)
+            
+            # Dynamic Call to Action
+            if metrics['action']:
+                st.markdown(f"""
+                    <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
+                        <strong>Optimization Tip:</strong><br>
+                        This format requires strong <em>{metrics['action'].split(' ')[-1]}</em> data. 
+                        Consider updating the profile.
+                    </div>
+                """, unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             edit_intensity = st.select_slider(
@@ -1364,7 +1392,6 @@ elif app_mode == "COPY EDITOR":
                 if draft_input:
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         # Get Rules
-                        profile_data = st.session_state['profiles'][active_profile]
                         prof_text = profile_data.get('final_text', str(profile_data))
                         
                         # Engineered Prompt using "Chain of Thought"
@@ -1414,13 +1441,12 @@ elif app_mode == "COPY EDITOR":
                             if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
                             from datetime import datetime
                             
-                            score = 85 if edit_intensity == "Polish" else 92
-                            
+                            # Log the CONFIDENCE score, not a fake score
                             log_entry = {
                                 "timestamp": datetime.now().strftime("%H:%M"),
                                 "type": "COPY EDIT",
                                 "name": f"{content_type} ({audience})",
-                                "score": score,
+                                "score": metrics['score'], # Uses the real confidence metric
                                 "verdict": "REWRITTEN",
                                 "result_data": rewrite,
                                 "image_data": None
@@ -2202,6 +2228,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
