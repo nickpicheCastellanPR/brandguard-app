@@ -621,6 +621,7 @@ if not st.session_state['authenticated']:
     st.stop()
     
 # --- SIDEBAR ---
+# --- SIDEBAR ---
 with st.sidebar:
     # 1. BRANDING
     if os.path.exists("Signet_Logo_Color.png"):
@@ -639,17 +640,17 @@ with st.sidebar:
     
     st.caption(f"OPERATIVE: {user_tag}")
     
-    # 2. INLINE STYLE FIX (The "Bulletproof" Method)
-    # We use direct style attributes to override any framework defaults
+    # 2. INLINE STYLE FIX (The "Nuclear" Method)
+    # We add !important to every property to force the browser to respect our colors.
     if status_tag == "ACTIVE":
         st.markdown(
-            """<span style='background-color: #ab8f59; color: #1b2a2e; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; border: 1px solid #1b2a2e; display: inline-block; margin-bottom: 10px;'>AGENCY TIER</span>""", 
+            """<div style='background-color: #ab8f59 !important; color: #1b2a2e !important; padding: 6px 12px !important; border-radius: 4px !important; font-size: 0.75rem !important; font-weight: 800 !important; letter-spacing: 1px !important; border: 1px solid #1b2a2e !important; display: inline-block !important; margin-bottom: 10px !important;'>AGENCY TIER</div>""", 
             unsafe_allow_html=True
         )
     else:
-        # High Contrast: Cream text on Dark Gray with Sage Border
+        # High Contrast: Cream text (#f5f5f0) on Dark Gray (#3d3d3d)
         st.markdown(
-            """<span style='background-color: #3d3d3d; color: #f5f5f0; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; border: 1px solid #5c6b61; display: inline-block; margin-bottom: 10px;'>TRIAL LICENSE</span>""", 
+            """<div style='background-color: #3d3d3d !important; color: #f5f5f0 !important; padding: 6px 12px !important; border-radius: 4px !important; font-size: 0.75rem !important; font-weight: 800 !important; letter-spacing: 1px !important; border: 1px solid #5c6b61 !important; display: inline-block !important; margin-bottom: 10px !important;'>TRIAL LICENSE</div>""", 
             unsafe_allow_html=True
         )
     
@@ -1504,6 +1505,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
