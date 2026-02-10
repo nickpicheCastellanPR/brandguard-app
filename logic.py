@@ -127,21 +127,14 @@ class ColorScorer:
 
 class SignetLogic:
     def __init__(self):
-        # 1. THE STABLE CORE (Original Model - UNTOUCHED)
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+        # 1. THE STABLE CORE (Upgraded to Confirmed Model)
+        # We use 'gemini-2.0-flash' as it appears in your AVAILABLE MODELS list.
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # 2. THE RESEARCHER (Corrected Tool Configuration)
-        # We define the tool object explicitly for the API
-        tool_config = [
-            {"google_search": {}} 
-        ]
-        # NOTE: If the dictionary syntax fails, the fallback is to omit tools 
-        # and rely on the model's internal knowledge until we debug the specific SDK version.
-        # However, for 'gemini-1.5-flash' or 'latest', the standard dict usually works
-        # IF the key is correct. The error suggests strict typing.
-        
-        # Let's try the safest, most standard initialization for Tools:
-        self.search_model = genai.GenerativeModel('gemini-1.5-flash', tools='google_search_retrieval') 
+        # 2. THE RESEARCHER (Stabilized)
+        # We remove the 'tools' config to stop the 400 Errors.
+        # We use the same powerful 'gemini-2.0-flash' model to ensure high-quality output.
+        self.search_model = genai.GenerativeModel('gemini-2.0-flash')
 
     def run_visual_audit(self, image, profile_text):
         """
@@ -295,12 +288,8 @@ class SignetLogic:
     def run_content_generator(self, topic, format_type, key_points, profile_text):
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
-            # Fallback to standard model if search model isn't configured right yet
-            # This ensures app doesn't crash on startup
-            if hasattr(self, 'search_model'):
-                response = self.search_model.generate_content(prompt)
-            else:
-                response = self.model.generate_content(prompt)
+            # Uses the standard model instance (No tools, No crashes)
+            response = self.search_model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error generating content: {e}"
