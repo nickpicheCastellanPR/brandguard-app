@@ -1523,7 +1523,7 @@ elif app_mode == "COPY EDITOR":
         show_paywall()
 
     # --- HELPER: RISK vs ASSETS CONFIDENCE MODEL ---
-    def calculate_content_confidence(profile_data, content_type):
+    def calculate_copy_confidence(profile_data, content_type):
         """
         Calculates confidence based on the 'Risk vs. Assets' tiered model.
         """
@@ -1671,7 +1671,7 @@ elif app_mode == "COPY EDITOR":
         with c2: 
             # --- DYNAMIC CALIBRATION METER (Fixed) ---
             profile_data = st.session_state['profiles'][active_profile]
-            metrics = calculate_content_confidence(profile_data, content_type)
+            metrics = calculate_copy_confidence(profile_data, content_type)
             
             st.markdown(f"""<div class="dashboard-card" style="padding: 15px;">
                 <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">TASK CONFIDENCE: {content_type.upper()}</div>
@@ -1822,9 +1822,9 @@ elif app_mode == "COPY EDITOR":
                     st.caption("REWRITTEN")
                     st.success(st.session_state['ce_result'])
                     
-# 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
-elif app_mode == "CONTENT GENERATOR":
-    st.title("CONTENT GENERATOR")
+# 5. SOCIAL MEDIA ASSISTANT (Platform-Aware, Goal-Oriented, Trend-Aware)
+elif app_mode == "SOCIAL MEDIA ASSISTANT":
+    st.title("SOCIAL MEDIA ASSISTANT")
     
     # --- CSS INJECTION ---
     st.markdown("""
@@ -1836,14 +1836,6 @@ elif app_mode == "CONTENT GENERATOR":
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 1px !important;
-        }
-        .rationale-box {
-            background-color: rgba(171, 143, 89, 0.1);
-            border-left: 3px solid #ab8f59;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-            color: #e0e0e0;
         }
         .calibration-bar {
             width: 100%;
@@ -1863,109 +1855,52 @@ elif app_mode == "CONTENT GENERATOR":
     if not is_admin and sub_status != 'active':
         show_paywall()
 
-    # --- HELPER: RISK vs ASSETS CONFIDENCE MODEL ---
-    def calculate_content_confidence(profile_data, content_type):
+    # --- HELPER: RESEARCH-BASED FEW-SHOT CONFIDENCE ---
+    def calculate_social_confidence(profile_data, target_platform):
         """
-        Calculates confidence based on the 'Risk vs. Assets' tiered model.
+        Calculates confidence based on LMM Few-Shot Learning research.
+        Thresholds: 
+        - 0 Assets: Zero-Shot (Low Confidence)
+        - 1-2 Assets: One-Shot (Medium Confidence - Pattern Unstable)
+        - 3+ Assets: Few-Shot (High Confidence - Pattern Stable)
         """
         inputs = profile_data.get('inputs', {})
-        score = 0
-        cap = 100
-        rationale_parts = []
-        missing_parts = []
-        action = ""
+        social_dna = inputs.get('social_dna', '')
         
-        # Data Availability Checks
-        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
-        has_values = len(inputs.get('wiz_values', '')) > 10
-        has_tone = len(inputs.get('wiz_tone', '')) > 2
-        voice_dna_len = len(inputs.get('voice_dna', ''))
-        has_deep_voice = voice_dna_len > 1000
-        has_voice_samples = voice_dna_len > 50
-
-        # TIER 1: HIGH RISK (Crisis, Press Release)
-        if content_type in ["Crisis Statement", "Press Release"]:
-            score = 0 # Base 0
-            
-            if has_guardrails:
-                score += 40
-                rationale_parts.append("Guardrails")
-            else:
-                cap = 50
-                missing_parts.append("Guardrails (CRITICAL)")
-                action = "Add Guardrails in Strategy tab to unlock higher scores."
-            
-            if has_values:
-                score += 30
-                rationale_parts.append("Core Values")
-            else:
-                missing_parts.append("Core Values")
-                
-            if has_tone:
-                score += 20
-                rationale_parts.append("Tone")
-
-        # TIER 2: STRATEGIC INTERNAL (Memo, Email)
-        elif content_type in ["Executive Memo", "Internal Email"]:
-            score = 20 # Base 20
-            
-            if has_tone:
-                score += 30
-                rationale_parts.append("Tone Definitions")
-            else:
-                cap = 60
-                missing_parts.append("Tone Definitions (CRITICAL)")
-                action = "Define Tone Keywords in Strategy tab."
-            
-            if has_voice_samples:
-                score += 30
-                rationale_parts.append("Voice Samples")
-            else:
-                missing_parts.append("Voice Samples")
-
-        # TIER 3: CREATIVE / EXTERNAL (Blog, Social, Speech)
-        else:
-            score = 30 # Base 30
-            
-            if has_deep_voice:
-                score += 40
-                rationale_parts.append("Deep Voice Data")
-            elif has_voice_samples:
-                score += 20
-                rationale_parts.append("Basic Voice Data")
-            else:
-                cap = 50
-                missing_parts.append("Voice DNA (CRITICAL)")
-                action = "Upload more text samples to the Voice Calibration Lab."
-            
-            if has_tone:
-                score += 30
-                rationale_parts.append("Tone Guidelines")
-
-        # Final Calculation
-        final_score = min(score, cap)
+        # 1. Count Specific Assets (The "N-Shot" Count)
+        clean_plat = target_platform.upper().split(" ")[0] # e.g. "LINKEDIN"
+        asset_count = social_dna.upper().count(f"ASSET: {clean_plat}")
         
-        # Color Logic
-        color = "#ff4b4b" # Red
-        label = "LOW DATA"
-        if final_score > 50: 
-            color = "#ffa421" # Orange
-            label = "CALIBRATED"
-        if final_score > 75: 
+        # 2. Determine Score & Rationale based on Research Thresholds
+        if asset_count >= 3:
+            # Few-Shot Threshold Met (Gold Standard)
+            score = 85
             color = "#09ab3b" # Green
             label = "HIGH CONFIDENCE"
-
-        # Rationale String construction
-        using_str = ", ".join(rationale_parts) if rationale_parts else "Generic Model"
-        missing_str = ", ".join(missing_parts) if missing_parts else "None"
-        
-        full_rationale = f"Using: {using_str}. Missing: {missing_str}."
+            rationale = f"Pattern Stability Achieved. {asset_count} {target_platform} assets found (Few-Shot threshold met)."
+            action = ""
+            
+        elif asset_count >= 1:
+            # One-Shot / Low-Shot (Unstable)
+            score = 55
+            color = "#ffa421" # Orange
+            label = "CALIBRATING"
+            rationale = f"Pattern Unstable. Only {asset_count} {target_platform} asset found. AI may overfit to this single example."
+            action = f"Upload {3 - asset_count} more {target_platform} screenshots to reach pattern stability."
+            
+        else:
+            # Zero-Shot (Generic)
+            score = 25
+            color = "#ff4b4b" # Red
+            label = "LOW DATA"
+            rationale = f"Zero-Shot Mode. No {target_platform} data found. Relying on generic best practices."
+            action = f"Upload at least 3 {target_platform} screenshots to train the engine."
 
         return {
-            "score": final_score,
+            "score": score,
             "color": color,
             "label": label,
-            "rationale": full_rationale,
+            "rationale": rationale,
             "action": action
         }
 
@@ -1973,56 +1908,35 @@ elif app_mode == "CONTENT GENERATOR":
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
         # --- STATE INITIALIZATION ---
-        if 'cg_topic' not in st.session_state: st.session_state['cg_topic'] = ""
-        if 'cg_key_points' not in st.session_state: st.session_state['cg_key_points'] = ""
-        if 'cg_result' not in st.session_state: st.session_state['cg_result'] = None
-        if 'cg_rationale' not in st.session_state: st.session_state['cg_rationale'] = None
-
-        # --- 1. INPUTS & DYNAMIC CALIBRATION ---
+        if 'sm_topic' not in st.session_state: st.session_state['sm_topic'] = ""
+        if 'sm_results' not in st.session_state: st.session_state['sm_results'] = None
+        
+        # --- INPUTS & CALIBRATION ---
         c1, c2 = st.columns([2, 1])
         
         with c1:
-            # Topic
-            st.markdown("##### 1. CORE PARAMETERS")
-            cg_topic = st.text_input("TOPIC / HEADLINE", value=st.session_state['cg_topic'], placeholder="e.g. Q3 Financial Results")
-            st.session_state['cg_topic'] = cg_topic
-            
-            # Expanded Format List
+            st.markdown("##### 1. PLATFORM STRATEGY")
             cc1, cc2 = st.columns(2)
             with cc1:
-                # Trigger for Dynamic Calibration
-                content_type = st.selectbox("FORMAT", [
-                    "Press Release", "Internal Email", "Executive Memo", "Blog Post", 
-                    "Crisis Statement", "Speech / Script", "Social Campaign"
-                ])
+                # Trigger Calibration
+                platform = st.selectbox("NETWORK", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"])
             with cc2:
-                length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
+                goal = st.selectbox("OBJECTIVE", ["Reach (Awareness)", "Engagement (Comments)", "Conversion (Clicks)"])
             
-            # Audience Context
-            cc3, cc4 = st.columns(2)
-            with cc3:
-                sender = st.text_input("VOICE / SENDER", placeholder="e.g. CEO")
-            with cc4:
-                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Public, Shareholders")
-
-            # Key Points
-            st.markdown("##### 2. MESSAGE DISCIPLINE")
-            cg_key_points = st.text_area(
-                "KEY MESSAGES (BULLET POINTS)", 
-                height=150, 
-                placeholder="- Revenue up 20%\n- New product launch in Q4\n- Focus on sustainability",
-                help="The AI will strictly adhere to these facts.",
-                value=st.session_state['cg_key_points']
-            )
-            st.session_state['cg_key_points'] = cg_key_points
-
+            st.markdown("##### 2. CONTENT CONTEXT")
+            sm_topic = st.text_input("TOPIC / HOOK", value=st.session_state['sm_topic'], placeholder="e.g. Launching our new sustainability initiative")
+            st.session_state['sm_topic'] = sm_topic
+            
+            # Image Uploader (Crucial for Visual Platforms)
+            uploaded_image = st.file_uploader("ATTACH VISUAL (Optional but Recommended)", type=['png', 'jpg', 'jpeg'])
+            
         with c2:
             # --- DYNAMIC CALIBRATION METER ---
             profile_data = st.session_state['profiles'][active_profile]
-            metrics = calculate_content_confidence(profile_data, content_type)
+            metrics = calculate_social_confidence(profile_data, platform)
             
             st.markdown(f"""<div class="dashboard-card" style="padding: 15px; margin-top: 28px;">
-                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">TASK CONFIDENCE: {content_type.upper()}</div>
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">DIALECT CONFIDENCE: {platform.upper()}</div>
                 <div style="font-size:1.6rem; font-weight:800; color:{metrics['color']}; margin-top:5px;">{metrics['score']}%</div>
                 <div class="calibration-bar">
                     <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
@@ -2031,7 +1945,7 @@ elif app_mode == "CONTENT GENERATOR":
                 <div style="font-size:0.7rem; color:#a0a0a0; margin-top:8px; line-height:1.2;"><em>{metrics['rationale']}</em></div>
             </div>""", unsafe_allow_html=True)
             
-            # Dynamic Warning / Call to Action
+            # Warning Logic
             if metrics['action']:
                 st.markdown(f"""
                     <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
@@ -2039,94 +1953,98 @@ elif app_mode == "CONTENT GENERATOR":
                         {metrics['action']}
                     </div>
                 """, unsafe_allow_html=True)
-            
+                if st.button("GO TO CALIBRATION LAB", type="secondary"):
+                    st.session_state['app_mode'] = "BRAND MANAGER"
+                    st.rerun()
+
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("GENERATE DRAFT", type="primary", use_container_width=True):
-                if cg_topic and cg_key_points:
-                    with st.spinner("ARCHITECTING CONTENT..."):
+            if st.button("GENERATE OPTIONS", type="primary", use_container_width=True):
+                if sm_topic:
+                    with st.spinner("SCANNING TRENDS & DRAFTING..."):
                         
                         # --- SMART CONTEXT BUILDING ---
                         inputs = profile_data.get('inputs', {})
                         
-                        # 1. Clean Base64 noise (Safety)
+                        # 1. Clean Base64 noise
                         def clean_dna(text):
                             if not text: return ""
                             return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
 
-                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
+                        social_dna = clean_dna(inputs.get('social_dna', ''))
                         
-                        # 2. Build the "Targeted Prompt"
+                        # 2. Build the "Social Prompt"
                         prof_text = f"""
                         STRATEGY:
                         - Mission: {inputs.get('wiz_mission', '')}
                         - Tone Keywords: {inputs.get('wiz_tone', '')}
                         
-                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
-                        {voice_dna}
+                        SOCIAL MEDIA DNA (SUCCESSFUL PATTERNS):
+                        {social_dna}
                         
                         CRITICAL GUARDRAILS (DO NOT VIOLATE):
                         {inputs.get('wiz_guardrails', '')}
                         """
                         
-                        # Engineered Prompt (Constraint-Based)
-                        prompt_wrapper = f"""
-                        CONTEXT:
-                        - Type: {content_type}
-                        - Length: {length}
-                        - Sender: {sender}
-                        - Audience: {audience}
+                        # 3. Image Analysis (if present)
+                        image_desc = "No image provided."
+                        if uploaded_image:
+                            img = Image.open(uploaded_image)
+                            image_desc = logic_engine.analyze_social_post(img)
                         
-                        CORE TASK: Write a {content_type} about "{cg_topic}".
-                        
-                        STRICT CONSTRAINTS:
-                        1. You must cover these KEY POINTS:
-                        {cg_key_points}
-                        2. Do NOT invent facts outside these points.
-                        3. Use the Brand Voice defined below.
-                        4. Adhere to all CRITICAL GUARDRAILS.
-                        
-                        STEP 1: STRATEGY
-                        Briefly outline the tone and structure you will use to meet the audience's needs.
-                        
-                        STEP 2: DRAFT
-                        Write the content.
-                        
-                        OUTPUT FORMAT:
-                        STRATEGY:
-                        [Reasoning]
-                        DRAFT:
-                        [Content]
-                        """
+                        # 4. Engineered Prompt (Trend-Aware)
+                        prompt = (
+                            f"ROLE: Expert Social Media Manager for the brand defined below.\n"
+                            f"PLATFORM: {platform} (Adhere strictly to character limits and cultural norms).\n"
+                            f"GOAL: {goal}\n"
+                            f"TOPIC: {sm_topic}\n"
+                            f"IMAGE CONTEXT: {image_desc}\n\n"
+                            
+                            "STEP 0: TREND CHECK (CRITICAL)\n"
+                            f"Using Google Search, identify 3 currently trending hashtags or conversation topics related to '{sm_topic}' on {platform}. "
+                            "If relevant, integrate these into the posts to maximize visibility.\n\n"
+                            
+                            "TASK: Generate 3 distinct post options.\n\n"
+                            
+                            "OPTION 1: THE STORYTELLER\n"
+                            "- Focus: Narrative, emotive, connects topic to brand values.\n"
+                            "- Structure: Long-form (if platform allows), spacing for readability.\n\n"
+                            
+                            "OPTION 2: THE PROVOCATEUR\n"
+                            "- Focus: Pattern interrupt, hot take, or question.\n"
+                            "- Structure: Short, punchy, designed to stop the scroll.\n\n"
+                            
+                            "OPTION 3: THE VALUE-ADD\n"
+                            "- Focus: Educational, utility, 'Save this post'.\n"
+                            "- Structure: Bullet points or actionable advice.\n\n"
+                            
+                            "OUTPUT FORMAT:\n"
+                            "Strictly separate options with '|||'.\n"
+                            "Example: Option 1 Content ||| Option 2 Content ||| Option 3 Content\n"
+                            "IMPORTANT: Append the 'Trending Hashtags' you found to the bottom of the best-suited option."
+                        )
                         
                         try:
-                            # Use content generator logic
-                            full_response = logic_engine.run_content_generator(cg_topic, content_type, cg_key_points, prof_text)
+                            # We use the content generator method as a wrapper (it uses the Search Model)
+                            response = logic_engine.run_content_generator("Social Post", platform, prompt, prof_text)
                             
-                            # Heuristic Parsing
-                            if "DRAFT:" in full_response:
-                                parts = full_response.split("DRAFT:")
-                                rationale = parts[0].replace("STRATEGY:", "").strip()
-                                draft = parts[1].strip()
-                            else:
-                                rationale = "Generated based on key points."
-                                draft = full_response
+                            # Parse
+                            options = response.split("|||")
+                            # Fallback if split fails
+                            if len(options) < 3: options = [response, "Option 2 Generation Failed", "Option 3 Generation Failed"]
                             
-                            # Update State
-                            st.session_state['cg_result'] = draft
-                            st.session_state['cg_rationale'] = rationale
+                            st.session_state['sm_results'] = options
                             
-                            # LOGGING
+                            # Log
                             if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
                             from datetime import datetime
-                            
                             log_entry = {
                                 "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "GENERATOR",
-                                "name": f"{content_type}: {cg_topic}",
-                                "score": metrics['score'], # Log the SPECIFIC confidence score
+                                "type": "SOCIAL GEN",
+                                "name": f"{platform}: {sm_topic}",
+                                "score": metrics['score'],
                                 "verdict": "CREATED",
-                                "result_data": draft,
+                                "result_data": response,
                                 "image_data": None
                             }
                             st.session_state['activity_log'].insert(0, log_entry)
@@ -2135,23 +2053,22 @@ elif app_mode == "CONTENT GENERATOR":
                         except Exception as e:
                             st.error(f"Error: {e}")
                 else:
-                    st.warning("Topic and Key Points are required.")
+                    st.warning("Please enter a topic.")
 
-        # --- 3. OUTPUT DISPLAY ---
-        if st.session_state['cg_result']:
+        # --- OUTPUT DISPLAY ---
+        if st.session_state['sm_results']:
             st.divider()
+            st.subheader("CAMPAIGN OPTIONS")
             
-            if st.session_state['cg_rationale']:
-                st.markdown(f"""
-                    <div class="rationale-box">
-                        <strong>GENERATION STRATEGY:</strong><br>
-                        {st.session_state['cg_rationale']}
-                    </div>
-                """, unsafe_allow_html=True)
+            t1, t2, t3 = st.tabs(["THE STORYTELLER", "THE PROVOCATEUR", "THE VALUE-ADD"])
             
-            st.subheader("FINAL DRAFT")
-            st.text_area("Copy to Clipboard", value=st.session_state['cg_result'], height=500)
-
+            with t1:
+                st.text_area("Narrative Focus", value=st.session_state['sm_results'][0].strip(), height=400)
+            with t2:
+                st.text_area("Engagement Focus", value=st.session_state['sm_results'][1].strip(), height=400)
+            with t3:
+                st.text_area("Utility Focus", value=st.session_state['sm_results'][2].strip(), height=400)
+                
 # 5. SOCIAL MEDIA ASSISTANT (Platform-Aware, Goal-Oriented, Trend-Aware)
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
@@ -3310,6 +3227,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
