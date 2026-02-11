@@ -2447,8 +2447,9 @@ elif app_mode == "BRAND MANAGER":
             return None
 
     def parse_assets_from_text(text_blob):
-        """Splits the DNA text block into assets and extracts visual tags."""
+        """Splits the DNA text block into manageable assets based on headers."""
         if not text_blob: return []
+        # Split by the divider line we used
         raw_assets = text_blob.split("----------------\n")
         parsed = []
         for asset in raw_assets:
@@ -2473,6 +2474,26 @@ elif app_mode == "BRAND MANAGER":
                     "image": img_data
                 })
         return parsed
+
+    def update_calibration_score(profile_obj):
+        """Recalculates the profile completeness score based on inputs."""
+        inputs = profile_obj.get('inputs', {})
+        score = 0
+        
+        # 1. Basics (40%)
+        if inputs.get('wiz_name'): score += 10
+        if inputs.get('wiz_mission'): score += 10
+        if inputs.get('wiz_values'): score += 10
+        if inputs.get('wiz_archetype'): score += 10
+        
+        # 2. DNA Layers (60%)
+        # Check if length > 50 chars (arbitrary minimum for "real" content)
+        if len(inputs.get('social_dna', '')) > 50: score += 20
+        if len(inputs.get('voice_dna', '')) > 50: score += 20
+        if len(inputs.get('visual_dna', '')) > 50: score += 20
+        
+        profile_obj['calibration_score'] = min(score, 100)
+        return profile_obj
 
     if st.session_state['profiles']:
         p_keys = list(st.session_state['profiles'].keys())
@@ -2576,9 +2597,13 @@ elif app_mode == "BRAND MANAGER":
                             injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}{vis_ref}\n----------------\n"
                             
                             inputs['social_dna'] += injection
+                            
+                            # UPDATE SCORE
+                            profile_obj = update_calibration_score(profile_obj)
+                            
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_social_analysis'] = ""
-                            st.success("Asset Injected.")
+                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
                     
                     # LIBRARY VIEW
@@ -2601,6 +2626,7 @@ elif app_mode == "BRAND MANAGER":
                                 with c_del:
                                     if st.button("DELETE", key=f"del_soc_{i}", type="secondary"):
                                         inputs['social_dna'] = inputs['social_dna'].replace(asset['full_text'], "")
+                                        profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
                                         st.rerun()
                     else:
@@ -2645,9 +2671,13 @@ elif app_mode == "BRAND MANAGER":
                             injection = f"\n\n[ASSET: {voice_type.upper()} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
                             
                             inputs['voice_dna'] += injection
+                            
+                            # UPDATE SCORE
+                            profile_obj = update_calibration_score(profile_obj)
+                            
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_voice_analysis'] = ""
-                            st.success("Asset Injected.")
+                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
 
                     # LIBRARY VIEW
@@ -2660,11 +2690,12 @@ elif app_mode == "BRAND MANAGER":
                                 st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
                                 c_txt, c_del = st.columns([4,1])
                                 with c_txt:
-                                    with st.expander("View Analysis"):
+                                    with st.expander("View Analysis Content"):
                                         st.text(asset['content'])
                                 with c_del:
                                     if st.button("DELETE", key=f"del_voc_{i}", type="secondary"):
                                         inputs['voice_dna'] = inputs['voice_dna'].replace(asset['full_text'], "")
+                                        profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
                                         st.rerun()
                     else:
@@ -2702,9 +2733,13 @@ elif app_mode == "BRAND MANAGER":
                             injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}{vis_ref}\n----------------\n"
                             
                             inputs['visual_dna'] += injection
+                            
+                            # UPDATE SCORE
+                            profile_obj = update_calibration_score(profile_obj)
+                            
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_vis_analysis'] = ""
-                            st.success("Asset Injected.")
+                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
 
                     # LIBRARY VIEW
@@ -2727,6 +2762,7 @@ elif app_mode == "BRAND MANAGER":
                                 with c_del:
                                     if st.button("DELETE", key=f"del_vis_{i}", type="secondary"):
                                         inputs['visual_dna'] = inputs['visual_dna'].replace(asset['full_text'], "")
+                                        profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
                                         st.rerun()
                     else:
@@ -2757,8 +2793,10 @@ elif app_mode == "BRAND MANAGER":
                     p_p = ", ".join(inputs['palette_primary'])
                     p_s = ", ".join(inputs['palette_secondary'])
                     
+                    # 2. Update Score
+                    profile_obj = update_calibration_score(profile_obj)
+                    
                     # 3. Rebuild Final Text (The Full Brand Kit)
-                    # Note: We parse out the visual refs so the LLM doesn't see base64 strings in the prompt context later
                     
                     def clean_dna_for_llm(text):
                         """Removes base64 images from text before sending to LLM context."""
@@ -2800,7 +2838,7 @@ elif app_mode == "BRAND MANAGER":
                     # 4. DB Commit
                     db.save_profile(st.session_state['user_id'], target, profile_obj)
                     
-                    st.success("UPDATED & REBUILT")
+                    st.success(f"Strategy Saved. Calibration Score: {profile_obj.get('calibration_score', 0)}%")
                     st.rerun()
 
             else:
@@ -2913,6 +2951,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
