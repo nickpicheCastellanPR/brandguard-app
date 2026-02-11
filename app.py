@@ -2115,51 +2115,64 @@ elif app_mode == "BRAND ARCHITECT":
                             st.session_state['wiz_samples_list'].pop(i)
                             st.rerun()
 
-        with st.expander("3. SOCIAL MEDIA (GOLD STANDARD)"):
+        with st.expander("3. SOCIAL MEDIA (GOLD STANDARD)", expanded=True):
             st.caption("Upload 'Representative' posts that capture your ideal look & feel.")
             
-            s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
-            s_key = f"social_up_{st.session_state['social_uploader_key']}"
-            s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook"], key="wiz_social_platform")
+            with c2:
+                s_key = f"social_up_{st.session_state['social_uploader_key']}"
+                s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
             
-            # INLINE ANALYSIS LOGIC (Smart Ingestion)
-            if st.button("ANALYZE & ADD SAMPLE"):
-                if s_file:
-                    with st.spinner("EXTRACTING VISUAL DNA..."):
-                        try:
-                            # 1. Analyze Immediately
-                            img_obj = Image.open(s_file)
-                            analysis_result = logic_engine.analyze_social_post(img_obj)
-                            
-                            # 2. Store with Analysis
-                            entry = {
-                                "file": s_file,
-                                "platform": s_plat,
-                                "analysis": analysis_result
-                            }
-                            st.session_state['wiz_social_list'].append(entry)
-                            
-                            # 3. Reset Uploader
-                            st.session_state['social_uploader_key'] += 1
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Analysis Failed: {e}")
-                else:
-                    st.warning("Please upload an image first.")
+            # STATEFUL ANALYSIS PREVIEW
+            if 'temp_social_analysis' not in st.session_state: st.session_state['temp_social_analysis'] = ""
+            
+            if s_file and st.button("ANALYZE POST"):
+                with st.spinner("REVERSE ENGINEERING STRATEGY..."):
+                    img = Image.open(s_file)
+                    # Use the NEW Strict Method
+                    st.session_state['temp_social_analysis'] = logic_engine.analyze_social_style(img)
+            
+            # THE FEEDBACK LOOP
+            if st.session_state['temp_social_analysis']:
+                st.markdown("#### 🧬 AI FINDINGS (REVIEW & EDIT)")
+                st.caption("The AI extracted this strategy from your image. Edit it to ensure accuracy.")
+                
+                edited_analysis = st.text_area(
+                    "SOCIAL DNA", 
+                    value=st.session_state['temp_social_analysis'], 
+                    height=150,
+                    key="social_edit_box"
+                )
+                
+                if st.button("CONFIRM & ADD TO DNA", type="primary"):
+                    entry = {
+                        "file": s_file,
+                        "platform": s_plat,
+                        "analysis": edited_analysis # Save the EDITED version
+                    }
+                    st.session_state['wiz_social_list'].append(entry)
+                    st.session_state['temp_social_analysis'] = "" # Reset
+                    st.session_state['social_uploader_key'] += 1 # Reset Uploader
+                    st.success("Added to Social DNA Buffer")
+                    st.rerun()
 
+            # BUFFER DISPLAY
             if st.session_state['wiz_social_list']:
                 st.divider()
-                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} ANALYZED POSTS**")
+                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} CONFIRMED POSTS**")
                 for i, item in enumerate(st.session_state['wiz_social_list']):
-                    c1, c2 = st.columns([4,1])
-                    with c1: 
-                        st.markdown(f"**{item['platform']}**")
-                        # Show the AI Recap to build trust
-                        st.caption(f"🤖 *AI Recap:* \"{item['analysis'][:100]}...\"")
-                    with c2: 
-                        if st.button("REMOVE", key=f"del_social_{i}", type="secondary"):
-                            st.session_state['wiz_social_list'].pop(i)
-                            st.rerun()
+                    with st.container():
+                        c1, c2 = st.columns([4,1])
+                        with c1: 
+                            st.markdown(f"**{item['platform']}**")
+                            st.caption(item['analysis'])
+                        with c2: 
+                            if st.button("REMOVE", key=f"del_social_{i}", type="secondary"):
+                                st.session_state['wiz_social_list'].pop(i)
+                                st.rerun()
+                        st.divider()
             
         with st.expander("4. VISUALS (DYNAMIC PALETTE)"):
             st.markdown("##### LOGO")
@@ -2534,6 +2547,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
