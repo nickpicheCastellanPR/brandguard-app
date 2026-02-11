@@ -1440,7 +1440,7 @@ elif app_mode == "COPY EDITOR":
             # Update state on change
             st.session_state['ce_draft'] = draft_input
             
-            # Context Inputs (No Social Caption - Moved to separate module)
+            # Context Inputs (Synced with Helper Function)
             cc1, cc2, cc3 = st.columns(3)
             with cc1: 
                 # TRIGGER: Changing this updates the Confidence Meter
@@ -1449,10 +1449,9 @@ elif app_mode == "COPY EDITOR":
                     "Press Release", 
                     "Blog Post", 
                     "Executive Memo", 
-                    "Website Copy",
-                    "Crisis Statement",     
-                    "Speech / Script",      
-                    "FAQ / Knowledge Base"  
+                    "Crisis Statement",      
+                    "Speech / Script",       
+                    "Social Campaign (Multi-Channel)"  
                 ])
             with cc2: 
                 sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
@@ -1472,6 +1471,7 @@ elif app_mode == "COPY EDITOR":
                     <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
                 </div>
                 <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+                <div style="font-size:0.7rem; color:#a0a0a0; margin-top:8px; line-height:1.2;"><em>{metrics['rationale']}</em></div>
             </div>""", unsafe_allow_html=True)
             
             # Dynamic Call to Action
@@ -1479,8 +1479,7 @@ elif app_mode == "COPY EDITOR":
                 st.markdown(f"""
                     <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
                         <strong>Optimization Tip:</strong><br>
-                        This format requires strong <em>{metrics['action'].split(' ')[-1]}</em> data. 
-                        Consider updating the profile.
+                        {metrics['action']}
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -1526,6 +1525,7 @@ elif app_mode == "COPY EDITOR":
                         
                         # Call Logic
                         try:
+                            # Use Safe Generate Wrapper
                             full_response = logic_engine.run_copy_editor(prompt_wrapper, prof_text)
                             
                             # Parse Split (Heuristic)
@@ -1591,7 +1591,7 @@ elif app_mode == "COPY EDITOR":
                 with d2:
                     st.caption("REWRITTEN")
                     st.success(st.session_state['ce_result'])
-
+                    
 # 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
 elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
@@ -2499,6 +2499,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
