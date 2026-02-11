@@ -2201,7 +2201,8 @@ elif app_mode == "BRAND MANAGER":
                 # STATEFUL PREVIEW
                 if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
                 
-                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST"):
+                # CHANGED TO PRIMARY FOR VISIBILITY
+                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary"):
                     with st.spinner("REVERSE ENGINEERING..."):
                         img = Image.open(cal_img)
                         # STRICT ANALYSIS (No Generation)
@@ -2209,7 +2210,8 @@ elif app_mode == "BRAND MANAGER":
                 
                 # FEEDBACK LOOP
                 if st.session_state['man_social_analysis']:
-                    st.markdown("#### 🧬 REVIEW FINDINGS")
+                    # REMOVED EMOJI
+                    st.markdown("#### REVIEW FINDINGS")
                     final_dna_snippet = st.text_area("EDIT STRATEGY BEFORE SAVING", value=st.session_state['man_social_analysis'], height=150)
                     
                     if st.button("CONFIRM & INJECT DNA", type="primary"):
@@ -2388,6 +2390,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
