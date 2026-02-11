@@ -1971,342 +1971,6 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             with t3:
                 st.text_area("Utility Focus", value=st.session_state['sm_results'][2].strip(), height=400)
 
-# 6. BRAND ARCHITECT
-elif app_mode == "BRAND ARCHITECT":
-    st.title("BRAND ARCHITECT")
-    
-    # --- CSS INJECTION FOR VISIBILITY ---
-    st.markdown("""
-        <style>
-        div.stButton > button[kind="primary"] {
-            background-color: #ab8f59 !important;
-            color: #1b2a2e !important;
-            border: none !important;
-            font-weight: 800 !important;
-        }
-        div.stButton > button[kind="primary"]:hover {
-            background-color: #f0c05a !important;
-            color: #1b2a2e !important;
-        }
-        div.stButton > button[kind="primary"] p {
-            color: #1b2a2e !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    def extract_and_map_pdf():
-        # This runs BEFORE the page redraws
-        uploaded_file = st.session_state.get('arch_pdf_uploader')
-        if uploaded_file:
-            try:
-                # USE logic_engine (The Class Instance), not logic (The Module)
-                raw_text = logic_engine.extract_text_from_pdf(uploaded_file)
-                data = logic_engine.generate_brand_rules_from_pdf(raw_text)
-                
-                # Update Session State safely
-                st.session_state['wiz_name'] = data.get('wiz_name', '')
-                st.session_state['wiz_mission'] = data.get('wiz_mission', '')
-                
-                # --- HEX CODE EXTRACTION (OVERWRITE MODE) ---
-                # 1. Clear Defaults
-                st.session_state['palette_primary'] = []
-                st.session_state['palette_secondary'] = []
-                st.session_state['palette_accent'] = [] 
-
-                # 2. Map Primary
-                if 'palette_primary' in data and isinstance(data['palette_primary'], list):
-                    valid_hex = [c for c in data['palette_primary'] if isinstance(c, str) and c.startswith('#')]
-                    st.session_state['palette_primary'] = valid_hex[:5]
-                
-                # Fallback to black if empty
-                if not st.session_state['palette_primary']:
-                    st.session_state['palette_primary'] = ["#000000"]
-
-                # 3. Map Secondary
-                if 'palette_secondary' in data and isinstance(data['palette_secondary'], list):
-                    valid_hex = [c for c in data['palette_secondary'] if isinstance(c, str) and c.startswith('#')]
-                    st.session_state['palette_secondary'] = valid_hex[:5]
-                # -------------------------------
-                
-                # Sanitize List Fields
-                raw_tone = data.get('wiz_tone', '')
-                if isinstance(raw_tone, list):
-                    st.session_state['wiz_tone'] = ", ".join([str(t) for t in raw_tone])
-                else:
-                    st.session_state['wiz_tone'] = str(raw_tone) if raw_tone else ""
-
-                raw_values = data.get('wiz_values', '')
-                if isinstance(raw_values, list):
-                    st.session_state['wiz_values'] = ", ".join([str(v) for v in raw_values])
-                else:
-                    st.session_state['wiz_values'] = str(raw_values) if raw_values else ""
-
-                raw_guard = data.get('wiz_guardrails', '')
-                if isinstance(raw_guard, list):
-                    st.session_state['wiz_guardrails'] = "\n".join([str(g) for g in raw_guard])
-                else:
-                    st.session_state['wiz_guardrails'] = str(raw_guard) if raw_guard else ""
-
-                # Match Archetype
-                suggested_arch = data.get('wiz_archetype')
-                if suggested_arch in ARCHETYPES:
-                    st.session_state['wiz_archetype'] = suggested_arch
-                
-                st.session_state['extraction_success'] = True
-                
-            except Exception as e:
-                st.session_state['extraction_error'] = str(e)
-            
-    # PERSISTENCE HANDLED AUTOMATICALLY UPON GENERATION NOW
-    st.info("Profiles are automatically saved to your account upon generation.")
-    
-    tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
-    with tab1:
-        with st.expander("1. STRATEGY (CORE)", expanded=True):
-            st.text_input("BRAND NAME", key="wiz_name")
-            c1, c2 = st.columns(2)
-            def format_archetype(option):
-                if option in ARCHETYPE_INFO:
-                    return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
-                return option
-
-            with c1: 
-                selected_arch = st.selectbox(
-                    "ARCHETYPE *", 
-                    options=ARCHETYPES, 
-                    index=None, 
-                    placeholder="SELECT...", 
-                    key="wiz_archetype",
-                    format_func=format_archetype
-                )
-            if selected_arch:
-                info = ARCHETYPE_INFO[selected_arch]
-                st.markdown(f"""
-                    <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 15px; margin-top: 10px; margin-bottom: 20px; border-radius: 0 4px 4px 0;">
-                        <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE VIBE:</strong>
-                        <span style="color: #5c6b61; font-size: 0.9rem;">{info['desc']}</span>
-                        <div style="margin-top: 8px; font-size: 0.8rem; color: #888;">
-                            <em>Real World Examples: {info['examples']}</em>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with c2: st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold", key="wiz_tone")
-            st.text_area("MISSION STATEMENT", key="wiz_mission")
-            st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values")
-            st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis.", key="wiz_guardrails")
-            
-        with st.expander("2. VOICE & CALIBRATION"):
-            st.caption("Upload existing content to train the engine on your voice.")
-            st.selectbox("CONTENT TYPE", ["Internal Email", "Executive Memo", "Press Release", "Article/Blog", "Social Post", "Website Copy", "Other"], key="wiz_sample_type")
-            v_tab1, v_tab2 = st.tabs(["PASTE TEXT", "UPLOAD FILE"])
-            with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150)
-            with v_tab2:
-                u_key = f"uploader_{st.session_state['file_uploader_key']}"
-                st.file_uploader("UPLOAD (PDF, DOCX, TXT, IMG)", type=["pdf", "docx", "txt", "png", "jpg"], key=u_key)
-            st.button("ADD SAMPLE", on_click=add_voice_sample_callback)
-            if st.session_state['wiz_samples_list']: 
-                st.divider()
-                st.markdown(f"**VOICE BUFFER: {len(st.session_state['wiz_samples_list'])} SAMPLES**")
-                for i, sample in enumerate(st.session_state['wiz_samples_list']):
-                    col_text, col_del = st.columns([4, 1])
-                    with col_text: st.caption(f"> {sample.splitlines()[0]}")
-                    with col_del:
-                        if st.button("REMOVE", key=f"del_sample_{i}", type="secondary"):
-                            st.session_state['wiz_samples_list'].pop(i)
-                            st.rerun()
-
-        with st.expander("3. SOCIAL MEDIA (GOLD STANDARD)", expanded=True):
-            st.caption("Upload 'Representative' posts that capture your ideal look & feel.")
-            
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook"], key="wiz_social_platform")
-            with c2:
-                s_key = f"social_up_{st.session_state['social_uploader_key']}"
-                s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
-            
-            # STATEFUL ANALYSIS PREVIEW
-            if 'temp_social_analysis' not in st.session_state: st.session_state['temp_social_analysis'] = ""
-            
-            if s_file and st.button("ANALYZE POST"):
-                with st.spinner("REVERSE ENGINEERING STRATEGY..."):
-                    img = Image.open(s_file)
-                    # Use the NEW Strict Method
-                    st.session_state['temp_social_analysis'] = logic_engine.analyze_social_style(img)
-            
-            # THE FEEDBACK LOOP
-            if st.session_state['temp_social_analysis']:
-                st.markdown("#### 🧬 AI FINDINGS (REVIEW & EDIT)")
-                st.caption("The AI extracted this strategy from your image. Edit it to ensure accuracy.")
-                
-                edited_analysis = st.text_area(
-                    "SOCIAL DNA", 
-                    value=st.session_state['temp_social_analysis'], 
-                    height=150,
-                    key="social_edit_box"
-                )
-                
-                if st.button("CONFIRM & ADD TO DNA", type="primary"):
-                    entry = {
-                        "file": s_file,
-                        "platform": s_plat,
-                        "analysis": edited_analysis # Save the EDITED version
-                    }
-                    st.session_state['wiz_social_list'].append(entry)
-                    st.session_state['temp_social_analysis'] = "" # Reset
-                    st.session_state['social_uploader_key'] += 1 # Reset Uploader
-                    st.success("Added to Social DNA Buffer")
-                    st.rerun()
-
-            # BUFFER DISPLAY
-            if st.session_state['wiz_social_list']:
-                st.divider()
-                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} CONFIRMED POSTS**")
-                for i, item in enumerate(st.session_state['wiz_social_list']):
-                    with st.container():
-                        c1, c2 = st.columns([4,1])
-                        with c1: 
-                            st.markdown(f"**{item['platform']}**")
-                            st.caption(item['analysis'])
-                        with c2: 
-                            if st.button("REMOVE", key=f"del_social_{i}", type="secondary"):
-                                st.session_state['wiz_social_list'].pop(i)
-                                st.rerun()
-                        st.divider()
-            
-        with st.expander("4. VISUALS (DYNAMIC PALETTE)"):
-            st.markdown("##### LOGO")
-            l_key = f"logo_up_{st.session_state['logo_uploader_key']}"
-            st.file_uploader("UPLOAD LOGO", type=["png", "jpg", "svg"], key=l_key)
-            st.button("ADD LOGO", on_click=add_logo_callback)
-            if st.session_state['wiz_logo_list']:
-                st.divider()
-                st.markdown(f"**LOGO BUFFER: {len(st.session_state['wiz_logo_list'])} FILES**")
-                for i, item in enumerate(st.session_state['wiz_logo_list']):
-                    c1, c2 = st.columns([4,1])
-                    with c1: st.caption(f"> {item['file'].name}")
-                    with c2: 
-                        if st.button("REMOVE", key=f"del_logo_{i}", type="secondary"):
-                            st.session_state['wiz_logo_list'].pop(i)
-                            st.rerun()
-            st.divider()
-            
-            st.markdown("##### COLOR PALETTE")
-            st.caption("Press 'Enter' after pasting a hex code for it to register.")
-            
-            st.markdown("**PRIMARY COLORS**")
-            for i, color in enumerate(st.session_state['palette_primary']):
-                c1, c2 = st.columns([4,1])
-                with c1: st.session_state['palette_primary'][i] = st.color_picker(f"Primary {i+1}", color, key=f"p_{i}")
-                with c2:
-                    if st.button("REMOVE", key=f"del_p_{i}", type="secondary"):
-                        remove_palette_color('palette_primary', i)
-                        st.rerun()
-            st.button("ADD PRIMARY COLOR", on_click=add_palette_color, args=('palette_primary',))
-            
-            st.markdown("---")
-            st.markdown("**SECONDARY COLORS**")
-            for i, color in enumerate(st.session_state['palette_secondary']):
-                c1, c2 = st.columns([4,1])
-                with c1: st.session_state['palette_secondary'][i] = st.color_picker(f"Secondary {i+1}", color, key=f"s_{i}")
-                with c2:
-                    if st.button("REMOVE", key=f"del_s_{i}", type="secondary"):
-                        remove_palette_color('palette_secondary', i)
-                        st.rerun()
-            st.button("ADD SECONDARY COLOR", on_click=add_palette_color, args=('palette_secondary',))
-            
-            st.markdown("---")
-            st.markdown("**ACCENT COLORS**")
-            for i, color in enumerate(st.session_state['palette_accent']):
-                c1, c2 = st.columns([4,1])
-                with c1: st.session_state['palette_accent'][i] = st.color_picker(f"Accent {i+1}", color, key=f"a_{i}")
-                with c2:
-                    if st.button("REMOVE", key=f"del_a_{i}", type="secondary"):
-                        remove_palette_color('palette_accent', i)
-                        st.rerun()
-            st.button("ADD ACCENT COLOR", on_click=add_palette_color, args=('palette_accent',))
-
-        if st.button("GENERATE SYSTEM", type="primary"):
-            if not st.session_state.get("wiz_name") or not st.session_state.get("wiz_archetype"): st.error("NAME/ARCHETYPE REQUIRED")
-            else:
-                with st.spinner("CALIBRATING..."):
-                    try:
-                        palette_str = f"Primary: {', '.join(st.session_state['palette_primary'])}. Secondary: {', '.join(st.session_state['palette_secondary'])}. Accents: {', '.join(st.session_state['palette_accent'])}."
-                        
-                        logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic_engine.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
-                        logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
-                        
-                        # USE PRE-ANALYZED SOCIAL DATA
-                        # We don't re-run analysis here. We use the stored 'analysis' string.
-                        social_desc_list = [f"Platform: {item['platform']}.\nAnalysis: {item['analysis']}" for item in st.session_state['wiz_social_list']]
-                        social_summary = "\n---\n".join(social_desc_list) if social_desc_list else "None provided."
-                        
-                        all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
-                        
-                        prompt = f"""
-                        SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
-                        1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
-                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
-                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social DNA: {social_summary}
-                        4. GUARDRAILS: {st.session_state.wiz_guardrails}
-                        """
-                        
-                        final_text_out = logic_engine.generate_brand_rules(prompt)
-                        
-                        profile_data = {
-                            "final_text": final_text_out,
-                            "inputs": {
-                                "wiz_name": st.session_state.wiz_name,
-                                "wiz_archetype": st.session_state.wiz_archetype,
-                                "wiz_tone": st.session_state.wiz_tone,
-                                "wiz_mission": st.session_state.wiz_mission,
-                                "wiz_values": st.session_state.wiz_values,
-                                "wiz_guardrails": st.session_state.wiz_guardrails,
-                                "palette_primary": st.session_state['palette_primary'],
-                                "palette_secondary": st.session_state['palette_secondary'],
-                                "palette_accent": st.session_state['palette_accent'],
-                                "social_dna": social_summary # PERSIST THE DNA
-                            }
-                        }
-                        
-                        profile_name = f"{st.session_state.wiz_name} (Gen)"
-                        st.session_state['profiles'][profile_name] = profile_data
-                        
-                        # SAVE TO DB
-                        db.save_profile(st.session_state['user_id'], profile_name, profile_data)
-                        
-                        # FORCE SWITCH TO NEW PROFILE
-                        st.session_state['active_profile_name'] = profile_name
-
-                        st.session_state['wiz_samples_list'] = []
-                        st.session_state['wiz_social_list'] = []
-                        st.session_state['wiz_logo_list'] = []
-                        st.success("CALIBRATED & SAVED TO DATABASE")
-                        st.rerun()
-                    except Exception as e:
-                        if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
-                        else: st.error(f"Error: {e}")
-
-    with tab2:
-        st.markdown("### AUTO-FILL FROM GUIDELINES")
-        st.caption("Upload a PDF to automatically populate the Wizard fields.")
-        
-        # The uploader needs the key match the callback
-        st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
-        
-        # The button simply triggers the callback
-        st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
-    
-        # Display Messages based on the flags set in callback
-        if st.session_state.get('extraction_success'):
-            st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
-            # Clear flag so it doesn't stay forever
-            st.session_state['extraction_success'] = False
-        
-        if st.session_state.get('extraction_error'):
-            st.error(f"Extraction Error: {st.session_state['extraction_error']}")
-            st.session_state['extraction_error'] = None
-
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
@@ -2347,6 +2011,7 @@ elif app_mode == "BRAND MANAGER":
                     info = ARCHETYPE_INFO[new_arch]
                     st.markdown(f"""
                         <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
+                            <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
                             <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
                         </div>
                     """, unsafe_allow_html=True)
@@ -2376,14 +2041,14 @@ elif app_mode == "BRAND MANAGER":
                 if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST"):
                     with st.spinner("REVERSE ENGINEERING..."):
                         img = Image.open(cal_img)
-                        # Use the NEW Strict Method
+                        # Use the NEW Strict Method (Visual AESTHETIC)
                         st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
                 
                 # FEEDBACK LOOP
                 if st.session_state['man_social_analysis']:
                     st.markdown("#### 🧬 REVIEW FINDINGS")
                     st.caption("Edit the analysis below to ensure it accurately reflects your strategy.")
-                    final_dna = st.text_area("EDIT STRATEGY BEFORE SAVING", value=st.session_state['man_social_analysis'], height=150)
+                    final_dna = st.text_area("EDIT STRATEGY BEFORE SAVING", value=st.session_state['man_social_analysis'], height=200)
                     
                     if st.button("CONFIRM & INJECT DNA", type="primary"):
                         # 1. Append to Final Text
@@ -2444,6 +2109,170 @@ elif app_mode == "BRAND MANAGER":
                 st.session_state['profiles'][target] = profile_obj
                 
                 # UPDATE DB
+                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                
+                st.success("UPDATED & REBUILT")
+                st.rerun()
+
+        else:
+            st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
+            new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
+            if st.button("SAVE RAW CHANGES"):
+                st.session_state['profiles'][target] = new_raw
+                db.save_profile(st.session_state['user_id'], target, new_raw)
+                st.success("SAVED")
+
+        if st.button("DELETE PROFILE"): 
+            del st.session_state['profiles'][target]
+            db.delete_profile(st.session_state['user_id'], target)
+            st.rerun()
+
+# 7. BRAND MANAGER
+elif app_mode == "BRAND MANAGER":
+    st.title("BRAND MANAGER")
+    if st.session_state['profiles']:
+        p_keys = list(st.session_state['profiles'].keys())
+        default_ix = 0
+        if st.session_state.get('active_profile_name') in p_keys:
+            default_ix = p_keys.index(st.session_state['active_profile_name'])
+        target = st.selectbox("PROFILE", p_keys, index=default_ix)
+        profile_obj = st.session_state['profiles'][target]
+        
+        is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
+        final_text_view = profile_obj['final_text'] if is_structured else profile_obj
+        
+        html_data = convert_to_html_brand_card(target, final_text_view)
+        st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", width="stretch")
+        
+        st.divider()
+        
+        if is_structured:
+            inputs = profile_obj['inputs']
+            
+            with st.expander("1. STRATEGY", expanded=True):
+                new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
+                idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
+                def format_archetype_edit(option):
+                    if option in ARCHETYPE_INFO:
+                        return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
+                    return option
+
+                new_arch = st.selectbox(
+                    "ARCHETYPE", 
+                    ARCHETYPES, 
+                    index=idx,
+                    format_func=format_archetype_edit
+                )
+                if new_arch:
+                    info = ARCHETYPE_INFO[new_arch]
+                    st.markdown(f"""
+                        <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
+                            <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
+                            <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                new_mission = st.text_area("MISSION", inputs['wiz_mission'])
+                new_values = st.text_area("VALUES", inputs['wiz_values'])
+            
+            with st.expander("2. VOICE"):
+                new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
+            
+            with st.expander("3. GUARDRAILS"):
+                new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
+            
+            # --- NEW: VISIBLE DNA EDITOR (Fixes the "Hidden Garbage" Issue) ---
+            with st.expander("4. SOCIAL DNA (CALIBRATION DATA)"):
+                st.caption("This is the 'Style Guide' the AI uses for social posts. Edit or clear this to refine your brand's visual/tonal instructions.")
+                # We default to existing, or empty string. We bind this to a key so we can read it on Save.
+                current_dna_val = inputs.get('social_dna', '')
+                st.text_area("STORED PATTERNS", value=current_dna_val, height=200, key="dna_editor")
+
+            # --- CALIBRATION LAB ---
+            st.markdown("### 🔬 CALIBRATION LAB")
+            st.info("Analyze new assets to append to your Social DNA.")
+            
+            with st.expander("INJECT 'GOLD STANDARD' SOCIAL ASSET", expanded=False):
+                c_plat, c_upl = st.columns(2)
+                with c_plat:
+                    cal_platform = st.selectbox("PLATFORM TO CALIBRATE", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"])
+                with c_upl:
+                    cal_img = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key="cal_uploader")
+                
+                # STATEFUL PREVIEW
+                if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
+                
+                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST"):
+                    with st.spinner("REVERSE ENGINEERING..."):
+                        img = Image.open(cal_img)
+                        # STRICT ANALYSIS (No Generation)
+                        st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                
+                # FEEDBACK LOOP
+                if st.session_state['man_social_analysis']:
+                    st.markdown("#### 🧬 REVIEW FINDINGS")
+                    final_dna_snippet = st.text_area("EDIT STRATEGY BEFORE SAVING", value=st.session_state['man_social_analysis'], height=150)
+                    
+                    if st.button("CONFIRM & INJECT DNA", type="primary"):
+                        # 1. Format the snippet
+                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {final_dna_snippet}\n----------------\n"
+                        
+                        # 2. Append to the inputs immediately
+                        existing_dna = profile_obj['inputs'].get('social_dna', '')
+                        profile_obj['inputs']['social_dna'] = existing_dna + injection
+                        
+                        # 3. Save to DB immediately so it persists
+                        st.session_state['profiles'][target] = profile_obj
+                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+                        
+                        st.session_state['man_social_analysis'] = "" # Reset
+                        st.success(f"SUCCESS: {cal_platform} patterns injected. Check 'SOCIAL DNA' above.")
+                        st.rerun()
+
+            st.divider()
+
+            if st.button("SAVE STRATEGY CHANGES"):
+                # 1. Update Inputs from UI
+                profile_obj['inputs']['wiz_name'] = new_name
+                profile_obj['inputs']['wiz_archetype'] = new_arch
+                profile_obj['inputs']['wiz_mission'] = new_mission
+                profile_obj['inputs']['wiz_values'] = new_values
+                profile_obj['inputs']['wiz_tone'] = new_tone
+                profile_obj['inputs']['wiz_guardrails'] = new_guard
+                
+                # CRITICAL: Save the DNA from the text area (allows clearing/editing)
+                # We use .get() on session_state to grab the widget's current value
+                new_dna_val = st.session_state.get('dna_editor', inputs.get('social_dna', ''))
+                profile_obj['inputs']['social_dna'] = new_dna_val
+                
+                p_p = ", ".join(inputs['palette_primary'])
+                p_s = ", ".join(inputs['palette_secondary'])
+                
+                # 2. Rebuild Final Text (Brand Kit)
+                new_text = f"""
+                1. STRATEGY
+                - Brand: {new_name}
+                - Archetype: {new_arch}
+                - Mission: {new_mission}
+                - Values: {new_values}
+                
+                2. VOICE
+                - Tone Keywords: {new_tone}
+                
+                3. VISUALS
+                - Primary: {p_p}
+                - Secondary: {p_s}
+                
+                4. GUARDRAILS
+                - {new_guard}
+                
+                5. SOCIAL DNA (CALIBRATION DATA)
+                {new_dna_val}
+                """
+                
+                profile_obj['final_text'] = new_text
+                st.session_state['profiles'][target] = profile_obj
+                
+                # 3. DB Commit
                 db.save_profile(st.session_state['user_id'], target, profile_obj)
                 
                 st.success("UPDATED & REBUILT")
@@ -2559,6 +2388,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
