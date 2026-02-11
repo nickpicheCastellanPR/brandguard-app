@@ -2380,7 +2380,7 @@ elif app_mode == "BRAND MANAGER":
             with st.expander("3. GUARDRAILS"):
                 new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
             
-            # --- NEW: UNIFIED DNA EDITOR ---
+            # --- NEW: UNIFIED DNA EDITOR (Fixes the "Hidden Garbage" Issue) ---
             with st.expander("4. BRAND DNA EDITORS (ADVANCED)"):
                 st.info("🗑️ **CLEANUP TASK:** Use these tabs to review or delete the 'Gold Standard' patterns the AI has learned.")
                 
@@ -2663,6 +2663,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
