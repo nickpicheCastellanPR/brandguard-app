@@ -1797,6 +1797,112 @@ elif app_mode == "CONTENT GENERATOR":
     if not is_admin and sub_status != 'active':
         show_paywall()
 
+    # --- HELPER: RISK vs ASSETS CONFIDENCE MODEL ---
+    def calculate_content_confidence(profile_data, content_type):
+        """
+        Calculates confidence based on the 'Risk vs. Assets' tiered model.
+        """
+        inputs = profile_data.get('inputs', {})
+        score = 0
+        cap = 100
+        rationale_parts = []
+        missing_parts = []
+        action = ""
+        
+        # Data Availability Checks
+        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
+        has_values = len(inputs.get('wiz_values', '')) > 10
+        has_tone = len(inputs.get('wiz_tone', '')) > 2
+        voice_dna_len = len(inputs.get('voice_dna', ''))
+        has_deep_voice = voice_dna_len > 1000
+        has_voice_samples = voice_dna_len > 50
+
+        # TIER 1: HIGH RISK (Crisis, Press Release)
+        if content_type in ["Crisis Statement", "Press Release"]:
+            score = 0 # Base 0
+            
+            if has_guardrails:
+                score += 40
+                rationale_parts.append("Guardrails")
+            else:
+                cap = 50
+                missing_parts.append("Guardrails (CRITICAL)")
+                action = "Add Guardrails in Strategy tab to unlock higher scores."
+            
+            if has_values:
+                score += 30
+                rationale_parts.append("Core Values")
+            else:
+                missing_parts.append("Core Values")
+                
+            if has_tone:
+                score += 20
+                rationale_parts.append("Tone")
+
+        # TIER 2: STRATEGIC INTERNAL (Memo, Email)
+        elif content_type in ["Executive Memo", "Internal Email"]:
+            score = 20 # Base 20
+            
+            if has_tone:
+                score += 30
+                rationale_parts.append("Tone Definitions")
+            else:
+                cap = 60
+                missing_parts.append("Tone Definitions (CRITICAL)")
+                action = "Define Tone Keywords in Strategy tab."
+            
+            if has_voice_samples:
+                score += 30
+                rationale_parts.append("Voice Samples")
+            else:
+                missing_parts.append("Voice Samples")
+
+        # TIER 3: CREATIVE / EXTERNAL (Blog, Social, Speech)
+        else:
+            score = 30 # Base 30
+            
+            if has_deep_voice:
+                score += 40
+                rationale_parts.append("Deep Voice Data")
+            elif has_voice_samples:
+                score += 20
+                rationale_parts.append("Basic Voice Data")
+            else:
+                cap = 50
+                missing_parts.append("Voice DNA (CRITICAL)")
+                action = "Upload more text samples to the Voice Calibration Lab."
+            
+            if has_tone:
+                score += 30
+                rationale_parts.append("Tone Guidelines")
+
+        # Final Calculation
+        final_score = min(score, cap)
+        
+        # Color Logic
+        color = "#ff4b4b" # Red
+        label = "LOW DATA"
+        if final_score > 50: 
+            color = "#ffa421" # Orange
+            label = "CALIBRATED"
+        if final_score > 75: 
+            color = "#09ab3b" # Green
+            label = "HIGH CONFIDENCE"
+
+        # Rationale String construction
+        using_str = ", ".join(rationale_parts) if rationale_parts else "Generic Model"
+        missing_str = ", ".join(missing_parts) if missing_parts else "None"
+        
+        full_rationale = f"Using: {using_str}. Missing: {missing_str}."
+
+        return {
+            "score": final_score,
+            "color": color,
+            "label": label,
+            "rationale": full_rationale,
+            "action": action
+        }
+
     if not active_profile:
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
@@ -1821,7 +1927,7 @@ elif app_mode == "CONTENT GENERATOR":
                 # Trigger for Dynamic Calibration
                 content_type = st.selectbox("FORMAT", [
                     "Press Release", "Internal Email", "Executive Memo", "Blog Post", 
-                    "Crisis Statement", "Speech / Script", "Social Campaign (Multi-Channel)"
+                    "Crisis Statement", "Speech / Script", "Social Campaign"
                 ])
             with cc2:
                 length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
@@ -1846,7 +1952,6 @@ elif app_mode == "CONTENT GENERATOR":
 
         with c2:
             # --- DYNAMIC CALIBRATION METER ---
-            # We calculate this ON THE FLY based on the 'content_type' selected above
             profile_data = st.session_state['profiles'][active_profile]
             metrics = calculate_content_confidence(profile_data, content_type)
             
@@ -1857,6 +1962,7 @@ elif app_mode == "CONTENT GENERATOR":
                     <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
                 </div>
                 <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+                <div style="font-size:0.7rem; color:#a0a0a0; margin-top:8px; line-height:1.2;"><em>{metrics['rationale']}</em></div>
             </div>""", unsafe_allow_html=True)
             
             # Dynamic Warning / Call to Action
@@ -1864,8 +1970,7 @@ elif app_mode == "CONTENT GENERATOR":
                 st.markdown(f"""
                     <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
                         <strong>Optimization Tip:</strong><br>
-                        This format requires strong <em>{metrics['action'].split(' ')[-1]}</em> data. 
-                        Consider updating the profile for better results.
+                        {metrics['action']}
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -1874,8 +1979,29 @@ elif app_mode == "CONTENT GENERATOR":
             if st.button("GENERATE DRAFT", type="primary", use_container_width=True):
                 if cg_topic and cg_key_points:
                     with st.spinner("ARCHITECTING CONTENT..."):
-                        # Get Rules
-                        prof_text = profile_data.get('final_text', str(profile_data))
+                        
+                        # --- SMART CONTEXT BUILDING ---
+                        inputs = profile_data.get('inputs', {})
+                        
+                        # 1. Clean Base64 noise (Safety)
+                        def clean_dna(text):
+                            if not text: return ""
+                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
+                        
+                        # 2. Build the "Targeted Prompt"
+                        prof_text = f"""
+                        STRATEGY:
+                        - Mission: {inputs.get('wiz_mission', '')}
+                        - Tone Keywords: {inputs.get('wiz_tone', '')}
+                        
+                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
+                        {voice_dna}
+                        
+                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
+                        {inputs.get('wiz_guardrails', '')}
+                        """
                         
                         # Engineered Prompt (Constraint-Based)
                         prompt_wrapper = f"""
@@ -1892,6 +2018,7 @@ elif app_mode == "CONTENT GENERATOR":
                         {cg_key_points}
                         2. Do NOT invent facts outside these points.
                         3. Use the Brand Voice defined below.
+                        4. Adhere to all CRITICAL GUARDRAILS.
                         
                         STEP 1: STRATEGY
                         Briefly outline the tone and structure you will use to meet the audience's needs.
@@ -3046,6 +3173,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
