@@ -2185,6 +2185,55 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
     if not is_admin and sub_status != 'active':
         show_paywall()
 
+    # --- HELPER: RESEARCH-BASED FEW-SHOT CONFIDENCE ---
+    def calculate_social_confidence(profile_data, target_platform):
+        """
+        Calculates confidence based on LMM Few-Shot Learning research.
+        Thresholds: 
+        - 0 Assets: Zero-Shot (Low Confidence)
+        - 1-2 Assets: One-Shot (Medium Confidence - Pattern Unstable)
+        - 3+ Assets: Few-Shot (High Confidence - Pattern Stable)
+        """
+        inputs = profile_data.get('inputs', {})
+        social_dna = inputs.get('social_dna', '')
+        
+        # 1. Count Specific Assets (The "N-Shot" Count)
+        clean_plat = target_platform.upper().split(" ")[0] # e.g. "LINKEDIN"
+        asset_count = social_dna.upper().count(f"ASSET: {clean_plat}")
+        
+        # 2. Determine Score & Rationale based on Research Thresholds
+        if asset_count >= 3:
+            # Few-Shot Threshold Met (Gold Standard)
+            score = 85
+            color = "#09ab3b" # Green
+            label = "HIGH CONFIDENCE"
+            rationale = f"Pattern Stability Achieved. {asset_count} {target_platform} assets found (Few-Shot threshold met)."
+            action = ""
+            
+        elif asset_count >= 1:
+            # One-Shot / Low-Shot (Unstable)
+            score = 55
+            color = "#ffa421" # Orange
+            label = "CALIBRATING"
+            rationale = f"Pattern Unstable. Only {asset_count} {target_platform} asset found. AI may overfit to this single example."
+            action = f"Upload {3 - asset_count} more {target_platform} screenshots to reach pattern stability."
+            
+        else:
+            # Zero-Shot (Generic)
+            score = 25
+            color = "#ff4b4b" # Red
+            label = "LOW DATA"
+            rationale = f"Zero-Shot Mode. No {target_platform} data found. Relying on generic best practices."
+            action = f"Upload at least 3 {target_platform} screenshots to train the engine."
+
+        return {
+            "score": score,
+            "color": color,
+            "label": label,
+            "rationale": rationale,
+            "action": action
+        }
+
     if not active_profile:
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
@@ -2223,18 +2272,19 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                     <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
                 </div>
                 <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+                <div style="font-size:0.7rem; color:#a0a0a0; margin-top:8px; line-height:1.2;"><em>{metrics['rationale']}</em></div>
             </div>""", unsafe_allow_html=True)
             
             # Warning Logic
             if metrics['action']:
                 st.markdown(f"""
                     <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
-                        <strong>Calibration Required:</strong><br>
-                        The engine has not analyzed any previous {platform} posts for this brand. Output will be generic.
+                        <strong>Optimization Tip:</strong><br>
+                        {metrics['action']}
                     </div>
                 """, unsafe_allow_html=True)
-                if st.button("UPLOAD SAMPLES", type="secondary"):
-                    st.session_state['app_mode'] = "BRAND ARCHITECT"
+                if st.button("GO TO CALIBRATION LAB", type="secondary"):
+                    st.session_state['app_mode'] = "BRAND MANAGER"
                     st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -2242,16 +2292,37 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             if st.button("GENERATE OPTIONS", type="primary", use_container_width=True):
                 if sm_topic:
                     with st.spinner("SCANNING TRENDS & DRAFTING..."):
-                        # 1. Image Analysis (if present)
+                        
+                        # --- SMART CONTEXT BUILDING ---
+                        inputs = profile_data.get('inputs', {})
+                        
+                        # 1. Clean Base64 noise
+                        def clean_dna(text):
+                            if not text: return ""
+                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                        social_dna = clean_dna(inputs.get('social_dna', ''))
+                        
+                        # 2. Build the "Social Prompt"
+                        prof_text = f"""
+                        STRATEGY:
+                        - Mission: {inputs.get('wiz_mission', '')}
+                        - Tone Keywords: {inputs.get('wiz_tone', '')}
+                        
+                        SOCIAL MEDIA DNA (SUCCESSFUL PATTERNS):
+                        {social_dna}
+                        
+                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
+                        {inputs.get('wiz_guardrails', '')}
+                        """
+                        
+                        # 3. Image Analysis (if present)
                         image_desc = "No image provided."
                         if uploaded_image:
                             img = Image.open(uploaded_image)
-                            image_desc = logic.analyze_social_post(img)
+                            image_desc = logic_engine.analyze_social_post(img)
                         
-                        # 2. Get Rules
-                        prof_text = profile_data.get('final_text', str(profile_data))
-                        
-                        # 3. Prompt Engineering (Strictly formatted for highlighter safety)
+                        # 4. Engineered Prompt (Trend-Aware)
                         prompt = (
                             f"ROLE: Expert Social Media Manager for the brand defined below.\n"
                             f"PLATFORM: {platform} (Adhere strictly to character limits and cultural norms).\n"
@@ -2284,8 +2355,8 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                         )
                         
                         try:
-                            # We use the content generator method as a wrapper (it now uses the Search Model)
-                            response = logic.run_content_generator("Social Post", platform, prompt, prof_text)
+                            # We use the content generator method as a wrapper (it uses the Search Model)
+                            response = logic_engine.run_content_generator("Social Post", platform, prompt, prof_text)
                             
                             # Parse
                             options = response.split("|||")
@@ -3239,6 +3310,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
