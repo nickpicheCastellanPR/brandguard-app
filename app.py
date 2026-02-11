@@ -2327,8 +2327,32 @@ elif app_mode == "BRAND MANAGER":
         div.stButton > button[kind="primary"] p {
             color: #1b2a2e !important;
         }
+        /* Asset Card Styling */
+        .asset-card {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid #ab8f59;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 0 4px 4px 0;
+        }
         </style>
     """, unsafe_allow_html=True)
+
+    # --- HELPER: ASSET PARSER ---
+    def parse_assets_from_text(text_blob):
+        """Splits the DNA text block into manageable assets based on headers."""
+        if not text_blob: return []
+        # Split by the divider line we used
+        raw_assets = text_blob.split("----------------\n")
+        parsed = []
+        for asset in raw_assets:
+            if "[ASSET:" in asset:
+                # Extract Title
+                lines = asset.strip().split('\n')
+                header = lines[0] # [ASSET: TYPE - NAME]
+                content = "\n".join(lines[1:])
+                parsed.append({"header": header, "content": content, "full_text": asset + "----------------\n"})
+        return parsed
 
     if st.session_state['profiles']:
         p_keys = list(st.session_state['profiles'].keys())
@@ -2389,146 +2413,179 @@ elif app_mode == "BRAND MANAGER":
                 with st.expander("3. GUARDRAILS"):
                     new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
                 
-                # --- CALIBRATION & ASSETS ---
-                st.markdown("### CALIBRATION LAB & ASSET LIBRARY")
-                st.info("Upload assets to train the engine. Manage your saved assets in the text windows below each section.")
+                # --- ASSET LIBRARY & CALIBRATION ---
+                st.markdown("### 📚 ASSET LIBRARY & CALIBRATION")
+                st.info("Manage the files and assets that train your brand engine.")
                 
-                cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL MEDIA", "VOICE & TONE", "VISUAL ID"])
+                lib_tab1, lib_tab2, lib_tab3 = st.tabs(["SOCIAL MEDIA", "VOICE & TONE", "VISUAL ID"])
                 
-                # --- 1. SOCIAL INJECTOR ---
-                with cal_tab1:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
-                    with c2:
-                        cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
-                    
-                    # Analysis State
-                    if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
-                    
-                    if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
-                        with st.spinner("REVERSE ENGINEERING..."):
-                            img = Image.open(cal_img)
-                            st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
-                    
-                    if st.session_state['man_social_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_social = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
-                        if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}\n----------------\n"
-                            
-                            # Append to Input
-                            current_dna = inputs.get('social_dna', '')
-                            profile_obj['inputs']['social_dna'] = current_dna + injection
-                            
-                            # Update Session for Text Area below
-                            st.session_state['editor_social'] = profile_obj['inputs']['social_dna']
-                            
-                            # Save to DB
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_social_analysis'] = ""
-                            st.success("Asset Injected.")
-                            st.rerun()
-                    
-                    st.divider()
-                    st.markdown("#### SOCIAL ASSET LOG")
-                    st.caption("This is the accumulated knowledge base for Social Media. Delete text blocks to remove assets.")
-                    # Use .get() with fallback to inputs to ensure persistence
-                    val_social = st.session_state.get('editor_social', inputs.get('social_dna', ''))
-                    st.text_area("SAVED SOCIAL PATTERNS", value=val_social, height=300, key="editor_social")
+                # --- 1. SOCIAL ---
+                with lib_tab1:
+                    # INJECTOR
+                    with st.expander("ADD NEW SOCIAL ASSET"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
+                        with c2:
+                            cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
+                        
+                        if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
+                        
+                        if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
+                            with st.spinner("REVERSE ENGINEERING..."):
+                                img = Image.open(cal_img)
+                                st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                        
+                        if st.session_state['man_social_analysis']:
+                            st.markdown("#### REVIEW FINDINGS")
+                            edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
+                            if st.button("CONFIRM & SAVE TO LIBRARY", type="primary"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}\n----------------\n"
+                                profile_obj['inputs']['social_dna'] = inputs.get('social_dna', '') + injection
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_social_analysis'] = ""
+                                st.success("Saved.")
+                                st.rerun()
 
-                # --- 2. VOICE INJECTOR ---
-                with cal_tab2:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
-                    with c2:
-                        v_file = st.file_uploader("UPLOAD TEXT SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
-                    
-                    if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
-                    
-                    if v_file and st.button("ANALYZE TONE", type="primary", key="btn_cal_voice"):
-                        with st.spinner("EXTRACTING LINGUISTIC PATTERNS..."):
-                            if v_file.type == "application/pdf":
-                                raw_txt = logic_engine.extract_text_from_pdf(v_file)
-                            else:
-                                raw_txt = str(v_file.read(), "utf-8")
-                            
-                            prompt = f"""
-                            TASK: Extract the 'Voice DNA' from this text.
-                            ROLE: Expert Linguist.
-                            CONSTRAINTS: No chat. No emojis. Bullet points only.
-                            INPUT TEXT: {raw_txt[:10000]}
-                            OUTPUT FORMAT:
-                            - SENTENCE STRUCTURE: (e.g. Complex, Fragmented)
-                            - VOCABULARY LEVEL: (e.g. Academic, Slang, Corporate)
-                            - RHETORICAL DEVICES: (e.g. Metaphors, Questions)
-                            - EMOTIONAL RESONANCE: (e.g. Urgent, Calm, Witty)
-                            """
-                            st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
+                    # LIBRARY VIEW
+                    social_assets = parse_assets_from_text(inputs.get('social_dna', ''))
+                    if social_assets:
+                        st.write(f"**{len(social_assets)} ASSETS ON FILE**")
+                        for i, asset in enumerate(social_assets):
+                            with st.container():
+                                col_txt, col_act = st.columns([5, 1])
+                                with col_txt:
+                                    st.markdown(f"**{asset['header']}**")
+                                    with st.expander("View Analysis"):
+                                        st.text(asset['content'])
+                                with col_act:
+                                    if st.button("DELETE", key=f"del_soc_{i}", type="secondary"):
+                                        new_dna = inputs.get('social_dna', '').replace(asset['full_text'], "")
+                                        profile_obj['inputs']['social_dna'] = new_dna
+                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                        st.rerun()
+                                st.divider()
+                    else:
+                        st.caption("No social assets calibrated yet.")
 
-                    if st.session_state['man_voice_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_voice = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
-                        if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {voice_type.upper()} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
-                            
-                            current_voice = inputs.get('voice_dna', '')
-                            profile_obj['inputs']['voice_dna'] = current_voice + injection
-                            st.session_state['editor_voice'] = profile_obj['inputs']['voice_dna']
-                            
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_voice_analysis'] = ""
-                            st.success("Asset Injected.")
-                            st.rerun()
+                # --- 2. VOICE ---
+                with lib_tab2:
+                    # INJECTOR
+                    with st.expander("ADD NEW VOICE ASSET"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
+                        with c2:
+                            v_file = st.file_uploader("UPLOAD TEXT (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                        
+                        if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
+                        
+                        if v_file and st.button("ANALYZE TONE", type="primary", key="btn_cal_voice"):
+                            with st.spinner("EXTRACTING PATTERNS..."):
+                                if v_file.type == "application/pdf":
+                                    raw_txt = logic_engine.extract_text_from_pdf(v_file)
+                                else:
+                                    raw_txt = str(v_file.read(), "utf-8")
+                                
+                                prompt = f"""
+                                TASK: Extract the 'Voice DNA' from this text.
+                                ROLE: Expert Linguist.
+                                CONSTRAINTS: No chat. No emojis. Bullet points only.
+                                INPUT TEXT: {raw_txt[:10000]}
+                                OUTPUT FORMAT:
+                                - SENTENCE STRUCTURE: (e.g. Complex, Fragmented)
+                                - VOCABULARY LEVEL: (e.g. Academic, Slang, Corporate)
+                                - RHETORICAL DEVICES: (e.g. Metaphors, Questions)
+                                - EMOTIONAL RESONANCE: (e.g. Urgent, Calm, Witty)
+                                """
+                                st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
 
-                    st.divider()
-                    st.markdown("#### VOICE ASSET LOG")
-                    st.caption("Accumulated linguistic patterns. Delete text blocks to remove assets.")
-                    val_voice = st.session_state.get('editor_voice', inputs.get('voice_dna', ''))
-                    st.text_area("SAVED VOICE PATTERNS", value=val_voice, height=300, key="editor_voice")
+                        if st.session_state['man_voice_analysis']:
+                            st.markdown("#### REVIEW FINDINGS")
+                            edit_voice = st.text_area("EDIT ANALYSIS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
+                            if st.button("CONFIRM & SAVE TO LIBRARY", type="primary", key="save_voice"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                injection = f"\n\n[ASSET: {voice_type.upper()} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
+                                profile_obj['inputs']['voice_dna'] = inputs.get('voice_dna', '') + injection
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_voice_analysis'] = ""
+                                st.success("Saved.")
+                                st.rerun()
 
-                # --- 3. VISUAL INJECTOR ---
-                with cal_tab3:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
-                    with c2:
-                        vis_file = st.file_uploader("UPLOAD VISUAL ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
-                    
-                    if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
-                    
-                    if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
-                        with st.spinner("ANALYZING DESIGN..."):
-                            img = Image.open(vis_file)
-                            st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
-                    
-                    if st.session_state['man_vis_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_vis = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
-                        if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}\n----------------\n"
-                            
-                            current_vis = inputs.get('visual_dna', '')
-                            profile_obj['inputs']['visual_dna'] = current_vis + injection
-                            st.session_state['editor_visual'] = profile_obj['inputs']['visual_dna']
-                            
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_vis_analysis'] = ""
-                            st.success("Asset Injected.")
-                            st.rerun()
+                    # LIBRARY VIEW
+                    voice_assets = parse_assets_from_text(inputs.get('voice_dna', ''))
+                    if voice_assets:
+                        st.write(f"**{len(voice_assets)} ASSETS ON FILE**")
+                        for i, asset in enumerate(voice_assets):
+                            with st.container():
+                                col_txt, col_act = st.columns([5, 1])
+                                with col_txt:
+                                    st.markdown(f"**{asset['header']}**")
+                                    with st.expander("View Analysis"):
+                                        st.text(asset['content'])
+                                with col_act:
+                                    if st.button("DELETE", key=f"del_voc_{i}", type="secondary"):
+                                        new_dna = inputs.get('voice_dna', '').replace(asset['full_text'], "")
+                                        profile_obj['inputs']['voice_dna'] = new_dna
+                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                        st.rerun()
+                                st.divider()
+                    else:
+                        st.caption("No voice assets calibrated yet.")
 
-                    st.divider()
-                    st.markdown("#### VISUAL ASSET LOG")
-                    st.caption("Accumulated design instructions. Delete text blocks to remove assets.")
-                    val_visual = st.session_state.get('editor_visual', inputs.get('visual_dna', ''))
-                    st.text_area("SAVED VISUAL PATTERNS", value=val_visual, height=300, key="editor_visual")
+                # --- 3. VISUAL ---
+                with lib_tab3:
+                    # INJECTOR
+                    with st.expander("ADD NEW VISUAL ASSET"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
+                        with c2:
+                            vis_file = st.file_uploader("UPLOAD VISUAL (IMG)", type=["png", "jpg"], key="cal_up_vis")
+                        
+                        if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
+                        
+                        if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
+                            with st.spinner("ANALYZING DESIGN..."):
+                                img = Image.open(vis_file)
+                                st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
+                        
+                        if st.session_state['man_vis_analysis']:
+                            st.markdown("#### REVIEW FINDINGS")
+                            edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
+                            if st.button("CONFIRM & SAVE TO LIBRARY", type="primary", key="save_vis"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}\n----------------\n"
+                                profile_obj['inputs']['visual_dna'] = inputs.get('visual_dna', '') + injection
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_vis_analysis'] = ""
+                                st.success("Saved.")
+                                st.rerun()
+
+                    # LIBRARY VIEW
+                    vis_assets = parse_assets_from_text(inputs.get('visual_dna', ''))
+                    if vis_assets:
+                        st.write(f"**{len(vis_assets)} ASSETS ON FILE**")
+                        for i, asset in enumerate(vis_assets):
+                            with st.container():
+                                col_txt, col_act = st.columns([5, 1])
+                                with col_txt:
+                                    st.markdown(f"**{asset['header']}**")
+                                    with st.expander("View Analysis"):
+                                        st.text(asset['content'])
+                                with col_act:
+                                    if st.button("DELETE", key=f"del_vis_{i}", type="secondary"):
+                                        new_dna = inputs.get('visual_dna', '').replace(asset['full_text'], "")
+                                        profile_obj['inputs']['visual_dna'] = new_dna
+                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                        st.rerun()
+                                st.divider()
+                    else:
+                        st.caption("No visual assets calibrated yet.")
 
                 st.divider()
 
@@ -2541,17 +2598,10 @@ elif app_mode == "BRAND MANAGER":
                     profile_obj['inputs']['wiz_tone'] = new_tone
                     profile_obj['inputs']['wiz_guardrails'] = new_guard
                     
-                    # 2. Update DNA Inputs from Editors (The Log Text Areas)
-                    # This captures manual deletions/edits made in the Asset Logs
-                    profile_obj['inputs']['social_dna'] = st.session_state.get('editor_social', val_social)
-                    profile_obj['inputs']['voice_dna'] = st.session_state.get('editor_voice', val_voice)
-                    profile_obj['inputs']['visual_dna'] = st.session_state.get('editor_visual', val_visual)
-                    
                     p_p = ", ".join(inputs['palette_primary'])
                     p_s = ", ".join(inputs['palette_secondary'])
                     
-                    # 3. Rebuild Final Text (The Full Brand Kit)
-                    # We strictly include the DNA logs here so the Export file is complete
+                    # 3. Rebuild Final Text
                     new_text = f"""
                     1. STRATEGY
                     - Brand: {new_name}
@@ -2698,6 +2748,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
