@@ -159,10 +159,10 @@ class SignetLogic:
             return model_instance.generate_content([prompt, image])
         return model_instance.generate_content(prompt)
 
-    # --- NEW: STRICT REVERSE ENGINEERING ---
+# --- NEW: STRICT REVERSE ENGINEERING ---
     def analyze_social_style(self, image):
         """
-        REVERSE ENGINEER: Extracts style/vibe from an image.
+        REVERSE ENGINEER: Extracts style/aesthetic from an image.
         Strictly forbids generation of new content.
         Used for Brand DNA Ingestion.
         """
@@ -170,19 +170,39 @@ class SignetLogic:
         ROLE: Brand Strategist.
         TASK: Reverse-engineer the 'Social DNA' of this post.
         
-        DO NOT GENERATE A CAPTION. DO NOT OFFER IMPROVEMENTS.
+        INSTRUCTIONS:
+        1. TRANSCRIPT: Read the exact caption text visible in the image. Ignore user comments.
+        2. ANALYZE: Break down the strategy used.
         
-        OUTPUT FORMAT (Bullet Points):
-        - VISUAL VIBE: (e.g. Minimalist, High Contrast, Candid, Stock Photo)
+        CONSTRAINTS:
+        - DO NOT chat (e.g. "Here is the analysis"). Start directly with the output.
+        - DO NOT use emojis.
+        - DO NOT offer improvements or generate new options.
+        
+        OUTPUT FORMAT (Strictly follow this structure):
+        [CAPTION TRANSCRIPT]
+        (Paste the exact text found in the image here)
+        
+        [STRATEGY ANALYSIS]
+        - VISUAL AESTHETIC: (e.g. Minimalist, High Contrast, Candid, Stock Photo)
         - CAPTION STRUCTURE: (e.g. Short & Punchy, Long Storytelling, Bullet Points)
-        - EMOJI USAGE: (e.g. Heavy, Minimal, None)
         - HASHTAG STRATEGY: (e.g. Brand-specific, Niche, Broad)
-        - TONE: (e.g. Professional, Sassy, Educational)
+        - TONE OF VOICE: (e.g. Professional, Direct, Educational)
         """
         try:
             # Use Safe Generate
             response = self._safe_generate(self.model, prompt, image)
-            return response.text
+            text = response.text
+            
+            # Post-processing: Strict Filter for Chatty Intros
+            # If the model ignores the system instruction and adds a preamble, strip it.
+            if "Here is" in text or "Okay" in text:
+                # Split by newline and take the rest
+                parts = text.split('\n', 1)
+                if len(parts) > 1:
+                    text = parts[1].strip()
+            
+            return text
         except Exception as e:
             return f"Error extracting style: {e}"
 
