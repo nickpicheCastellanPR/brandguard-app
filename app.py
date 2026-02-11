@@ -396,66 +396,135 @@ def calculate_calibration_score(profile_data):
         "color": color,
         "message": msg
     }
-# --- HELPER: CONTEXT-AWARE CONFIDENCE ENGINE ---
+# --- HELPER: ASSET-AWARE CONFIDENCE ENGINE ---
 def calculate_content_confidence(profile_data, content_type):
     """
-    Calculates confidence specifically for the requested CONTENT TYPE.
-    Returns: Score (0-100), Label, Color, and Missing Ingredients.
+    Calculates confidence based on 'Risk vs. Assets'.
+    Returns: Score (0-100), Label, Color, Action, and a 'Evidence-Based' Rationale.
     """
     score = 0
-    required = []
+    # The Yin (What we have) and Yang (What we lack)
+    assets_found = []
+    missing_risks = []
     
     # Extract Ingredients
     inputs = profile_data.get('inputs', {})
-    final_text = profile_data.get('final_text', '')
+    # Lowercase text scan for keywords
+    final_text = str(profile_data.get('final_text', '')).lower()
     
-    # 1. BASELINE (All formats need these) - 40 pts
-    if inputs.get('wiz_mission'): score += 20
-    else: required.append("Mission")
-    
-    if inputs.get('wiz_tone'): score += 20
-    else: required.append("Tone")
-    
-    # 2. FORMAT SPECIFIC (60 pts)
-    
-    # A. HIGH STAKES (Crisis, Press Release) -> Needs Values & Guardrails
-    if content_type in ["Crisis Statement", "Press Release", "Executive Memo"]:
-        if inputs.get('wiz_values'): score += 20
-        else: required.append("Core Values")
-        
-        if inputs.get('wiz_guardrails'): score += 20
-        else: required.append("Guardrails")
-        
-        # specific check for length (depth of context)
-        if len(final_text) > 1000: score += 20
-        else: required.append("Deep Context")
+    # --- TIER 1: HIGH RISK (Crisis, Press Release) ---
+    # Strategy: Start at 0. Trust must be earned. Safety is paramount.
+    if content_type in ["Crisis Statement", "Press Release"]:
+        # 1. GUARDRAILS (The Safety Net) - Critical
+        if inputs.get('wiz_guardrails'): 
+            score += 40
+            assets_found.append("Safety Guardrails")
+        else:
+            missing_risks.append("Guardrails (Risk of wrong tone)")
+            
+        # 2. VALUES (The Moral Compass) - Critical
+        if inputs.get('wiz_values'): 
+            score += 30
+            assets_found.append("Core Values")
+        else:
+            missing_risks.append("Values (Lack of empathy anchor)")
+            
+        # 3. MISSION (The Identity)
+        if inputs.get('wiz_mission'): 
+            score += 20
+            assets_found.append("Mission Boilerplate")
+        else:
+            missing_risks.append("Mission Statement")
+            
+        # 4. HISTORY (The Precedent)
+        if content_type == "Crisis Statement" and ("crisis" in final_text or "statement" in final_text):
+            score += 10
+            assets_found.append("Crisis History")
+        elif content_type == "Press Release" and ("press" in final_text or "release" in final_text):
+            score += 10
+            assets_found.append("Press History")
+            
+        # HARD CAP: If Guardrails are missing, cannot exceed 50%.
+        if not inputs.get('wiz_guardrails'):
+            score = min(score, 50)
 
-    # B. HUMAN CONNECTION (Email, Blog, Social) -> Needs Voice Samples
-    elif content_type in ["Internal Email", "Blog Post", "Social Campaign (Multi-Channel)"]:
-        if "Analysis:" in final_text: score += 40 # Proof of analyzed writing samples
-        else: required.append("Writing Samples")
+    # --- TIER 2: STRATEGIC INTERNAL (Memo, Email) ---
+    # Strategy: Start at 20. Needs Authority and Tone.
+    elif content_type in ["Executive Memo", "Internal Email"]:
+        score = 20 # Base trust
         
-        if inputs.get('wiz_values'): score += 20
-        else: required.append("Values")
+        # 1. TONE (The Voice) - Critical
+        if inputs.get('wiz_tone'): 
+            score += 30
+            assets_found.append("Tone Definitions")
+        else:
+            missing_risks.append("Tone Keywords")
+            
+        # 2. WRITING SAMPLES (The Proof)
+        if "analysis:" in final_text or len(final_text) > 1000:
+            score += 30
+            assets_found.append("Analyzed Voice Samples")
+        else:
+            missing_risks.append("Writing Samples")
+            
+        # 3. MISSION (Alignment)
+        if inputs.get('wiz_mission'): 
+            score += 20
+            assets_found.append("Strategic Alignment")
+            
+        # HARD CAP: If Tone is missing, max 60.
+        if not inputs.get('wiz_tone'):
+            score = min(score, 60)
 
-    # C. SPOKEN WORD (Speech) -> Needs Cadence/Rhetoric (Hardest to do)
-    elif content_type == "Speech / Script":
-        if "Analysis:" in final_text and len(final_text) > 2000: score += 60
-        elif "Analysis:" in final_text: score += 30; required.append("More Samples")
-        else: required.append("Voice Analysis")
-
-    # D. UTILITY (FAQ) -> Needs Facts
+    # --- TIER 3: CREATIVE & EXTERNAL (Blog, Speech, Social) ---
+    # Strategy: Start at 30. Needs Style and Rhythm.
     else:
-        # Default generous scoring for simple formats
-        score += 60
+        score = 30 # Base trust
+        
+        # 1. DEEP CONTEXT (The Rhythm)
+        if len(final_text) > 1500:
+            score += 40
+            assets_found.append("Deep Voice Data")
+        elif len(final_text) > 500:
+            score += 20
+            assets_found.append("Basic Context")
+        else:
+            missing_risks.append("Sufficient Text Data")
+            
+        # 2. TONE (The Vibe)
+        if inputs.get('wiz_tone'): 
+            score += 30
+            assets_found.append("Tone Guidelines")
+        else:
+            missing_risks.append("Tone Definitions")
+            
+        # HARD CAP: If context is shallow, max 50.
+        if len(final_text) < 500:
+            score = min(score, 50)
 
-    # 3. FORMATTING OUTPUT
+    # --- FINAL CALCULATIONS & OUTPUT ---
+    score = min(100, score)
+    
+    # Construct Evidence-Based Rationale
+    if assets_found:
+        found_str = f"Using: {', '.join(assets_found)}."
+    else:
+        found_str = "No specific assets found."
+        
+    if missing_risks:
+        missing_str = f"Missing: {', '.join(missing_risks)}."
+    else:
+        missing_str = ""
+
+    rationale = f"{found_str} {missing_str}"
+
+    # Visual Output
     if score >= 80:
-        return {"score": score, "label": "HIGH PRECISION", "color": "#09ab3b", "action": None}
+        return {"score": score, "label": "HIGH PRECISION", "color": "#09ab3b", "action": None, "rationale": rationale}
     elif score >= 50:
-        return {"score": score, "label": "CAPABLE", "color": "#ffa421", "action": f"Add {required[0] if required else 'Context'}"}
+        return {"score": score, "label": "CAPABLE", "color": "#ffa421", "action": f"Add {missing_risks[0]}" if missing_risks else "Add Context", "rationale": rationale}
     else:
-        return {"score": score, "label": "LOW DATA", "color": "#ff4b4b", "action": f"Needs {required[0]}"}
+        return {"score": score, "label": "LOW DATA", "color": "#ff4b4b", "action": f"Needs {missing_risks[0]}" if missing_risks else "Build Profile", "rationale": rationale}
 
 # --- HELPER: SOCIAL CALIBRATION ---
 def calculate_social_confidence(profile_data, platform):
@@ -2430,6 +2499,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
