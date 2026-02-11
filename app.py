@@ -1515,6 +1515,47 @@ elif app_mode == "COPY EDITOR":
         </style>
     """, unsafe_allow_html=True)
 
+    # --- HELPER: REAL CONFIDENCE CALCULATION ---
+    def calculate_content_confidence(profile_data, content_type):
+        """
+        Scans the Voice DNA to see if we have assets matching the requested content type.
+        Returns a score, color, and rationale.
+        """
+        score = 40 # Base score (Generic Strategy exists)
+        color = "#ff4b4b" # Red
+        label = "LOW DATA"
+        rationale = " relying on generic brand values."
+        action = "Go to Brand Manager > Voice Calibration and upload samples."
+
+        inputs = profile_data.get('inputs', {})
+        voice_dna = inputs.get('voice_dna', '')
+        
+        # 1. Check for Volume
+        if len(voice_dna) > 500:
+            score += 20
+            color = "#ffa421" # Orange
+            label = "CALIBRATED"
+            rationale = " using general linguistic patterns."
+            action = f"Upload specific {content_type} examples for better accuracy."
+
+        # 2. Check for Specific Match (The "Smart" Part)
+        # We look for the Content Type string inside the DNA header tags
+        type_keyword = content_type.split(" ")[0].upper() # e.g. "INTERNAL" or "PRESS"
+        if f"TYPE: {type_keyword}" in voice_dna.upper() or f"ASSET: {type_keyword}" in voice_dna.upper():
+            score += 35
+            color = "#09ab3b" # Green
+            label = "HIGH CONFIDENCE"
+            rationale = f" trained specifically on {content_type} examples."
+            action = "" # No action needed
+
+        return {
+            "score": min(score, 100),
+            "color": color,
+            "label": label,
+            "rationale": "Engine is" + rationale,
+            "action": action
+        }
+
     # --- AGENCY TIER CHECK ---
     is_admin = st.session_state.get('is_admin', False)
     sub_status = st.session_state.get('status', 'trial').lower()
@@ -1552,9 +1593,9 @@ elif app_mode == "COPY EDITOR":
                     "Press Release", 
                     "Blog Post", 
                     "Executive Memo", 
-                    "Crisis Statement",      
-                    "Speech / Script",       
-                    "Social Campaign (Multi-Channel)"  
+                    "Crisis Statement",       
+                    "Speech / Script",        
+                    "Social Campaign"   
                 ])
             with cc2: 
                 sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
@@ -1562,8 +1603,7 @@ elif app_mode == "COPY EDITOR":
                 audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Staff")
                 
         with c2: 
-            # --- DYNAMIC CALIBRATION METER (The Fix) ---
-            # We check if the profile is actually trained for the selected task
+            # --- DYNAMIC CALIBRATION METER (Fixed) ---
             profile_data = st.session_state['profiles'][active_profile]
             metrics = calculate_content_confidence(profile_data, content_type)
             
@@ -1597,10 +1637,31 @@ elif app_mode == "COPY EDITOR":
             if st.button("REWRITE AND ALIGN", type="primary", use_container_width=True):
                 if draft_input:
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
-                        # Get Rules
-                        prof_text = profile_data.get('final_text', str(profile_data))
                         
-                        # Engineered Prompt using "Chain of Thought"
+                        # --- SMART CONTEXT BUILDING ---
+                        inputs = profile_data.get('inputs', {})
+                        
+                        # 1. Clean Base64 noise (Safety)
+                        def clean_dna(text):
+                            if not text: return ""
+                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
+                        
+                        # 2. Build the "Voice Prompt"
+                        prof_text = f"""
+                        STRATEGY:
+                        - Mission: {inputs.get('wiz_mission', '')}
+                        - Tone Keywords: {inputs.get('wiz_tone', '')}
+                        
+                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
+                        {voice_dna}
+                        
+                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
+                        {inputs.get('wiz_guardrails', '')}
+                        """
+                        
+                        # 3. Engineered Prompt using "Chain of Thought"
                         prompt_wrapper = f"""
                         CONTEXT: 
                         - Type: {content_type} (Use appropriate formatting/structure)
@@ -1611,10 +1672,10 @@ elif app_mode == "COPY EDITOR":
                         TASK: Rewrite the draft below to match the Brand Rules.
                         
                         STEP 1: RATIONALE
-                        Analyze the draft against the brand voice. Explain 3 key changes you are making and why (e.g. "Changed X to Y to sound more authoritative").
+                        Analyze the draft against the brand voice. Explain 3 key changes you are making and why.
                         
                         STEP 2: REWRITE
-                        Provide the rewritten text.
+                        Provide the rewritten text. Ensure all GUARDRAILS are strictly followed.
                         
                         OUTPUT FORMAT:
                         RATIONALE:
@@ -2985,6 +3046,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
