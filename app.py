@@ -2419,7 +2419,7 @@ elif app_mode == "BRAND MANAGER":
                 
                 if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
                 
-                if cal_img and st.button(f"ANALYZE {cal_platform} POST", type="primary", key="btn_cal_social"):
+                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
                     with st.spinner("REVERSE ENGINEERING..."):
                         img = Image.open(cal_img)
                         st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
@@ -2663,6 +2663,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
