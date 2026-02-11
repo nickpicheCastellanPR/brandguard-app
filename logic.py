@@ -159,6 +159,33 @@ class SignetLogic:
             return model_instance.generate_content([prompt, image])
         return model_instance.generate_content(prompt)
 
+    # --- NEW: STRICT REVERSE ENGINEERING ---
+    def analyze_social_style(self, image):
+        """
+        REVERSE ENGINEER: Extracts style/vibe from an image.
+        Strictly forbids generation of new content.
+        Used for Brand DNA Ingestion.
+        """
+        prompt = """
+        ROLE: Brand Strategist.
+        TASK: Reverse-engineer the 'Social DNA' of this post.
+        
+        DO NOT GENERATE A CAPTION. DO NOT OFFER IMPROVEMENTS.
+        
+        OUTPUT FORMAT (Bullet Points):
+        - VISUAL VIBE: (e.g. Minimalist, High Contrast, Candid, Stock Photo)
+        - CAPTION STRUCTURE: (e.g. Short & Punchy, Long Storytelling, Bullet Points)
+        - EMOJI USAGE: (e.g. Heavy, Minimal, None)
+        - HASHTAG STRATEGY: (e.g. Brand-specific, Niche, Broad)
+        - TONE: (e.g. Professional, Sassy, Educational)
+        """
+        try:
+            # Use Safe Generate
+            response = self._safe_generate(self.model, prompt, image)
+            return response.text
+        except Exception as e:
+            return f"Error extracting style: {e}"
+
     def run_visual_audit(self, image, profile_text):
         """
         THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
