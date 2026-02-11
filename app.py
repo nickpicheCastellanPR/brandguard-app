@@ -2661,7 +2661,13 @@ elif app_mode == "BRAND MANAGER":
                 with cal_tab2:
                     c1, c2 = st.columns(2)
                     with c1:
+                        # NEW: Asset Type Dropdown
                         voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
+                        # NEW: Sender Dropdown
+                        voice_sender = st.selectbox("SENDER", ["CEO", f"{inputs['wiz_name']}", "HR Department", "Marketing Team", "Customer Support", "Other"], key="cal_sender_voice")
+                        # NEW: Audience Dropdown
+                        voice_audience = st.selectbox("TARGET AUDIENCE", ["Employees (Internal)", "Investors/Board", "Journalists & Media", "Customers", "General Public", "Other"], key="cal_audience_voice")
+                    
                     with c2:
                         v_file = st.file_uploader("UPLOAD TEXT SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
                     
@@ -2693,7 +2699,10 @@ elif app_mode == "BRAND MANAGER":
                         if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {voice_type.upper()} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
+                            
+                            # UPDATED: Inject new metadata into the header
+                            header_meta = f"TYPE: {voice_type.upper()} | SENDER: {voice_sender.upper()} | AUDIENCE: {voice_audience.upper()}"
+                            injection = f"\n\n[ASSET: {header_meta} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
                             
                             inputs['voice_dna'] += injection
                             
@@ -2976,6 +2985,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
