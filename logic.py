@@ -124,17 +124,40 @@ class ColorScorer:
 
 
 # --- 2. MAIN LOGIC CLASS --- #
+import time
+from google.api_core import exceptions
 
 class SignetLogic:
     def __init__(self):
         # 1. THE STABLE CORE (Upgraded to Confirmed Model)
-        # We use 'gemini-2.0-flash' as it appears in your AVAILABLE MODELS list.
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         
         # 2. THE RESEARCHER (Stabilized)
-        # We remove the 'tools' config to stop the 400 Errors.
-        # We use the same powerful 'gemini-2.0-flash' model to ensure high-quality output.
         self.search_model = genai.GenerativeModel('gemini-2.0-flash')
+
+    def _safe_generate(self, model_instance, prompt, image=None, retries=3):
+        """
+        Internal helper to handle 429 Quota errors with exponential backoff.
+        """
+        for i in range(retries):
+            try:
+                if image:
+                    return model_instance.generate_content([prompt, image])
+                else:
+                    return model_instance.generate_content(prompt)
+            except exceptions.ResourceExhausted:
+                # If quota hits, wait exponentially (2s, 4s, 8s)
+                wait_time = 2 ** (i + 1)
+                time.sleep(wait_time)
+                continue
+            except Exception as e:
+                # If it's a different error (like 400), fail immediately
+                raise e
+        
+        # If we run out of retries, try one last time and let it fail if it must
+        if image:
+            return model_instance.generate_content([prompt, image])
+        return model_instance.generate_content(prompt)
 
     def run_visual_audit(self, image, profile_text):
         """
@@ -187,7 +210,8 @@ class SignetLogic:
         """
         
         try:
-            response = self.model.generate_content([prompt, image])
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.model, prompt, image)
             txt = response.text.replace("```json", "").replace("```", "").strip()
             ai_result = json.loads(txt)
             
@@ -259,7 +283,8 @@ class SignetLogic:
         RAW TEXT: {pdf_text[:15000]}
         """
         try:
-            response = self.model.generate_content(prompt)
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.model, prompt)
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
         except Exception as e:
@@ -273,14 +298,16 @@ class SignetLogic:
              }
 
     def generate_brand_rules(self, prompt_text):
-        response = self.model.generate_content(prompt_text)
+        # UPGRADE: Wrapper used
+        response = self._safe_generate(self.model, prompt_text)
         return response.text
 
     # --- COPY EDITOR & GENERATOR ---
     def run_copy_editor(self, user_draft, profile_text):
         prompt = f"Rewrite this draft to match the brand voice:\n\nBRAND RULES:\n{profile_text}\n\nDRAFT:\n{user_draft}"
         try:
-            response = self.model.generate_content(prompt)
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.model, prompt)
             return response.text
         except Exception as e:
             return f"Error generating copy: {e}"
@@ -288,22 +315,24 @@ class SignetLogic:
     def run_content_generator(self, topic, format_type, key_points, profile_text):
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
-            # Uses the standard model instance (No tools, No crashes)
-            response = self.search_model.generate_content(prompt)
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.search_model, prompt)
             return response.text
         except Exception as e:
             return f"Error generating content: {e}"
     
     def analyze_social_post(self, image):
         try:
-            response = self.model.generate_content(["Analyze this social post and suggest a caption.", image])
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.model, "Analyze this social post and suggest a caption.", image)
             return response.text
         except Exception as e:
             return "Error analyzing image."
 
     def describe_logo(self, image):
         try:
-            response = self.model.generate_content(["Describe this logo in detail (colors, shapes, text).", image])
+            # UPGRADE: Wrapper used
+            response = self._safe_generate(self.model, "Describe this logo in detail (colors, shapes, text).", image)
             return response.text
         except Exception as e:
             return "Logo analysis failed."
