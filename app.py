@@ -2338,24 +2338,62 @@ elif app_mode == "BRAND MANAGER":
             font-weight: bold;
             color: #ab8f59;
             font-size: 0.9em;
+            margin-bottom: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- HELPER: ASSET PARSER ---
+    # --- HELPERS ---
+    def process_image_for_storage(file_buffer):
+        """Resizes image and converts to base64 for storage."""
+        try:
+            import base64
+            from io import BytesIO
+            
+            # Reset buffer pointer
+            file_buffer.seek(0)
+            img = Image.open(file_buffer)
+            
+            # Resize for thumbnail (Max 400px width)
+            base_width = 400
+            w_percent = (base_width / float(img.size[0]))
+            h_size = int((float(img.size[1]) * float(w_percent)))
+            img = img.resize((base_width, h_size), Image.Resampling.LANCZOS)
+            
+            # Convert to Base64
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return f"data:image/png;base64,{img_str}"
+        except Exception:
+            return None
+
     def parse_assets_from_text(text_blob):
-        """Splits the DNA text block into manageable assets based on headers."""
+        """Splits the DNA text block into assets and extracts visual tags."""
         if not text_blob: return []
-        # Split by the divider line we used
         raw_assets = text_blob.split("----------------\n")
         parsed = []
         for asset in raw_assets:
             if "[ASSET:" in asset:
-                # Extract Title
                 lines = asset.strip().split('\n')
                 header = lines[0] # [ASSET: TYPE - NAME]
-                content = "\n".join(lines[1:])
-                parsed.append({"header": header, "content": content, "full_text": asset + "----------------\n"})
+                
+                # Extract Visual Data if present
+                img_data = None
+                clean_lines = []
+                for line in lines[1:]:
+                    if line.startswith("[VISUAL_REF:"):
+                        img_data = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
+                    else:
+                        clean_lines.append(line)
+                
+                content = "\n".join(clean_lines)
+                parsed.append({
+                    "header": header, 
+                    "content": content, 
+                    "full_text": asset + "----------------\n",
+                    "image": img_data
+                })
         return parsed
 
     if st.session_state['profiles']:
@@ -2386,11 +2424,9 @@ elif app_mode == "BRAND MANAGER":
             if is_structured:
                 inputs = profile_obj['inputs']
                 
-                # --- SAFETY: INITIALIZE MISSING KEYS TO PREVENT CRASHES ---
-                # This fixes the KeyError: 'voice_dna' on older profiles
+                # --- SAFETY INIT ---
                 for key in ['social_dna', 'voice_dna', 'visual_dna']:
-                    if key not in inputs:
-                        inputs[key] = ""
+                    if key not in inputs: inputs[key] = ""
                 
                 with st.expander("1. STRATEGY", expanded=True):
                     new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
@@ -2451,7 +2487,15 @@ elif app_mode == "BRAND MANAGER":
                         if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}\n----------------\n"
+                            
+                            # Process Visual for Storage
+                            vis_ref = ""
+                            if cal_img:
+                                b64_img = process_image_for_storage(cal_img)
+                                if b64_img:
+                                    vis_ref = f"\n[VISUAL_REF: {b64_img}]"
+
+                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}{vis_ref}\n----------------\n"
                             
                             inputs['social_dna'] += injection
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
@@ -2467,9 +2511,14 @@ elif app_mode == "BRAND MANAGER":
                         for i, asset in enumerate(social_assets):
                             with st.container():
                                 st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_view, c_del = st.columns([4,1])
-                                with c_view:
-                                    with st.expander("View Analysis Content"):
+                                c_img, c_txt, c_del = st.columns([1, 3, 1])
+                                with c_img:
+                                    if asset['image']:
+                                        st.image(asset['image'], caption="Asset Thumbnail")
+                                    else:
+                                        st.caption("No Image")
+                                with c_txt:
+                                    with st.expander("View Analysis"):
                                         st.text(asset['content'])
                                 with c_del:
                                     if st.button("DELETE", key=f"del_soc_{i}", type="secondary"):
@@ -2531,9 +2580,9 @@ elif app_mode == "BRAND MANAGER":
                         for i, asset in enumerate(voice_assets):
                             with st.container():
                                 st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_view, c_del = st.columns([4,1])
-                                with c_view:
-                                    with st.expander("View Analysis Content"):
+                                c_txt, c_del = st.columns([4,1])
+                                with c_txt:
+                                    with st.expander("View Analysis"):
                                         st.text(asset['content'])
                                 with c_del:
                                     if st.button("DELETE", key=f"del_voc_{i}", type="secondary"):
@@ -2564,7 +2613,15 @@ elif app_mode == "BRAND MANAGER":
                         if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}\n----------------\n"
+                            
+                            # Process Visual for Storage
+                            vis_ref = ""
+                            if vis_file:
+                                b64_img = process_image_for_storage(vis_file)
+                                if b64_img:
+                                    vis_ref = f"\n[VISUAL_REF: {b64_img}]"
+
+                            injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}{vis_ref}\n----------------\n"
                             
                             inputs['visual_dna'] += injection
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
@@ -2580,9 +2637,14 @@ elif app_mode == "BRAND MANAGER":
                         for i, asset in enumerate(vis_assets):
                             with st.container():
                                 st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_view, c_del = st.columns([4,1])
-                                with c_view:
-                                    with st.expander("View Analysis Content"):
+                                c_img, c_txt, c_del = st.columns([1, 3, 1])
+                                with c_img:
+                                    if asset['image']:
+                                        st.image(asset['image'], caption="Asset Thumbnail")
+                                    else:
+                                        st.caption("No Image")
+                                with c_txt:
+                                    with st.expander("View Analysis"):
                                         st.text(asset['content'])
                                 with c_del:
                                     if st.button("DELETE", key=f"del_vis_{i}", type="secondary"):
@@ -2618,6 +2680,15 @@ elif app_mode == "BRAND MANAGER":
                     p_s = ", ".join(inputs['palette_secondary'])
                     
                     # 3. Rebuild Final Text (The Full Brand Kit)
+                    # Note: We parse out the visual refs so the LLM doesn't see base64 strings in the prompt context later
+                    
+                    def clean_dna_for_llm(text):
+                        """Removes base64 images from text before sending to LLM context."""
+                        if not text: return ""
+                        lines = text.split('\n')
+                        clean = [l for l in lines if not l.startswith("[VISUAL_REF:")]
+                        return "\n".join(clean)
+
                     new_text = f"""
                     1. STRATEGY
                     - Brand: {new_name}
@@ -2629,20 +2700,20 @@ elif app_mode == "BRAND MANAGER":
                     - Tone Keywords: {new_tone}
                     
                     [VOICE DNA & ASSETS]
-                    {inputs['voice_dna']}
+                    {clean_dna_for_llm(inputs['voice_dna'])}
                     
                     3. VISUALS
                     - Primary: {p_p}
                     - Secondary: {p_s}
                     
                     [VISUAL DNA & ASSETS]
-                    {inputs['visual_dna']}
+                    {clean_dna_for_llm(inputs['visual_dna'])}
                     
                     4. GUARDRAILS
                     - {new_guard}
                     
                     5. SOCIAL DNA (CALIBRATION DATA)
-                    {inputs['social_dna']}
+                    {clean_dna_for_llm(inputs['social_dna'])}
                     """
                     
                     profile_obj['final_text'] = new_text
@@ -2764,6 +2835,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
