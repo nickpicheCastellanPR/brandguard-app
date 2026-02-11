@@ -2130,6 +2130,26 @@ elif app_mode == "BRAND MANAGER":
 # 7. BRAND MANAGER
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
+    
+    # --- CSS INJECTION (Crucial for Button Visibility) ---
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            background-color: #f0c05a !important;
+            color: #1b2a2e !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     if st.session_state['profiles']:
         p_keys = list(st.session_state['profiles'].keys())
         default_ix = 0
@@ -2182,7 +2202,7 @@ elif app_mode == "BRAND MANAGER":
             
             # --- NEW: VISIBLE DNA EDITOR (Fixes the "Hidden Garbage" Issue) ---
             with st.expander("4. SOCIAL DNA (CALIBRATION DATA)"):
-                st.caption("This is the 'Style Guide' the AI uses for social posts. Edit or clear this to refine your brand's visual/tonal instructions.")
+                st.info("🗑️ **CLEANUP TASK:** The text below determines your social style. If you see old 'Caption Options' or generic text, delete them manually here and click 'SAVE STRATEGY CHANGES'.")
                 # We default to existing, or empty string. We bind this to a key so we can read it on Save.
                 current_dna_val = inputs.get('social_dna', '')
                 st.text_area("STORED PATTERNS", value=current_dna_val, height=200, key="dna_editor")
@@ -2198,10 +2218,10 @@ elif app_mode == "BRAND MANAGER":
                 with c_upl:
                     cal_img = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key="cal_uploader")
                 
-                # STATEFUL PREVIEW
+                # STATEFUL PREVIEW FOR MANAGER
                 if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
                 
-                # CHANGED TO PRIMARY FOR VISIBILITY
+                # UPDATED: Primary type for visibility
                 if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary"):
                     with st.spinner("REVERSE ENGINEERING..."):
                         img = Image.open(cal_img)
@@ -2232,7 +2252,7 @@ elif app_mode == "BRAND MANAGER":
 
             st.divider()
 
-            if st.button("SAVE STRATEGY CHANGES"):
+            if st.button("SAVE STRATEGY CHANGES", type="primary"):
                 # 1. Update Inputs from UI
                 profile_obj['inputs']['wiz_name'] = new_name
                 profile_obj['inputs']['wiz_archetype'] = new_arch
@@ -2390,6 +2410,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
