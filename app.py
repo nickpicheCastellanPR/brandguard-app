@@ -784,7 +784,7 @@ if not st.session_state['authenticated']:
     st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR INTERNAL TOOL</div>", unsafe_allow_html=True)
     st.stop()
     
-# --- SIDEBAR (Brand Manager Restored) ---
+# --- SIDEBAR ---
 with st.sidebar:
     # 0. STYLE INJECTION
     st.markdown("""
@@ -885,20 +885,45 @@ with st.sidebar:
         st.rerun()
     
     if active_profile_selection != "Create New..." and active_profile_selection in st.session_state['profiles']:
-        current_rules = st.session_state['profiles'][active_profile_selection]
-        metrics = calculate_calibration_score(current_rules)
+        current_profile = st.session_state['profiles'][active_profile_selection]
+        
+        # --- DYNAMIC SCORE CALCULATION ---
+        # Try to get saved score, or calculate on fly
+        score = current_profile.get('calibration_score', 0)
+        
+        # Fallback calculation if key missing (backward compatibility)
+        if score == 0 and isinstance(current_profile, dict) and "inputs" in current_profile:
+            inp = current_profile['inputs']
+            raw_score = 0
+            if inp.get('wiz_name'): raw_score += 10
+            if inp.get('wiz_mission'): raw_score += 10
+            if inp.get('wiz_values'): raw_score += 10
+            if len(inp.get('social_dna', '')) > 50: raw_score += 20
+            if len(inp.get('voice_dna', '')) > 50: raw_score += 20
+            if len(inp.get('visual_dna', '')) > 50: raw_score += 20
+            score = min(raw_score, 100)
+
+        # Color Logic
+        score_color = "#ff4b4b" # Red
+        status_label = "LOW DATA"
+        if score > 40: 
+            score_color = "#ffa421" # Orange
+            status_label = "CALIBRATING"
+        if score > 75: 
+            score_color = "#09ab3b" # Green
+            status_label = "LOCKED ON"
         
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
                 .sb-track {{ width: 100%; height: 6px; background: #dcdcd9; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }}
-                .sb-fill {{ height: 100%; width: {metrics['score']}%; background: {metrics['color']}; border-radius: 999px; }}
-                .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {metrics['color']}; }}
+                .sb-fill {{ height: 100%; width: {score}%; background: {score_color}; border-radius: 999px; transition: width 0.5s ease; }}
+                .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {score_color}; }}
             </style>
             <div class="sb-container">
                 <span style="font-size: 0.7rem; font-weight: 700; color: #5c6b61;">ENGINE CONFIDENCE</span>
                 <div class="sb-track"><div class="sb-fill"></div></div>
-                <div class="sb-status">{metrics['status_label'].upper()} ({metrics['score']}%)</div>
+                <div class="sb-status">{status_label} ({score}%)</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -917,7 +942,7 @@ with st.sidebar:
     
     # ADMIN TOOLS
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
-    st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",)) # <--- RESTORED
+    st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
     if st.session_state.get('is_admin', False) or raw_user == "NICK_ADMIN":
          st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
@@ -2951,6 +2976,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
