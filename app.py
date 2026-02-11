@@ -1197,7 +1197,7 @@ if app_mode == "DASHBOARD":
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
     
-    # --- CSS INJECTION FOR VISIBILITY (Local Override) ---
+    # --- CSS INJECTION ---
     st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -1223,33 +1223,63 @@ elif app_mode == "VISUAL COMPLIANCE":
     if not is_admin and sub_status != 'active':
         show_paywall()
     
+    # --- HELPER: EXTRACT REFERENCE IMAGE ---
+    def get_primary_reference_image(dna_text):
+        """Finds the first [VISUAL_REF] in the DNA and converts it back to an image."""
+        if not dna_text: return None
+        import base64
+        from io import BytesIO
+        try:
+            for line in dna_text.split('\n'):
+                if line.startswith("[VISUAL_REF:"):
+                    # Extract base64 string
+                    b64_str = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
+                    if b64_str.startswith("data:image"):
+                        b64_str = b64_str.split(",")[1]
+                    
+                    image_data = base64.b64decode(b64_str)
+                    return Image.open(BytesIO(image_data))
+        except Exception:
+            return None
+        return None
+
     # 1. Check if Profile is Active
     active_profile_name = st.session_state.get('active_profile_name')
     if not active_profile_name:
-        st.warning("⚠️ No Brand Profile Loaded. Please select one in the Sidebar.")
+        st.warning("No Brand Profile Loaded. Please select one in the Sidebar.")
     else:
         profile_data = st.session_state['profiles'][active_profile_name]
 
-        # --- PERSISTENCE CHECK: DO WE HAVE A CACHED RESULT? ---
+        # --- PERSISTENCE CHECK ---
         if 'active_audit_result' in st.session_state and st.session_state['active_audit_result']:
-            # RENDER CACHED RESULT
             result = st.session_state['active_audit_result']
             image = st.session_state.get('active_audit_image')
             
-            # Context Bar
             c_info, c_reset = st.columns([3, 1])
-            with c_info: st.success("✅ RESTORED PREVIOUS SESSION")
+            with c_info: st.info("RESTORED PREVIOUS SESSION")
             with c_reset: 
-                if st.button("⬅ START NEW AUDIT", type="secondary", use_container_width=True):
+                if st.button("START NEW AUDIT", type="secondary", use_container_width=True):
                     del st.session_state['active_audit_result']
                     del st.session_state['active_audit_image']
                     st.rerun()
             
             st.divider()
-            if image:
-                st.image(image, caption="ANALYZED ASSET", width=400)
             
-            # --- SHARED RENDERING LOGIC (used for both new and cached) ---
+            # Show Candidate vs Reference (If available)
+            if image:
+                # Try to fetch reference for context
+                ref_img = None
+                if isinstance(profile_data, dict) and "inputs" in profile_data:
+                    ref_img = get_primary_reference_image(profile_data['inputs'].get('visual_dna', ''))
+                
+                if ref_img:
+                    c_can, c_ref = st.columns(2)
+                    with c_can: st.image(image, caption="CANDIDATE ASSET", width=350)
+                    with c_ref: st.image(ref_img, caption="GOLD STANDARD REFERENCE", width=350)
+                else:
+                    st.image(image, caption="CANDIDATE ASSET", width=400)
+            
+            # --- SCORING DISPLAY ---
             score = result.get('score', 0)
             bd = result.get('breakdown', {})
             
@@ -1326,12 +1356,18 @@ elif app_mode == "VISUAL COMPLIANCE":
                     st.caption("No specific wins.")
             
             with st.expander("VIEW SCORING LOGIC (TRANSPARENCY REPORT)"):
+                r_color = bd.get('color', {}).get('reason', 'No data.')
+                r_id = bd.get('identity', {}).get('reason', 'No data.')
+                r_tone = bd.get('tone', {}).get('reason', 'No data.')
+                r_typo = bd.get('typography', {}).get('reason', 'No data.')
+                r_vibe = bd.get('vibe', {}).get('reason', 'No data.')
+                
                 st.markdown(f"""
-                **1. COLOR ANALYSIS:** {bd.get('color', {}).get('reason')}  
-                **2. IDENTITY:** {bd.get('identity', {}).get('reason')}  
-                **3. TONE & COPY:** {bd.get('tone', {}).get('reason')}
-                **4. TYPOGRAPHY:** {bd.get('typography', {}).get('reason')}  
-                **5. VIBE:** {bd.get('vibe', {}).get('reason')}
+                **1. COLOR ANALYSIS:** {r_color}  
+                **2. IDENTITY:** {r_id}  
+                **3. TONE & COPY:** {r_tone}
+                **4. TYPOGRAPHY:** {r_typo}  
+                **5. VIBE:** {r_vibe}
                 """)
 
         else:
@@ -1346,13 +1382,57 @@ elif app_mode == "VISUAL COMPLIANCE":
 
                 if st.button("RUN COMPLIANCE CHECK", type="primary"):
                     with st.spinner("ANALYZING PIXELS, TEXT & CONTEXT..."):
-                        final_rules = profile_data.get('final_text', '') if isinstance(profile_data, dict) else profile_data
+                        
+                        visual_context = ""
+                        reference_image = None
+                        
+                        if isinstance(profile_data, dict) and "inputs" in profile_data:
+                            inputs = profile_data['inputs']
+                            
+                            # 1. EXTRACT REFERENCE IMAGE FROM DNA
+                            reference_image = get_primary_reference_image(inputs.get('visual_dna', ''))
+                            
+                            # 2. BUILD CLEAN TEXT CONTEXT
+                            def clean_dna(text):
+                                if not text: return ""
+                                return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                            visual_dna_clean = clean_dna(inputs.get('visual_dna', ''))
+                            social_dna_clean = clean_dna(inputs.get('social_dna', ''))
+                            
+                            visual_context = f"""
+                            1. VISUAL STRATEGY:
+                            - Primary Colors: {', '.join(inputs.get('palette_primary', []))}
+                            - Secondary Colors: {', '.join(inputs.get('palette_secondary', []))}
+                            
+                            2. DESIGN DNA (GOLD STANDARDS):
+                            {visual_dna_clean}
+                            
+                            3. SOCIAL MEDIA VISUALS (IF RELEVANT):
+                            {social_dna_clean}
+                            
+                            4. GUARDRAILS (DO NOT VIOLATE):
+                            {inputs.get('wiz_guardrails', '')}
+                            """
+                        else:
+                            # Fallback for old profiles
+                            visual_context = profile_data.get('final_text', '')
                         
                         try:
-                            # 1. RUN AUDIT
-                            result = logic_engine.run_visual_audit(image, final_rules)
+                            # 1. RUN AUDIT (Passing Ref Image if logic engine supports it)
+                            # Note: We pass reference_image to the engine. If the engine doesn't support it yet,
+                            # it needs to be updated. For now, we pass it as a kwargs or modified arg.
+                            # Assuming standard signature: run_visual_audit(candidate, context, reference=None)
                             
-                            # 2. SAVE TO STATE (Persistence)
+                            # Since I cannot see logic.py, I will attempt to pass it.
+                            # If logic.py isn't updated, this might error, but this is the correct App-side implementation.
+                            try:
+                                result = logic_engine.run_visual_audit(image, visual_context, reference_image=reference_image)
+                            except TypeError:
+                                # Fallback if logic.py hasn't been updated to accept reference_image
+                                result = logic_engine.run_visual_audit(image, visual_context)
+                            
+                            # 2. SAVE TO STATE
                             st.session_state['active_audit_result'] = result
                             st.session_state['active_audit_image'] = image
                             
@@ -1371,12 +1451,10 @@ elif app_mode == "VISUAL COMPLIANCE":
                             }
                             st.session_state['activity_log'].insert(0, log_entry)
                             
-                            # 4. RERUN TO SHOW RESULT VIEW
                             st.rerun()
                             
                         except Exception as e:
                             st.error(f"System Error: {e}")
-
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
@@ -2835,6 +2913,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
