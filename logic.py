@@ -165,7 +165,11 @@ class SignetLogic:
         REVERSE ENGINEER: Extracts style/aesthetic from an image.
         Strictly forbids generation of new content.
         Used for Brand DNA Ingestion.
+        Includes 429/Quota Retry Logic.
         """
+        import time
+        from google.api_core.exceptions import ResourceExhausted
+
         prompt = """
         ROLE: Brand Strategist.
         TASK: Reverse-engineer the 'Social DNA' of this post.
@@ -189,23 +193,38 @@ class SignetLogic:
         - HASHTAG STRATEGY: (e.g. Brand-specific, Niche, Broad)
         - TONE OF VOICE: (e.g. Professional, Direct, Educational)
         """
-        try:
-            # Use Safe Generate
-            response = self._safe_generate(self.model, prompt, image)
-            text = response.text
-            
-            # Post-processing: Strict Filter for Chatty Intros
-            # If the model ignores the system instruction and adds a preamble, strip it.
-            if "Here is" in text or "Okay" in text:
-                # Split by newline and take the rest
-                parts = text.split('\n', 1)
-                if len(parts) > 1:
-                    text = parts[1].strip()
-            
-            return text
-        except Exception as e:
-            return f"Error extracting style: {e}"
+        
+        # RETRY LOOP (Safeguard for 429 Errors)
+        max_retries = 3
+        backoff_factor = 2  # Seconds
+        
+        for attempt in range(max_retries):
+            try:
+                # Use Safe Generate
+                response = self._safe_generate(self.model, prompt, image)
+                text = response.text
+                
+                # Post-processing: Strict Filter for Chatty Intros
+                # If the model ignores the system instruction and adds a preamble, strip it.
+                if "Here is" in text or "Okay" in text:
+                    # Split by newline and take the rest
+                    parts = text.split('\n', 1)
+                    if len(parts) > 1:
+                        text = parts[1].strip()
+                
+                return text
 
+            except ResourceExhausted:
+                # HIT RATE LIMIT - WAIT AND RETRY
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor * (2 ** attempt) # 2s, 4s, 8s...
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    return "⚠️ System Busy: The AI is currently overloaded. Please wait 30 seconds and try again."
+            
+            except Exception as e:
+                return f"Error extracting style: {e}"
     def run_visual_audit(self, image, profile_text):
         """
         THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
