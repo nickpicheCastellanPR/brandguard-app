@@ -1822,6 +1822,295 @@ elif app_mode == "COPY EDITOR":
                     st.caption("REWRITTEN")
                     st.success(st.session_state['ce_result'])
                     
+# 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
+elif app_mode == "CONTENT GENERATOR":
+    st.title("CONTENT GENERATOR")
+    
+    # --- CSS INJECTION ---
+    st.markdown("""
+        <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #ab8f59 !important;
+            color: #1b2a2e !important;
+            border: none !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+        .rationale-box {
+            background-color: rgba(171, 143, 89, 0.1);
+            border-left: 3px solid #ab8f59;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+        }
+        .calibration-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- AGENCY TIER CHECK ---
+    is_admin = st.session_state.get('is_admin', False)
+    sub_status = st.session_state.get('status', 'trial').lower()
+    if not is_admin and sub_status != 'active':
+        show_paywall()
+
+    # --- HELPER: UNIFIED CONFIDENCE MODEL (FEW-SHOT + RISK) ---
+    def calculate_content_confidence(profile_data, content_type):
+        """
+        Combines 'Risk Tier' requirements with 'Few-Shot' asset counting.
+        """
+        inputs = profile_data.get('inputs', {})
+        voice_dna = inputs.get('voice_dna', '')
+        
+        score = 0
+        color = "#ff4b4b" # Red
+        label = "LOW DATA"
+        rationale_parts = []
+        action = ""
+
+        # 1. ASSET VOLUME CHECK (The Research Layer)
+        # We count how many times this specific format appears in the DNA
+        type_key = content_type.upper().split(" ")[0] # "INTERNAL", "PRESS", "BLOG"
+        # We check both explicit TYPE tags and general ASSET headers
+        asset_count = voice_dna.upper().count(f"TYPE: {type_key}") + voice_dna.upper().count(f"ASSET: {type_key}")
+        
+        if asset_count >= 3:
+            score += 50
+            rationale_parts.append(f"High Stability ({asset_count} samples)")
+        elif asset_count >= 1:
+            score += 30
+            rationale_parts.append(f"Low Stability ({asset_count} sample)")
+            action = f"Upload {3-asset_count} more {content_type} samples for stable style transfer."
+        else:
+            rationale_parts.append("Zero-Shot (No samples)")
+            action = f"Upload at least 3 {content_type} examples to Voice Calibration."
+
+        # 2. RISK & COMPLIANCE CHECK (The Safety Layer)
+        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
+        has_mission = len(inputs.get('wiz_mission', '')) > 10
+        
+        if has_guardrails:
+            score += 30
+            rationale_parts.append("Guardrails Active")
+        else:
+            action = "Add Guardrails in Strategy to ensure safety."
+            
+        if has_mission:
+            score += 20
+            rationale_parts.append("Mission Aligned")
+
+        # 3. FINAL VERDICT
+        # Cap score if asset count is low, regardless of guardrails (Style cannot be forced)
+        if asset_count < 3 and score > 60:
+            score = 60
+            label = "CALIBRATING"
+        elif score > 80:
+            label = "HIGH CONFIDENCE"
+            color = "#09ab3b"
+        elif score > 50:
+            label = "CALIBRATING"
+            color = "#ffa421"
+            
+        return {
+            "score": score,
+            "color": color,
+            "label": label,
+            "rationale": ", ".join(rationale_parts) + ".",
+            "action": action
+        }
+
+    if not active_profile:
+        st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
+    else:
+        # --- STATE INITIALIZATION ---
+        if 'cg_topic' not in st.session_state: st.session_state['cg_topic'] = ""
+        if 'cg_key_points' not in st.session_state: st.session_state['cg_key_points'] = ""
+        if 'cg_result' not in st.session_state: st.session_state['cg_result'] = None
+        if 'cg_rationale' not in st.session_state: st.session_state['cg_rationale'] = None
+
+        # --- 1. INPUTS & DYNAMIC CALIBRATION ---
+        c1, c2 = st.columns([2, 1])
+        
+        with c1:
+            # Topic
+            st.markdown("##### 1. CORE PARAMETERS")
+            cg_topic = st.text_input("TOPIC / HEADLINE", value=st.session_state['cg_topic'], placeholder="e.g. Q3 Financial Results")
+            st.session_state['cg_topic'] = cg_topic
+            
+            # Expanded Format List
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                # Trigger for Dynamic Calibration
+                content_type = st.selectbox("FORMAT", [
+                    "Press Release", "Internal Email", "Executive Memo", "Blog Post", 
+                    "Crisis Statement", "Speech / Script", "Social Campaign"
+                ])
+            with cc2:
+                length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
+            
+            # Audience Context
+            cc3, cc4 = st.columns(2)
+            with cc3:
+                sender = st.text_input("VOICE / SENDER", placeholder="e.g. CEO")
+            with cc4:
+                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Public, Shareholders")
+
+            # Key Points
+            st.markdown("##### 2. MESSAGE DISCIPLINE")
+            cg_key_points = st.text_area(
+                "KEY MESSAGES (BULLET POINTS)", 
+                height=150, 
+                placeholder="- Revenue up 20%\n- New product launch in Q4\n- Focus on sustainability",
+                help="The AI will strictly adhere to these facts.",
+                value=st.session_state['cg_key_points']
+            )
+            st.session_state['cg_key_points'] = cg_key_points
+
+        with c2:
+            # --- DYNAMIC CALIBRATION METER ---
+            profile_data = st.session_state['profiles'][active_profile]
+            metrics = calculate_content_confidence(profile_data, content_type)
+            
+            st.markdown(f"""<div class="dashboard-card" style="padding: 15px; margin-top: 28px;">
+                <div style="font-size:0.7rem; color:#5c6b61; font-weight:700;">TASK CONFIDENCE: {content_type.upper()}</div>
+                <div style="font-size:1.6rem; font-weight:800; color:{metrics['color']}; margin-top:5px;">{metrics['score']}%</div>
+                <div class="calibration-bar">
+                    <div style="width:{metrics['score']}%; height:100%; background-color:{metrics['color']};"></div>
+                </div>
+                <div style="font-size:0.8rem; color:#f5f5f0; font-weight:700; margin-top:5px;">{metrics['label']}</div>
+                <div style="font-size:0.7rem; color:#a0a0a0; margin-top:8px; line-height:1.2;"><em>{metrics['rationale']}</em></div>
+            </div>""", unsafe_allow_html=True)
+            
+            # Dynamic Warning / Call to Action
+            if metrics['action']:
+                st.markdown(f"""
+                    <div style="border-left: 2px solid {metrics['color']}; padding-left: 10px; margin-top: 10px; font-size: 0.8rem; color: #a0a0a0;">
+                        <strong>Optimization Tip:</strong><br>
+                        {metrics['action']}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("GENERATE DRAFT", type="primary", use_container_width=True):
+                if cg_topic and cg_key_points:
+                    with st.spinner("ARCHITECTING CONTENT..."):
+                        
+                        # --- SMART CONTEXT BUILDING ---
+                        inputs = profile_data.get('inputs', {})
+                        
+                        # 1. Clean Base64 noise (Safety)
+                        def clean_dna(text):
+                            if not text: return ""
+                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
+                        
+                        # 2. Build the "Targeted Prompt"
+                        prof_text = f"""
+                        STRATEGY:
+                        - Mission: {inputs.get('wiz_mission', '')}
+                        - Tone Keywords: {inputs.get('wiz_tone', '')}
+                        
+                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
+                        {voice_dna}
+                        
+                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
+                        {inputs.get('wiz_guardrails', '')}
+                        """
+                        
+                        # Engineered Prompt (Constraint-Based)
+                        prompt_wrapper = f"""
+                        CONTEXT:
+                        - Type: {content_type}
+                        - Length: {length}
+                        - Sender: {sender}
+                        - Audience: {audience}
+                        
+                        CORE TASK: Write a {content_type} about "{cg_topic}".
+                        
+                        STRICT CONSTRAINTS:
+                        1. You must cover these KEY POINTS:
+                        {cg_key_points}
+                        2. Do NOT invent facts outside these points.
+                        3. Use the Brand Voice defined below.
+                        4. Adhere to all CRITICAL GUARDRAILS.
+                        
+                        STEP 1: STRATEGY
+                        Briefly outline the tone and structure you will use to meet the audience's needs.
+                        
+                        STEP 2: DRAFT
+                        Write the content.
+                        
+                        OUTPUT FORMAT:
+                        STRATEGY:
+                        [Reasoning]
+                        DRAFT:
+                        [Content]
+                        """
+                        
+                        try:
+                            # Use content generator logic
+                            full_response = logic_engine.run_content_generator(cg_topic, content_type, cg_key_points, prof_text)
+                            
+                            # Heuristic Parsing
+                            if "DRAFT:" in full_response:
+                                parts = full_response.split("DRAFT:")
+                                rationale = parts[0].replace("STRATEGY:", "").strip()
+                                draft = parts[1].strip()
+                            else:
+                                rationale = "Generated based on key points."
+                                draft = full_response
+                            
+                            # Update State
+                            st.session_state['cg_result'] = draft
+                            st.session_state['cg_rationale'] = rationale
+                            
+                            # LOGGING
+                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
+                            from datetime import datetime
+                            
+                            log_entry = {
+                                "timestamp": datetime.now().strftime("%H:%M"),
+                                "type": "GENERATOR",
+                                "name": f"{content_type}: {cg_topic}",
+                                "score": metrics['score'], # Log the SPECIFIC confidence score
+                                "verdict": "CREATED",
+                                "result_data": draft,
+                                "image_data": None
+                            }
+                            st.session_state['activity_log'].insert(0, log_entry)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Topic and Key Points are required.")
+
+        # --- 3. OUTPUT DISPLAY ---
+        if st.session_state['cg_result']:
+            st.divider()
+            
+            if st.session_state['cg_rationale']:
+                st.markdown(f"""
+                    <div class="rationale-box">
+                        <strong>GENERATION STRATEGY:</strong><br>
+                        {st.session_state['cg_rationale']}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.subheader("FINAL DRAFT")
+            st.text_area("Copy to Clipboard", value=st.session_state['cg_result'], height=500)
+
 # 5. SOCIAL MEDIA ASSISTANT (Platform-Aware, Goal-Oriented, Trend-Aware)
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
@@ -3227,6 +3516,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
