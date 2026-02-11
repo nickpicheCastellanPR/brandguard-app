@@ -2370,24 +2370,36 @@ elif app_mode == "BRAND MANAGER":
                 with c_upl:
                     cal_img = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key="cal_uploader")
                 
-                if cal_img and st.button(f"ANALYZE & INJECT {cal_platform.upper()} DNA"):
-                    with st.spinner("EXTRACTING PATTERNS..."):
-                        # 1. Run Analysis
-                        analysis = logic_engine.analyze_social_post(Image.open(cal_img))
-                        
-                        # 2. Append to Final Text (Visible Change)
-                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {analysis}\n----------------\n"
+                # STATEFUL PREVIEW FOR MANAGER
+                if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
+                
+                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST"):
+                    with st.spinner("REVERSE ENGINEERING..."):
+                        img = Image.open(cal_img)
+                        # Use the NEW Strict Method
+                        st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                
+                # FEEDBACK LOOP
+                if st.session_state['man_social_analysis']:
+                    st.markdown("#### 🧬 REVIEW FINDINGS")
+                    st.caption("Edit the analysis below to ensure it accurately reflects your strategy.")
+                    final_dna = st.text_area("EDIT STRATEGY BEFORE SAVING", value=st.session_state['man_social_analysis'], height=150)
+                    
+                    if st.button("CONFIRM & INJECT DNA", type="primary"):
+                        # 1. Append to Final Text
+                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {final_dna}\n----------------\n"
                         profile_obj['final_text'] += injection
                         
-                        # 3. SAVE TO INPUTS (Persistence Change)
-                        # We save this block so we don't lose it if we edit the Mission later
+                        # 2. Save to Inputs (Persistence)
                         existing_dna = profile_obj['inputs'].get('social_dna', '')
                         profile_obj['inputs']['social_dna'] = existing_dna + injection
                         
-                        # 4. Save
+                        # 3. Commit
                         st.session_state['profiles'][target] = profile_obj
                         db.save_profile(st.session_state['user_id'], target, profile_obj)
-                        st.success(f"SUCCESS: {cal_platform} patterns injected into Brand Profile.")
+                        
+                        st.session_state['man_social_analysis'] = "" # Reset
+                        st.success(f"SUCCESS: {cal_platform} patterns injected.")
                         st.rerun()
 
             st.divider()
@@ -2547,6 +2559,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
