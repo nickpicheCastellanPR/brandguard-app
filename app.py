@@ -2389,43 +2389,21 @@ elif app_mode == "BRAND MANAGER":
                 with st.expander("3. GUARDRAILS"):
                     new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
                 
-                # --- ADVANCED EDITORS ---
-                with st.expander("4. BRAND DNA & ASSET LOG"):
-                    st.info("CLEANUP TASK: Use these tabs to review the raw instructions the AI has learned from your uploaded assets. You can delete outdated blocks of text here.")
-                    
-                    dna_tab1, dna_tab2, dna_tab3 = st.tabs(["SOCIAL DNA", "VOICE DNA", "VISUAL DNA"])
-                    
-                    # Fetch existing values
-                    val_social = inputs.get('social_dna', '')
-                    val_voice = inputs.get('voice_dna', '')
-                    val_visual = inputs.get('visual_dna', '')
-                    
-                    with dna_tab1:
-                        st.caption("Instructions derived from Social Media uploads.")
-                        new_social_dna = st.text_area("SOCIAL PATTERNS", value=val_social, height=300, key="editor_social")
-                    
-                    with dna_tab2:
-                        st.caption("Instructions derived from Text/PDF uploads.")
-                        new_voice_dna = st.text_area("VOICE PATTERNS", value=val_voice, height=300, key="editor_voice")
-                        
-                    with dna_tab3:
-                        st.caption("Instructions derived from Logo/Visual uploads.")
-                        new_visual_dna = st.text_area("VISUAL PATTERNS", value=val_visual, height=300, key="editor_visual")
-
-                # --- CALIBRATION LAB ---
-                st.markdown("### CALIBRATION LAB")
-                st.info("Upload new assets here to train the engine. Select the correct Asset Type to ensure accurate tagging.")
+                # --- CALIBRATION & ASSETS ---
+                st.markdown("### CALIBRATION LAB & ASSET LIBRARY")
+                st.info("Upload assets to train the engine. Manage your saved assets in the text windows below each section.")
                 
-                cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL POSTS", "VOICE/TEXT", "VISUAL ASSETS"])
+                cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL MEDIA", "VOICE & TONE", "VISUAL ID"])
                 
                 # --- 1. SOCIAL INJECTOR ---
                 with cal_tab1:
                     c1, c2 = st.columns(2)
                     with c1:
-                        cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"], key="cal_plat")
+                        cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
                     with c2:
-                        cal_img = st.file_uploader("UPLOAD POST", type=["png", "jpg"], key="cal_up_social")
+                        cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
                     
+                    # Analysis State
                     if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
                     
                     if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
@@ -2437,19 +2415,29 @@ elif app_mode == "BRAND MANAGER":
                         st.markdown("#### REVIEW FINDINGS")
                         edit_social = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
                         if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
+                            from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
-                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST - {timestamp}]\nAnalysis: {edit_social}\n----------------\n"
+                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}\n----------------\n"
                             
-                            # Update Inputs & Save
-                            profile_obj['inputs']['social_dna'] = inputs.get('social_dna', '') + injection
+                            # Append to Input
+                            current_dna = inputs.get('social_dna', '')
+                            profile_obj['inputs']['social_dna'] = current_dna + injection
                             
-                            # Force Rebuild Context
-                            st.session_state['editor_social'] = profile_obj['inputs']['social_dna'] 
+                            # Update Session for Text Area below
+                            st.session_state['editor_social'] = profile_obj['inputs']['social_dna']
                             
+                            # Save to DB
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_social_analysis'] = ""
-                            st.success("Social DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.success("Asset Injected.")
                             st.rerun()
+                    
+                    st.divider()
+                    st.markdown("#### SOCIAL ASSET LOG")
+                    st.caption("This is the accumulated knowledge base for Social Media. Delete text blocks to remove assets.")
+                    # Use .get() with fallback to inputs to ensure persistence
+                    val_social = st.session_state.get('editor_social', inputs.get('social_dna', ''))
+                    st.text_area("SAVED SOCIAL PATTERNS", value=val_social, height=300, key="editor_social")
 
                 # --- 2. VOICE INJECTOR ---
                 with cal_tab2:
@@ -2457,7 +2445,7 @@ elif app_mode == "BRAND MANAGER":
                     with c1:
                         voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
                     with c2:
-                        v_file = st.file_uploader("UPLOAD SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                        v_file = st.file_uploader("UPLOAD TEXT SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
                     
                     if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
                     
@@ -2485,15 +2473,24 @@ elif app_mode == "BRAND MANAGER":
                         st.markdown("#### REVIEW FINDINGS")
                         edit_voice = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
                         if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
-                            injection = f"\n\n[ASSET: {voice_type.upper()} - {v_file.name}]\nAnalysis: {edit_voice}\n----------------\n"
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y-%m-%d")
+                            injection = f"\n\n[ASSET: {voice_type.upper()} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
                             
-                            profile_obj['inputs']['voice_dna'] = inputs.get('voice_dna', '') + injection
+                            current_voice = inputs.get('voice_dna', '')
+                            profile_obj['inputs']['voice_dna'] = current_voice + injection
                             st.session_state['editor_voice'] = profile_obj['inputs']['voice_dna']
                             
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_voice_analysis'] = ""
-                            st.success("Voice DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.success("Asset Injected.")
                             st.rerun()
+
+                    st.divider()
+                    st.markdown("#### VOICE ASSET LOG")
+                    st.caption("Accumulated linguistic patterns. Delete text blocks to remove assets.")
+                    val_voice = st.session_state.get('editor_voice', inputs.get('voice_dna', ''))
+                    st.text_area("SAVED VOICE PATTERNS", value=val_voice, height=300, key="editor_voice")
 
                 # --- 3. VISUAL INJECTOR ---
                 with cal_tab3:
@@ -2501,7 +2498,7 @@ elif app_mode == "BRAND MANAGER":
                     with c1:
                         vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
                     with c2:
-                        vis_file = st.file_uploader("UPLOAD ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
+                        vis_file = st.file_uploader("UPLOAD VISUAL ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
                     
                     if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
                     
@@ -2514,15 +2511,24 @@ elif app_mode == "BRAND MANAGER":
                         st.markdown("#### REVIEW FINDINGS")
                         edit_vis = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
                         if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
-                            injection = f"\n\n[ASSET: {vis_type.upper()} - {vis_file.name}]\nAnalysis: {edit_vis}\n----------------\n"
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y-%m-%d")
+                            injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}\n----------------\n"
                             
-                            profile_obj['inputs']['visual_dna'] = inputs.get('visual_dna', '') + injection
+                            current_vis = inputs.get('visual_dna', '')
+                            profile_obj['inputs']['visual_dna'] = current_vis + injection
                             st.session_state['editor_visual'] = profile_obj['inputs']['visual_dna']
                             
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_vis_analysis'] = ""
-                            st.success("Visual DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.success("Asset Injected.")
                             st.rerun()
+
+                    st.divider()
+                    st.markdown("#### VISUAL ASSET LOG")
+                    st.caption("Accumulated design instructions. Delete text blocks to remove assets.")
+                    val_visual = st.session_state.get('editor_visual', inputs.get('visual_dna', ''))
+                    st.text_area("SAVED VISUAL PATTERNS", value=val_visual, height=300, key="editor_visual")
 
                 st.divider()
 
@@ -2535,7 +2541,8 @@ elif app_mode == "BRAND MANAGER":
                     profile_obj['inputs']['wiz_tone'] = new_tone
                     profile_obj['inputs']['wiz_guardrails'] = new_guard
                     
-                    # 2. Update DNA Inputs from Editors (Reading the Widgets)
+                    # 2. Update DNA Inputs from Editors (The Log Text Areas)
+                    # This captures manual deletions/edits made in the Asset Logs
                     profile_obj['inputs']['social_dna'] = st.session_state.get('editor_social', val_social)
                     profile_obj['inputs']['voice_dna'] = st.session_state.get('editor_voice', val_voice)
                     profile_obj['inputs']['visual_dna'] = st.session_state.get('editor_visual', val_visual)
@@ -2543,7 +2550,8 @@ elif app_mode == "BRAND MANAGER":
                     p_p = ", ".join(inputs['palette_primary'])
                     p_s = ", ".join(inputs['palette_secondary'])
                     
-                    # 3. Rebuild Final Text (The Full DNA)
+                    # 3. Rebuild Final Text (The Full Brand Kit)
+                    # We strictly include the DNA logs here so the Export file is complete
                     new_text = f"""
                     1. STRATEGY
                     - Brand: {new_name}
@@ -2553,13 +2561,15 @@ elif app_mode == "BRAND MANAGER":
                     
                     2. VOICE
                     - Tone Keywords: {new_tone}
-                    [VOICE DNA]
+                    
+                    [VOICE DNA & ASSETS]
                     {profile_obj['inputs']['voice_dna']}
                     
                     3. VISUALS
                     - Primary: {p_p}
                     - Secondary: {p_s}
-                    [VISUAL DNA]
+                    
+                    [VISUAL DNA & ASSETS]
                     {profile_obj['inputs']['visual_dna']}
                     
                     4. GUARDRAILS
@@ -2688,6 +2698,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
