@@ -2115,19 +2115,47 @@ elif app_mode == "BRAND ARCHITECT":
                             st.session_state['wiz_samples_list'].pop(i)
                             st.rerun()
 
-        with st.expander("3. SOCIAL MEDIA"):
-            st.caption("Upload screenshots of high-performing posts.")
-            # MATCHED TO SOCIAL ASSISTANT
-            st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
+        with st.expander("3. SOCIAL MEDIA (GOLD STANDARD)"):
+            st.caption("Upload 'Representative' posts that capture your ideal look & feel.")
+            
+            s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook", "Other"], key="wiz_social_platform")
             s_key = f"social_up_{st.session_state['social_uploader_key']}"
-            st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
-            st.button("ADD SOCIAL SAMPLE", on_click=add_social_callback)
+            s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
+            
+            # INLINE ANALYSIS LOGIC (Smart Ingestion)
+            if st.button("ANALYZE & ADD SAMPLE"):
+                if s_file:
+                    with st.spinner("EXTRACTING VISUAL DNA..."):
+                        try:
+                            # 1. Analyze Immediately
+                            img_obj = Image.open(s_file)
+                            analysis_result = logic_engine.analyze_social_post(img_obj)
+                            
+                            # 2. Store with Analysis
+                            entry = {
+                                "file": s_file,
+                                "platform": s_plat,
+                                "analysis": analysis_result
+                            }
+                            st.session_state['wiz_social_list'].append(entry)
+                            
+                            # 3. Reset Uploader
+                            st.session_state['social_uploader_key'] += 1
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Analysis Failed: {e}")
+                else:
+                    st.warning("Please upload an image first.")
+
             if st.session_state['wiz_social_list']:
                 st.divider()
-                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} IMAGES**")
+                st.markdown(f"**SOCIAL BUFFER: {len(st.session_state['wiz_social_list'])} ANALYZED POSTS**")
                 for i, item in enumerate(st.session_state['wiz_social_list']):
                     c1, c2 = st.columns([4,1])
-                    with c1: st.caption(f"> {item['platform']} - {item['file'].name}")
+                    with c1: 
+                        st.markdown(f"**{item['platform']}**")
+                        # Show the AI Recap to build trust
+                        st.caption(f"🤖 *AI Recap:* \"{item['analysis'][:100]}...\"")
                     with c2: 
                         if st.button("REMOVE", key=f"del_social_{i}", type="secondary"):
                             st.session_state['wiz_social_list'].pop(i)
@@ -2192,12 +2220,13 @@ elif app_mode == "BRAND ARCHITECT":
                     try:
                         palette_str = f"Primary: {', '.join(st.session_state['palette_primary'])}. Secondary: {', '.join(st.session_state['palette_secondary'])}. Accents: {', '.join(st.session_state['palette_accent'])}."
                         
-                        # FIX: Use logic_engine for logo and social analysis
                         logo_desc_list = [f"Logo Variant ({item['file'].name}): {logic_engine.describe_logo(Image.open(item['file']))}" for item in st.session_state['wiz_logo_list']]
                         logo_summary = "\n".join(logo_desc_list) if logo_desc_list else "None provided."
                         
-                        social_desc_list = [f"Platform: {item['platform']}. Analysis: {logic_engine.analyze_social_post(Image.open(item['file']))}" for item in st.session_state['wiz_social_list']]
-                        social_summary = "\n".join(social_desc_list) if social_desc_list else "None provided."
+                        # USE PRE-ANALYZED SOCIAL DATA
+                        # We don't re-run analysis here. We use the stored 'analysis' string.
+                        social_desc_list = [f"Platform: {item['platform']}.\nAnalysis: {item['analysis']}" for item in st.session_state['wiz_social_list']]
+                        social_summary = "\n---\n".join(social_desc_list) if social_desc_list else "None provided."
                         
                         all_samples = "\n---\n".join(st.session_state['wiz_samples_list'])
                         
@@ -2205,11 +2234,10 @@ elif app_mode == "BRAND ARCHITECT":
                         SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
                         1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
                         2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
-                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social: {social_summary}
+                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social DNA: {social_summary}
                         4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
                         
-                        # FIX: Use logic_engine for final generation
                         final_text_out = logic_engine.generate_brand_rules(prompt)
                         
                         profile_data = {
@@ -2223,7 +2251,8 @@ elif app_mode == "BRAND ARCHITECT":
                                 "wiz_guardrails": st.session_state.wiz_guardrails,
                                 "palette_primary": st.session_state['palette_primary'],
                                 "palette_secondary": st.session_state['palette_secondary'],
-                                "palette_accent": st.session_state['palette_accent']
+                                "palette_accent": st.session_state['palette_accent'],
+                                "social_dna": social_summary # PERSIST THE DNA
                             }
                         }
                         
@@ -2301,7 +2330,6 @@ elif app_mode == "BRAND MANAGER":
                     index=idx,
                     format_func=format_archetype_edit
                 )
-                # Info Card for Editor
                 if new_arch:
                     info = ARCHETYPE_INFO[new_arch]
                     st.markdown(f"""
@@ -2318,11 +2346,11 @@ elif app_mode == "BRAND MANAGER":
             with st.expander("3. GUARDRAILS"):
                 new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
             
-            # --- THE NEW CALIBRATION LAB (The Gap Fix) ---
+            # --- THE NEW CALIBRATION LAB ---
             st.markdown("### 🔬 CALIBRATION LAB")
             st.info("Improve your Confidence Score by injecting specific assets here.")
             
-            with st.expander("INJECT SOCIAL MEDIA ASSET (Fix 'Low Data' Warning)", expanded=True):
+            with st.expander("INJECT 'GOLD STANDARD' SOCIAL ASSET", expanded=True):
                 c_plat, c_upl = st.columns(2)
                 with c_plat:
                     cal_platform = st.selectbox("PLATFORM TO CALIBRATE", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"])
@@ -2334,13 +2362,16 @@ elif app_mode == "BRAND MANAGER":
                         # 1. Run Analysis
                         analysis = logic_engine.analyze_social_post(Image.open(cal_img))
                         
-                        # 2. Append to Final Text
-                        # We append it clearly so the engine sees "Platform: LinkedIn"
+                        # 2. Append to Final Text (Visible Change)
                         injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {analysis}\n----------------\n"
-                        
                         profile_obj['final_text'] += injection
                         
-                        # 3. Save
+                        # 3. SAVE TO INPUTS (Persistence Change)
+                        # We save this block so we don't lose it if we edit the Mission later
+                        existing_dna = profile_obj['inputs'].get('social_dna', '')
+                        profile_obj['inputs']['social_dna'] = existing_dna + injection
+                        
+                        # 4. Save
                         st.session_state['profiles'][target] = profile_obj
                         db.save_profile(st.session_state['user_id'], target, profile_obj)
                         st.success(f"SUCCESS: {cal_platform} patterns injected into Brand Profile.")
@@ -2359,6 +2390,10 @@ elif app_mode == "BRAND MANAGER":
                 p_p = ", ".join(inputs['palette_primary'])
                 p_s = ", ".join(inputs['palette_secondary'])
                 
+                # RETRIEVE PERSISTED SOCIAL DNA
+                # If we didn't do this, editing the Mission would delete all your Social Calibrations!
+                saved_social_dna = profile_obj['inputs'].get('social_dna', '')
+                
                 new_text = f"""
                 1. STRATEGY
                 - Brand: {new_name}
@@ -2375,11 +2410,11 @@ elif app_mode == "BRAND MANAGER":
                 
                 4. GUARDRAILS
                 - {new_guard}
+                
+                5. SOCIAL DNA (CALIBRATION DATA)
+                {saved_social_dna}
                 """
-                # Note: We replace the base structure but keep the appended Calibration Data if it exists? 
-                # This simple overwrite might lose injected data if not careful.
-                # Ideally, we should preserve the analysis sections.
-                # For this MVP, we will just update the base text.
+                
                 profile_obj['final_text'] = new_text
                 st.session_state['profiles'][target] = profile_obj
                 
@@ -2499,6 +2534,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
