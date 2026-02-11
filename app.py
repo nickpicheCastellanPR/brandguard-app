@@ -1480,6 +1480,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                             
                         except Exception as e:
                             st.error(f"System Error: {e}")
+                            
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
@@ -1515,52 +1516,117 @@ elif app_mode == "COPY EDITOR":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- HELPER: REAL CONFIDENCE CALCULATION ---
-    def calculate_content_confidence(profile_data, content_type):
-        """
-        Scans the Voice DNA to see if we have assets matching the requested content type.
-        Returns a score, color, and rationale.
-        """
-        score = 40 # Base score (Generic Strategy exists)
-        color = "#ff4b4b" # Red
-        label = "LOW DATA"
-        rationale = " relying on generic brand values."
-        action = "Go to Brand Manager > Voice Calibration and upload samples."
-
-        inputs = profile_data.get('inputs', {})
-        voice_dna = inputs.get('voice_dna', '')
-        
-        # 1. Check for Volume
-        if len(voice_dna) > 500:
-            score += 20
-            color = "#ffa421" # Orange
-            label = "CALIBRATED"
-            rationale = " using general linguistic patterns."
-            action = f"Upload specific {content_type} examples for better accuracy."
-
-        # 2. Check for Specific Match (The "Smart" Part)
-        # We look for the Content Type string inside the DNA header tags
-        type_keyword = content_type.split(" ")[0].upper() # e.g. "INTERNAL" or "PRESS"
-        if f"TYPE: {type_keyword}" in voice_dna.upper() or f"ASSET: {type_keyword}" in voice_dna.upper():
-            score += 35
-            color = "#09ab3b" # Green
-            label = "HIGH CONFIDENCE"
-            rationale = f" trained specifically on {content_type} examples."
-            action = "" # No action needed
-
-        return {
-            "score": min(score, 100),
-            "color": color,
-            "label": label,
-            "rationale": "Engine is" + rationale,
-            "action": action
-        }
-
     # --- AGENCY TIER CHECK ---
     is_admin = st.session_state.get('is_admin', False)
     sub_status = st.session_state.get('status', 'trial').lower()
     if not is_admin and sub_status != 'active':
         show_paywall()
+
+    # --- HELPER: RISK vs ASSETS CONFIDENCE MODEL ---
+    def calculate_content_confidence(profile_data, content_type):
+        """
+        Calculates confidence based on the 'Risk vs. Assets' tiered model.
+        """
+        inputs = profile_data.get('inputs', {})
+        score = 0
+        cap = 100
+        rationale_parts = []
+        missing_parts = []
+        action = ""
+        
+        # Data Availability Checks
+        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
+        has_values = len(inputs.get('wiz_values', '')) > 10
+        has_tone = len(inputs.get('wiz_tone', '')) > 2
+        voice_dna_len = len(inputs.get('voice_dna', ''))
+        has_deep_voice = voice_dna_len > 1000
+        has_voice_samples = voice_dna_len > 50
+
+        # TIER 1: HIGH RISK (Crisis, Press Release)
+        if content_type in ["Crisis Statement", "Press Release"]:
+            score = 0 # Base 0
+            
+            if has_guardrails:
+                score += 40
+                rationale_parts.append("Guardrails")
+            else:
+                cap = 50
+                missing_parts.append("Guardrails (CRITICAL)")
+                action = "Add Guardrails in Strategy tab to unlock higher scores."
+            
+            if has_values:
+                score += 30
+                rationale_parts.append("Core Values")
+            else:
+                missing_parts.append("Core Values")
+                
+            if has_tone:
+                score += 20
+                rationale_parts.append("Tone")
+
+        # TIER 2: STRATEGIC INTERNAL (Memo, Email)
+        elif content_type in ["Executive Memo", "Internal Email"]:
+            score = 20 # Base 20
+            
+            if has_tone:
+                score += 30
+                rationale_parts.append("Tone Definitions")
+            else:
+                cap = 60
+                missing_parts.append("Tone Definitions (CRITICAL)")
+                action = "Define Tone Keywords in Strategy tab."
+            
+            if has_voice_samples:
+                score += 30
+                rationale_parts.append("Voice Samples")
+            else:
+                missing_parts.append("Voice Samples")
+
+        # TIER 3: CREATIVE / EXTERNAL (Blog, Social, Speech)
+        else:
+            score = 30 # Base 30
+            
+            if has_deep_voice:
+                score += 40
+                rationale_parts.append("Deep Voice Data")
+            elif has_voice_samples:
+                score += 20
+                rationale_parts.append("Basic Voice Data")
+            else:
+                cap = 50
+                missing_parts.append("Voice DNA (CRITICAL)")
+                action = "Upload more text samples to the Voice Calibration Lab."
+            
+            if has_tone:
+                score += 30
+                rationale_parts.append("Tone Guidelines")
+
+        # Final Calculation
+        final_score = min(score, cap)
+        
+        # Color Logic
+        color = "#ff4b4b" # Red
+        label = "LOW DATA"
+        if final_score > 50: 
+            color = "#ffa421" # Orange
+            label = "CALIBRATED"
+        if final_score > 75: 
+            color = "#09ab3b" # Green
+            label = "HIGH CONFIDENCE"
+
+        # Rationale String construction
+        using_str = ", ".join(rationale_parts) if rationale_parts else "Generic Model"
+        missing_str = ", ".join(missing_parts) if missing_parts else "None"
+        
+        full_rationale = f"Using: {using_str}. Missing: {missing_str}."
+
+        return {
+            "score": final_score,
+            "color": color,
+            "label": label,
+            "rationale": full_rationale,
+            "action": action
+        }
 
     if not active_profile: 
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
@@ -3173,6 +3239,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
