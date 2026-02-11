@@ -4,10 +4,12 @@ import json
 import re
 import math
 import colorsys
+import time
 from collections import Counter
 from PIL import Image
 import numpy as np
 from sklearn.cluster import KMeans
+from google.api_core import exceptions
 
 # --- CONFIG ---
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -26,9 +28,7 @@ def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 def extract_dominant_colors(image, num_colors=5):
-    """
-    K-Means clustering to find distinct dominant hex codes.
-    """
+    """K-Means clustering to find distinct dominant hex codes."""
     try:
         # Resize for speed
         img = image.copy()
@@ -78,7 +78,6 @@ class ColorScorer:
                 b_rgb = hex_to_rgb(b_hex)
                 
                 # A. EXACT MATCH (Euclidean Distance in RGB)
-                # Max distance is ~441. We consider < 50 a "close" match.
                 distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(d_rgb, b_rgb)))
                 dist_score = max(0, 100 - (distance * 2))
                 
@@ -88,18 +87,14 @@ class ColorScorer:
                     matched_brand_color = b_hex
 
                 # B. TINT/SHADE MATH (The Vector Upgrade)
-                # Convert to HLS (Hue, Lightness, Saturation)
                 d_h, d_l, d_s = colorsys.rgb_to_hls(*[x/255.0 for x in d_rgb])
                 b_h, b_l, b_s = colorsys.rgb_to_hls(*[x/255.0 for x in b_rgb])
                 
-                # Logic:
-                # 1. Hue must be very close (within 5% / 18 degrees)
-                # 2. Lightness/Saturation can vary (that's what makes it a tint/shade)
                 hue_diff = abs(d_h - b_h)
-                if hue_diff > 0.5: hue_diff = 1.0 - hue_diff # Handle color wheel wrap-around
+                if hue_diff > 0.5: hue_diff = 1.0 - hue_diff 
                 
                 if hue_diff < 0.05: # 5% Tolerance on Hue Family
-                    tint_score = 90 # High score for correct color family
+                    tint_score = 90 
                     if tint_score > best_match_score:
                         best_match_score = tint_score
                         match_type = "Tint/Shade"
@@ -109,7 +104,6 @@ class ColorScorer:
             if best_match_score > 60:
                 logs.append(f"Detected {d_hex} matches {matched_brand_color} ({match_type})")
         
-        # Final Score is average of the top 3 dominant colors found
         matches.sort(reverse=True)
         top_matches = matches[:3]
         final_score = int(sum(top_matches) / max(len(top_matches), 1))
@@ -124,52 +118,47 @@ class ColorScorer:
 
 
 # --- 2. MAIN LOGIC CLASS --- #
-import time
-from google.api_core import exceptions
 
 class SignetLogic:
     def __init__(self):
-        # 1. THE STABLE CORE (Upgraded to Confirmed Model)
+        # 1. THE STABLE CORE
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # 2. THE RESEARCHER (Stabilized)
+        # 2. THE RESEARCHER
         self.search_model = genai.GenerativeModel('gemini-2.0-flash')
 
-    def _safe_generate(self, model_instance, prompt, image=None, retries=3):
+    def _safe_generate(self, model_instance, prompt, images=None, retries=3):
         """
         Internal helper to handle 429 Quota errors with exponential backoff.
+        Updated to handle multiple images (list) for Visual Compliance.
         """
+        # Prepare content list (Prompt + 0 or more images)
+        content = [prompt]
+        if images:
+            if isinstance(images, list):
+                content.extend(images) # Add multiple images
+            else:
+                content.append(images) # Add single image
+
         for i in range(retries):
             try:
-                if image:
-                    return model_instance.generate_content([prompt, image])
-                else:
-                    return model_instance.generate_content(prompt)
+                return model_instance.generate_content(content)
             except exceptions.ResourceExhausted:
                 # If quota hits, wait exponentially (2s, 4s, 8s)
                 wait_time = 2 ** (i + 1)
                 time.sleep(wait_time)
                 continue
             except Exception as e:
-                # If it's a different error (like 400), fail immediately
                 raise e
         
-        # If we run out of retries, try one last time and let it fail if it must
-        if image:
-            return model_instance.generate_content([prompt, image])
-        return model_instance.generate_content(prompt)
+        # Final attempt
+        return model_instance.generate_content(content)
 
-# --- NEW: STRICT REVERSE ENGINEERING ---
     def analyze_social_style(self, image):
         """
         REVERSE ENGINEER: Extracts style/aesthetic from an image.
-        Strictly forbids generation of new content.
-        Used for Brand DNA Ingestion.
         Includes 429/Quota Retry Logic.
         """
-        import time
-        from google.api_core.exceptions import ResourceExhausted
-
         prompt = """
         ROLE: Brand Strategist.
         TASK: Reverse-engineer the 'Social DNA' of this post.
@@ -194,40 +183,35 @@ class SignetLogic:
         - TONE OF VOICE: (e.g. Professional, Direct, Educational)
         """
         
-        # RETRY LOOP (Safeguard for 429 Errors)
+        # RETRY LOOP (Safeguard)
         max_retries = 3
-        backoff_factor = 2  # Seconds
+        backoff_factor = 2
         
         for attempt in range(max_retries):
             try:
-                # Use Safe Generate
                 response = self._safe_generate(self.model, prompt, image)
                 text = response.text
                 
-                # Post-processing: Strict Filter for Chatty Intros
-                # If the model ignores the system instruction and adds a preamble, strip it.
+                # Strict Clean
                 if "Here is" in text or "Okay" in text:
-                    # Split by newline and take the rest
                     parts = text.split('\n', 1)
                     if len(parts) > 1:
                         text = parts[1].strip()
-                
                 return text
 
-            except ResourceExhausted:
-                # HIT RATE LIMIT - WAIT AND RETRY
+            except exceptions.ResourceExhausted:
                 if attempt < max_retries - 1:
-                    wait_time = backoff_factor * (2 ** attempt) # 2s, 4s, 8s...
-                    time.sleep(wait_time)
+                    time.sleep(backoff_factor * (2 ** attempt))
                     continue
                 else:
                     return "⚠️ System Busy: The AI is currently overloaded. Please wait 30 seconds and try again."
-            
             except Exception as e:
                 return f"Error extracting style: {e}"
-    def run_visual_audit(self, image, profile_text):
+
+    def run_visual_audit(self, image, profile_text, reference_image=None):
         """
         THE JUDGE: Combines Math + Vision + Text Reading for 5-Pillar Score.
+        UPDATED: Accepts an optional 'reference_image' for direct visual comparison.
         """
         # A. MATH: RUN COLOR SCIENCE
         color_raw = 50 
@@ -241,43 +225,60 @@ class SignetLogic:
             color_logic = f"Math Error: {str(e)}"
         
         # B. AI: RUN VISION & TEXT ANALYSIS
+        reference_instruction = ""
+        if reference_image:
+            reference_instruction = """
+            CRITICAL: I have provided two images. 
+            - Image 1: The 'CANDIDATE' asset being audited.
+            - Image 2: The 'GOLD STANDARD REFERENCE' from the brand kit.
+            COMPARE the Candidate against the Reference. Does it match the aesthetic, logo placement, and quality?
+            """
+
         prompt = f"""
         ROLE: Chief Brand Officer.
-        TASK: Audit this image against the Brand Profile.
+        TASK: Audit the 'CANDIDATE' image against the Brand Profile.
         
-        BRAND PROFILE:
+        {reference_instruction}
+
+        BRAND PROFILE TEXT:
         {profile_text}
         
         DETECTED HEX CODES: {", ".join(detected_hexes) if detected_hexes else "N/A"}
         
         INSTRUCTIONS:
-        1. READ ANY TEXT visible in the image. Check for spelling, grammar, tone, and forbidden words.
+        1. READ ANY TEXT visible in the candidate image. Check for spelling, grammar, tone, and forbidden words.
         2. ANALYZE VISUALS (Logo, Typography, Vibe).
         
         SCORING RUBRIC (0-100 per category):
-        - IDENTITY (25%): Logo usage, placement, distortion. If no logo but valid asset (e.g. pattern), score high.
-        - COLOR (25%): Check against hex codes. IMPORTANT: Accept tints (lighter) and shades (darker) of the Primary Palette as COMPLIANT. Do not penalize for opacity changes.
+        - IDENTITY (25%): Logo usage, placement, distortion. Compare to Reference if available.
+        - COLOR (25%): Check against hex codes. IMPORTANT: Accept tints/shades of Primary Palette.
         - TYPOGRAPHY (15%): Font family, hierarchy, legibility.
-        - VIBE (15%): Archetype match (e.g. Ruler vs Jester).
-        - TONE & COPY (20%): Does the text match the brand voice? Are there forbidden words? Is it typo-free?
+        - VIBE (15%): Archetype match. Does it feel like the Brand Profile?
+        - TONE & COPY (20%): Does the text match the brand voice?
         
         OUTPUT FORMAT: Return a PURE JSON object (no markdown) with these exact keys:
-        - "identity_score": (int 0-100)
+        - "identity_score": (int)
         - "identity_reason": (string)
-        - "type_score": (int 0-100)
+        - "type_score": (int)
         - "type_reason": (string)
-        - "vibe_score": (int 0-100)
+        - "vibe_score": (int)
         - "vibe_reason": (string)
-        - "tone_score": (int 0-100)
-        - "tone_reason": (string) If no text found, give 100 (Neutral).
-        - "critical_fixes": (List of strings) Absolute failures (e.g. Wrong Logo).
-        - "minor_fixes": (List of strings) Polish items.
-        - "brand_wins": (List of strings) What is working well.
+        - "tone_score": (int)
+        - "tone_reason": (string)
+        - "critical_fixes": (List of strings)
+        - "minor_fixes": (List of strings)
+        - "brand_wins": (List of strings)
         """
         
         try:
-            # UPGRADE: Wrapper used
-            response = self._safe_generate(self.model, prompt, image)
+            # Build inputs: Prompt + Candidate + Reference (if exists)
+            inputs = [image]
+            if reference_image:
+                inputs.append(reference_image)
+            
+            # UPGRADE: Wrapper now handles lists correctly
+            response = self._safe_generate(self.model, prompt, inputs)
+            
             txt = response.text.replace("```json", "").replace("```", "").strip()
             ai_result = json.loads(txt)
             
@@ -349,7 +350,6 @@ class SignetLogic:
         RAW TEXT: {pdf_text[:15000]}
         """
         try:
-            # UPGRADE: Wrapper used
             response = self._safe_generate(self.model, prompt)
             cleaned = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
@@ -364,7 +364,6 @@ class SignetLogic:
              }
 
     def generate_brand_rules(self, prompt_text):
-        # UPGRADE: Wrapper used
         response = self._safe_generate(self.model, prompt_text)
         return response.text
 
@@ -372,7 +371,6 @@ class SignetLogic:
     def run_copy_editor(self, user_draft, profile_text):
         prompt = f"Rewrite this draft to match the brand voice:\n\nBRAND RULES:\n{profile_text}\n\nDRAFT:\n{user_draft}"
         try:
-            # UPGRADE: Wrapper used
             response = self._safe_generate(self.model, prompt)
             return response.text
         except Exception as e:
@@ -381,7 +379,6 @@ class SignetLogic:
     def run_content_generator(self, topic, format_type, key_points, profile_text):
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
-            # UPGRADE: Wrapper used
             response = self._safe_generate(self.search_model, prompt)
             return response.text
         except Exception as e:
@@ -389,7 +386,6 @@ class SignetLogic:
     
     def analyze_social_post(self, image):
         try:
-            # UPGRADE: Wrapper used
             response = self._safe_generate(self.model, "Analyze this social post and suggest a caption.", image)
             return response.text
         except Exception as e:
@@ -397,7 +393,6 @@ class SignetLogic:
 
     def describe_logo(self, image):
         try:
-            # UPGRADE: Wrapper used
             response = self._safe_generate(self.model, "Describe this logo in detail (colors, shapes, text).", image)
             return response.text
         except Exception as e:
