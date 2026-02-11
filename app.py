@@ -2025,7 +2025,7 @@ elif app_mode == "BRAND MANAGER":
                 new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
             
             # --- THE NEW CALIBRATION LAB ---
-            st.markdown("### 🔬 CALIBRATION LAB")
+            st.markdown("###  CALIBRATION LAB")
             st.info("Improve your Confidence Score by injecting specific assets here.")
             
             with st.expander("INJECT 'GOLD STANDARD' SOCIAL ASSET", expanded=True):
@@ -2410,6 +2410,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
