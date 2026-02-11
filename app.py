@@ -2311,7 +2311,7 @@ elif app_mode == "BRAND ARCHITECT":
 elif app_mode == "BRAND MANAGER":
     st.title("BRAND MANAGER")
     
-    # --- CSS INJECTION (Crucial for Button Visibility) ---
+    # --- CSS INJECTION ---
     st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -2341,230 +2341,255 @@ elif app_mode == "BRAND MANAGER":
         is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
         final_text_view = profile_obj['final_text'] if is_structured else profile_obj
         
-        html_data = convert_to_html_brand_card(target, final_text_view)
-        st.download_button(label="📄 DOWNLOAD BRAND KIT (HTML)", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html", width="stretch")
+        # --- VIEW MODES ---
+        view_tab1, view_tab2 = st.tabs(["EDITOR", "LIVE PROFILE PREVIEW"])
         
-        st.divider()
-        
-        if is_structured:
-            inputs = profile_obj['inputs']
+        with view_tab2:
+            st.markdown("### CURRENT BRAND KIT")
+            st.caption("This is the exact data the AI uses to generate content.")
+            st.text_area("READ-ONLY VIEW", value=final_text_view, height=600, disabled=True)
             
-            with st.expander("1. STRATEGY", expanded=True):
-                new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
-                idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
-                def format_archetype_edit(option):
-                    if option in ARCHETYPE_INFO:
-                        return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
-                    return option
+            html_data = convert_to_html_brand_card(target, final_text_view)
+            st.download_button(label="DOWNLOAD HTML REPORT", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html")
 
-                new_arch = st.selectbox(
-                    "ARCHETYPE", 
-                    ARCHETYPES, 
-                    index=idx,
-                    format_func=format_archetype_edit
-                )
-                if new_arch:
-                    info = ARCHETYPE_INFO[new_arch]
-                    st.markdown(f"""
-                        <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
-                            <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
-                            <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                new_mission = st.text_area("MISSION", inputs['wiz_mission'])
-                new_values = st.text_area("VALUES", inputs['wiz_values'])
-            
-            with st.expander("2. VOICE"):
-                new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
-            
-            with st.expander("3. GUARDRAILS"):
-                new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
-            
-            # --- NEW: UNIFIED DNA EDITOR (Fixes the "Hidden Garbage" Issue) ---
-            with st.expander("4. BRAND DNA EDITORS (ADVANCED)"):
-                st.info("🗑️ **CLEANUP TASK:** Use these tabs to review or delete the 'Gold Standard' patterns the AI has learned.")
-                
-                dna_tab1, dna_tab2, dna_tab3 = st.tabs(["SOCIAL DNA", "VOICE DNA", "VISUAL DNA"])
-                
-                # Fetch existing values
-                val_social = inputs.get('social_dna', '')
-                val_voice = inputs.get('voice_dna', '')
-                val_visual = inputs.get('visual_dna', '')
-                
-                with dna_tab1:
-                    st.caption("Instructions for Social Media Posts")
-                    new_social_dna = st.text_area("SOCIAL PATTERNS", value=val_social, height=200, key="editor_social")
-                
-                with dna_tab2:
-                    st.caption("Instructions for Writing Style & Tone")
-                    new_voice_dna = st.text_area("VOICE PATTERNS", value=val_voice, height=200, key="editor_voice")
-                    
-                with dna_tab3:
-                    st.caption("Instructions for Graphic Design & Imagery")
-                    new_visual_dna = st.text_area("VISUAL PATTERNS", value=val_visual, height=200, key="editor_visual")
-
-            # --- CALIBRATION LAB (THE INJECTORS) ---
-            st.markdown("### 🔬 CALIBRATION LAB")
-            st.info("Analyze new assets to append to your specific DNA profiles.")
-            
-            cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL POSTS", "VOICE/TEXT", "VISUAL ASSETS"])
-            
-            # --- 1. SOCIAL INJECTOR ---
-            with cal_tab1:
-                c1, c2 = st.columns(2)
-                with c1:
-                    cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"], key="cal_plat")
-                with c2:
-                    cal_img = st.file_uploader("UPLOAD POST", type=["png", "jpg"], key="cal_up_social")
-                
-                if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
-                
-                if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
-                    with st.spinner("REVERSE ENGINEERING..."):
-                        img = Image.open(cal_img)
-                        st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
-                
-                if st.session_state['man_social_analysis']:
-                    st.markdown("#### REVIEW FINDINGS")
-                    edit_social = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
-                    if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
-                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nPlatform: {cal_platform}.\nAnalysis: {edit_social}\n----------------\n"
-                        # Append & Save
-                        profile_obj['inputs']['social_dna'] = inputs.get('social_dna', '') + injection
-                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-                        st.session_state['man_social_analysis'] = ""
-                        st.success("Social DNA Updated.")
-                        st.rerun()
-
-            # --- 2. VOICE INJECTOR ---
-            with cal_tab2:
-                v_file = st.file_uploader("UPLOAD SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
-                
-                if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
-                
-                if v_file and st.button("ANALYZE TONE", type="primary", key="btn_cal_voice"):
-                    with st.spinner("EXTRACTING LINGUISTIC PATTERNS..."):
-                        if v_file.type == "application/pdf":
-                            raw_txt = logic_engine.extract_text_from_pdf(v_file)
-                        else:
-                            raw_txt = str(v_file.read(), "utf-8")
-                        
-                        # Strict Linguist Prompt
-                        prompt = f"""
-                        TASK: Extract the 'Voice DNA' from this text.
-                        ROLE: Expert Linguist.
-                        CONSTRAINTS: No chat. No emojis. Bullet points only.
-                        INPUT TEXT: {raw_txt[:10000]}
-                        OUTPUT FORMAT:
-                        - SENTENCE STRUCTURE: (e.g. Complex, Fragmented)
-                        - VOCABULARY LEVEL: (e.g. Academic, Slang, Corporate)
-                        - RHETORICAL DEVICES: (e.g. Metaphors, Questions)
-                        - EMOTIONAL RESONANCE: (e.g. Urgent, Calm, Witty)
-                        """
-                        st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
-
-                if st.session_state['man_voice_analysis']:
-                    st.markdown("#### REVIEW FINDINGS")
-                    edit_voice = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
-                    if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
-                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nSource: {v_file.name}\nAnalysis: {edit_voice}\n----------------\n"
-                        profile_obj['inputs']['voice_dna'] = inputs.get('voice_dna', '') + injection
-                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-                        st.session_state['man_voice_analysis'] = ""
-                        st.success("Voice DNA Updated.")
-                        st.rerun()
-
-            # --- 3. VISUAL INJECTOR ---
-            with cal_tab3:
-                vis_file = st.file_uploader("UPLOAD ASSET (LOGO/PATTERN)", type=["png", "jpg"], key="cal_up_vis")
-                
-                if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
-                
-                if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
-                    with st.spinner("ANALYZING DESIGN..."):
-                        img = Image.open(vis_file)
-                        # Use generic description but labeled as DNA extraction
-                        st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
-                
-                if st.session_state['man_vis_analysis']:
-                    st.markdown("#### REVIEW FINDINGS")
-                    edit_vis = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
-                    if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
-                        injection = f"\n\n[INJECTED CALIBRATION DATA]\nAsset: {vis_file.name}\nAnalysis: {edit_vis}\n----------------\n"
-                        profile_obj['inputs']['visual_dna'] = inputs.get('visual_dna', '') + injection
-                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-                        st.session_state['man_vis_analysis'] = ""
-                        st.success("Visual DNA Updated.")
-                        st.rerun()
-
+        with view_tab1:
             st.divider()
+            
+            if is_structured:
+                inputs = profile_obj['inputs']
+                
+                with st.expander("1. STRATEGY", expanded=True):
+                    new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
+                    idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
+                    def format_archetype_edit(option):
+                        if option in ARCHETYPE_INFO:
+                            return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
+                        return option
 
-            if st.button("SAVE STRATEGY CHANGES", type="primary"):
-                # 1. Update Standard Inputs
-                profile_obj['inputs']['wiz_name'] = new_name
-                profile_obj['inputs']['wiz_archetype'] = new_arch
-                profile_obj['inputs']['wiz_mission'] = new_mission
-                profile_obj['inputs']['wiz_values'] = new_values
-                profile_obj['inputs']['wiz_tone'] = new_tone
-                profile_obj['inputs']['wiz_guardrails'] = new_guard
+                    new_arch = st.selectbox(
+                        "ARCHETYPE", 
+                        ARCHETYPES, 
+                        index=idx,
+                        format_func=format_archetype_edit
+                    )
+                    if new_arch:
+                        info = ARCHETYPE_INFO[new_arch]
+                        st.markdown(f"""
+                            <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
+                                <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
+                                <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    new_mission = st.text_area("MISSION", inputs['wiz_mission'])
+                    new_values = st.text_area("VALUES", inputs['wiz_values'])
                 
-                # 2. Update DNA Inputs from Editors (Reading the Widgets)
-                # Using session_state.get to ensure we capture the latest edit in the text area
-                # Fallback to existing if the widget hasn't been touched (unlikely but safe)
-                profile_obj['inputs']['social_dna'] = st.session_state.get('editor_social', val_social)
-                profile_obj['inputs']['voice_dna'] = st.session_state.get('editor_voice', val_voice)
-                profile_obj['inputs']['visual_dna'] = st.session_state.get('editor_visual', val_visual)
+                with st.expander("2. VOICE"):
+                    new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
                 
-                p_p = ", ".join(inputs['palette_primary'])
-                p_s = ", ".join(inputs['palette_secondary'])
+                with st.expander("3. GUARDRAILS"):
+                    new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
                 
-                # 3. Rebuild Final Text (The Full DNA)
-                new_text = f"""
-                1. STRATEGY
-                - Brand: {new_name}
-                - Archetype: {new_arch}
-                - Mission: {new_mission}
-                - Values: {new_values}
+                # --- ADVANCED EDITORS ---
+                with st.expander("4. BRAND DNA & ASSET LOG"):
+                    st.info("CLEANUP TASK: Use these tabs to review the raw instructions the AI has learned from your uploaded assets. You can delete outdated blocks of text here.")
+                    
+                    dna_tab1, dna_tab2, dna_tab3 = st.tabs(["SOCIAL DNA", "VOICE DNA", "VISUAL DNA"])
+                    
+                    # Fetch existing values
+                    val_social = inputs.get('social_dna', '')
+                    val_voice = inputs.get('voice_dna', '')
+                    val_visual = inputs.get('visual_dna', '')
+                    
+                    with dna_tab1:
+                        st.caption("Instructions derived from Social Media uploads.")
+                        new_social_dna = st.text_area("SOCIAL PATTERNS", value=val_social, height=300, key="editor_social")
+                    
+                    with dna_tab2:
+                        st.caption("Instructions derived from Text/PDF uploads.")
+                        new_voice_dna = st.text_area("VOICE PATTERNS", value=val_voice, height=300, key="editor_voice")
+                        
+                    with dna_tab3:
+                        st.caption("Instructions derived from Logo/Visual uploads.")
+                        new_visual_dna = st.text_area("VISUAL PATTERNS", value=val_visual, height=300, key="editor_visual")
+
+                # --- CALIBRATION LAB ---
+                st.markdown("### CALIBRATION LAB")
+                st.info("Upload new assets here to train the engine. Select the correct Asset Type to ensure accurate tagging.")
                 
-                2. VOICE
-                - Tone Keywords: {new_tone}
-                [VOICE DNA]
-                {profile_obj['inputs']['voice_dna']}
+                cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL POSTS", "VOICE/TEXT", "VISUAL ASSETS"])
                 
-                3. VISUALS
-                - Primary: {p_p}
-                - Secondary: {p_s}
-                [VISUAL DNA]
-                {profile_obj['inputs']['visual_dna']}
-                
-                4. GUARDRAILS
-                - {new_guard}
-                
-                5. SOCIAL DNA (CALIBRATION DATA)
-                {profile_obj['inputs']['social_dna']}
-                """
-                
-                profile_obj['final_text'] = new_text
-                st.session_state['profiles'][target] = profile_obj
-                
-                # 4. DB Commit
-                db.save_profile(st.session_state['user_id'], target, profile_obj)
-                
-                st.success("UPDATED & REBUILT")
+                # --- 1. SOCIAL INJECTOR ---
+                with cal_tab1:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"], key="cal_plat")
+                    with c2:
+                        cal_img = st.file_uploader("UPLOAD POST", type=["png", "jpg"], key="cal_up_social")
+                    
+                    if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
+                    
+                    if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
+                        with st.spinner("REVERSE ENGINEERING..."):
+                            img = Image.open(cal_img)
+                            st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                    
+                    if st.session_state['man_social_analysis']:
+                        st.markdown("#### REVIEW FINDINGS")
+                        edit_social = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
+                        if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
+                            timestamp = datetime.now().strftime("%Y-%m-%d")
+                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST - {timestamp}]\nAnalysis: {edit_social}\n----------------\n"
+                            
+                            # Update Inputs & Save
+                            profile_obj['inputs']['social_dna'] = inputs.get('social_dna', '') + injection
+                            
+                            # Force Rebuild Context
+                            st.session_state['editor_social'] = profile_obj['inputs']['social_dna'] 
+                            
+                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                            st.session_state['man_social_analysis'] = ""
+                            st.success("Social DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.rerun()
+
+                # --- 2. VOICE INJECTOR ---
+                with cal_tab2:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
+                    with c2:
+                        v_file = st.file_uploader("UPLOAD SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                    
+                    if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
+                    
+                    if v_file and st.button("ANALYZE TONE", type="primary", key="btn_cal_voice"):
+                        with st.spinner("EXTRACTING LINGUISTIC PATTERNS..."):
+                            if v_file.type == "application/pdf":
+                                raw_txt = logic_engine.extract_text_from_pdf(v_file)
+                            else:
+                                raw_txt = str(v_file.read(), "utf-8")
+                            
+                            prompt = f"""
+                            TASK: Extract the 'Voice DNA' from this text.
+                            ROLE: Expert Linguist.
+                            CONSTRAINTS: No chat. No emojis. Bullet points only.
+                            INPUT TEXT: {raw_txt[:10000]}
+                            OUTPUT FORMAT:
+                            - SENTENCE STRUCTURE: (e.g. Complex, Fragmented)
+                            - VOCABULARY LEVEL: (e.g. Academic, Slang, Corporate)
+                            - RHETORICAL DEVICES: (e.g. Metaphors, Questions)
+                            - EMOTIONAL RESONANCE: (e.g. Urgent, Calm, Witty)
+                            """
+                            st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
+
+                    if st.session_state['man_voice_analysis']:
+                        st.markdown("#### REVIEW FINDINGS")
+                        edit_voice = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
+                        if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
+                            injection = f"\n\n[ASSET: {voice_type.upper()} - {v_file.name}]\nAnalysis: {edit_voice}\n----------------\n"
+                            
+                            profile_obj['inputs']['voice_dna'] = inputs.get('voice_dna', '') + injection
+                            st.session_state['editor_voice'] = profile_obj['inputs']['voice_dna']
+                            
+                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                            st.session_state['man_voice_analysis'] = ""
+                            st.success("Voice DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.rerun()
+
+                # --- 3. VISUAL INJECTOR ---
+                with cal_tab3:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
+                    with c2:
+                        vis_file = st.file_uploader("UPLOAD ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
+                    
+                    if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
+                    
+                    if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
+                        with st.spinner("ANALYZING DESIGN..."):
+                            img = Image.open(vis_file)
+                            st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
+                    
+                    if st.session_state['man_vis_analysis']:
+                        st.markdown("#### REVIEW FINDINGS")
+                        edit_vis = st.text_area("EDIT BEFORE SAVING", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
+                        if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
+                            injection = f"\n\n[ASSET: {vis_type.upper()} - {vis_file.name}]\nAnalysis: {edit_vis}\n----------------\n"
+                            
+                            profile_obj['inputs']['visual_dna'] = inputs.get('visual_dna', '') + injection
+                            st.session_state['editor_visual'] = profile_obj['inputs']['visual_dna']
+                            
+                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                            st.session_state['man_vis_analysis'] = ""
+                            st.success("Visual DNA Updated. Check the 'Brand DNA' section to verify.")
+                            st.rerun()
+
+                st.divider()
+
+                if st.button("SAVE STRATEGY CHANGES", type="primary"):
+                    # 1. Update Standard Inputs
+                    profile_obj['inputs']['wiz_name'] = new_name
+                    profile_obj['inputs']['wiz_archetype'] = new_arch
+                    profile_obj['inputs']['wiz_mission'] = new_mission
+                    profile_obj['inputs']['wiz_values'] = new_values
+                    profile_obj['inputs']['wiz_tone'] = new_tone
+                    profile_obj['inputs']['wiz_guardrails'] = new_guard
+                    
+                    # 2. Update DNA Inputs from Editors (Reading the Widgets)
+                    profile_obj['inputs']['social_dna'] = st.session_state.get('editor_social', val_social)
+                    profile_obj['inputs']['voice_dna'] = st.session_state.get('editor_voice', val_voice)
+                    profile_obj['inputs']['visual_dna'] = st.session_state.get('editor_visual', val_visual)
+                    
+                    p_p = ", ".join(inputs['palette_primary'])
+                    p_s = ", ".join(inputs['palette_secondary'])
+                    
+                    # 3. Rebuild Final Text (The Full DNA)
+                    new_text = f"""
+                    1. STRATEGY
+                    - Brand: {new_name}
+                    - Archetype: {new_arch}
+                    - Mission: {new_mission}
+                    - Values: {new_values}
+                    
+                    2. VOICE
+                    - Tone Keywords: {new_tone}
+                    [VOICE DNA]
+                    {profile_obj['inputs']['voice_dna']}
+                    
+                    3. VISUALS
+                    - Primary: {p_p}
+                    - Secondary: {p_s}
+                    [VISUAL DNA]
+                    {profile_obj['inputs']['visual_dna']}
+                    
+                    4. GUARDRAILS
+                    - {new_guard}
+                    
+                    5. SOCIAL DNA (CALIBRATION DATA)
+                    {profile_obj['inputs']['social_dna']}
+                    """
+                    
+                    profile_obj['final_text'] = new_text
+                    st.session_state['profiles'][target] = profile_obj
+                    
+                    # 4. DB Commit
+                    db.save_profile(st.session_state['user_id'], target, profile_obj)
+                    
+                    st.success("UPDATED & REBUILT")
+                    st.rerun()
+
+            else:
+                st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
+                new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
+                if st.button("SAVE RAW CHANGES"):
+                    st.session_state['profiles'][target] = new_raw
+                    db.save_profile(st.session_state['user_id'], target, new_raw)
+                    st.success("SAVED")
+
+            if st.button("DELETE PROFILE"): 
+                del st.session_state['profiles'][target]
+                db.delete_profile(st.session_state['user_id'], target)
                 st.rerun()
-
-        else:
-            st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
-            new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
-            if st.button("SAVE RAW CHANGES"):
-                st.session_state['profiles'][target] = new_raw
-                db.save_profile(st.session_state['user_id'], target, new_raw)
-                st.success("SAVED")
-
-        if st.button("DELETE PROFILE"): 
-            del st.session_state['profiles'][target]
-            db.delete_profile(st.session_state['user_id'], target)
-            st.rerun()
             
 # --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
@@ -2663,6 +2688,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
