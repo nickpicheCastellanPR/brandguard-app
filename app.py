@@ -1603,117 +1603,75 @@ elif app_mode == "COPY EDITOR":
     if not is_admin and sub_status != 'active':
         show_paywall()
 
-    # --- HELPER: RISK vs ASSETS CONFIDENCE MODEL ---
+    # --- HELPER: UNIFIED CONFIDENCE MODEL (FEW-SHOT + SAFETY) ---
     def calculate_copy_confidence(profile_data, content_type):
         """
-        Calculates confidence based on the 'Risk vs. Assets' tiered model.
+        Combines 'Few-Shot' asset counting (Performance) with 'Risk' checks (Safety).
         """
         inputs = profile_data.get('inputs', {})
+        voice_dna = inputs.get('voice_dna', '')
+        
         score = 0
-        cap = 100
-        rationale_parts = []
-        missing_parts = []
-        action = ""
-        
-        # Data Availability Checks
-        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
-        has_values = len(inputs.get('wiz_values', '')) > 10
-        has_tone = len(inputs.get('wiz_tone', '')) > 2
-        voice_dna_len = len(inputs.get('voice_dna', ''))
-        has_deep_voice = voice_dna_len > 1000
-        has_voice_samples = voice_dna_len > 50
-
-        # TIER 1: HIGH RISK (Crisis, Press Release)
-        if content_type in ["Crisis Statement", "Press Release"]:
-            score = 0 # Base 0
-            
-            if has_guardrails:
-                score += 40
-                rationale_parts.append("Guardrails")
-            else:
-                cap = 50
-                missing_parts.append("Guardrails (CRITICAL)")
-                action = "Add Guardrails in Strategy tab to unlock higher scores."
-            
-            if has_values:
-                score += 30
-                rationale_parts.append("Core Values")
-            else:
-                missing_parts.append("Core Values")
-                
-            if has_tone:
-                score += 20
-                rationale_parts.append("Tone")
-
-        # TIER 2: STRATEGIC INTERNAL (Memo, Email)
-        elif content_type in ["Executive Memo", "Internal Email"]:
-            score = 20 # Base 20
-            
-            if has_tone:
-                score += 30
-                rationale_parts.append("Tone Definitions")
-            else:
-                cap = 60
-                missing_parts.append("Tone Definitions (CRITICAL)")
-                action = "Define Tone Keywords in Strategy tab."
-            
-            if has_voice_samples:
-                score += 30
-                rationale_parts.append("Voice Samples")
-            else:
-                missing_parts.append("Voice Samples")
-
-        # TIER 3: CREATIVE / EXTERNAL (Blog, Social, Speech)
-        else:
-            score = 30 # Base 30
-            
-            if has_deep_voice:
-                score += 40
-                rationale_parts.append("Deep Voice Data")
-            elif has_voice_samples:
-                score += 20
-                rationale_parts.append("Basic Voice Data")
-            else:
-                cap = 50
-                missing_parts.append("Voice DNA (CRITICAL)")
-                action = "Upload more text samples to the Voice Calibration Lab."
-            
-            if has_tone:
-                score += 30
-                rationale_parts.append("Tone Guidelines")
-
-        # Final Calculation
-        final_score = min(score, cap)
-        
-        # Color Logic
         color = "#ff4b4b" # Red
         label = "LOW DATA"
-        if final_score > 50: 
-            color = "#ffa421" # Orange
-            label = "CALIBRATED"
-        if final_score > 75: 
-            color = "#09ab3b" # Green
-            label = "HIGH CONFIDENCE"
+        rationale_parts = []
+        action = ""
 
-        # Rationale String construction
-        using_str = ", ".join(rationale_parts) if rationale_parts else "Generic Model"
-        missing_str = ", ".join(missing_parts) if missing_parts else "None"
+        # 1. ASSET VOLUME CHECK (The Research Layer)
+        type_key = content_type.upper().split(" ")[0] # "INTERNAL", "PRESS", "BLOG"
+        asset_count = voice_dna.upper().count(f"TYPE: {type_key}") + voice_dna.upper().count(f"ASSET: {type_key}")
         
-        full_rationale = f"Using: {using_str}. Missing: {missing_str}."
+        if asset_count >= 3:
+            score += 50
+            rationale_parts.append(f"High Stability ({asset_count} samples)")
+        elif asset_count >= 1:
+            score += 30
+            rationale_parts.append(f"Low Stability ({asset_count} sample)")
+            action = f"Upload {3-asset_count} more {content_type} samples for stable style transfer."
+        else:
+            rationale_parts.append("Zero-Shot (No samples)")
+            action = f"Upload at least 3 {content_type} examples to Voice Calibration."
 
+        # 2. RISK & COMPLIANCE CHECK (The Safety Layer)
+        has_guardrails = len(inputs.get('wiz_guardrails', '')) > 10
+        has_mission = len(inputs.get('wiz_mission', '')) > 10
+        
+        if has_guardrails:
+            score += 30
+            rationale_parts.append("Guardrails Active")
+        else:
+            action = "Add Guardrails in Strategy to ensure safety."
+            
+        if has_mission:
+            score += 20
+            rationale_parts.append("Mission Aligned")
+
+        # 3. FINAL VERDICT
+        if asset_count < 3 and score > 60:
+            score = 60
+            label = "CALIBRATING"
+        elif score > 80:
+            label = "HIGH CONFIDENCE"
+            color = "#09ab3b"
+        elif score > 50:
+            label = "CALIBRATING"
+            color = "#ffa421"
+            
         return {
-            "score": final_score,
+            "score": score,
             "color": color,
             "label": label,
-            "rationale": full_rationale,
+            "rationale": ", ".join(rationale_parts) + ".",
             "action": action
         }
 
     if not active_profile: 
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
-        # --- STATE INITIALIZATION ---
+        # --- STATE INITIALIZATION (GLOBAL PERSISTENCE) ---
         if 'ce_draft' not in st.session_state: st.session_state['ce_draft'] = ""
+        if 'ce_sender' not in st.session_state: st.session_state['ce_sender'] = ""
+        if 'ce_audience' not in st.session_state: st.session_state['ce_audience'] = ""
         if 'ce_result' not in st.session_state: st.session_state['ce_result'] = None
         if 'ce_rationale' not in st.session_state: st.session_state['ce_rationale'] = None
 
@@ -1721,20 +1679,18 @@ elif app_mode == "COPY EDITOR":
         c1, c2 = st.columns([2, 1])
         
         with c1: 
-            # Bind text area to session state variable for persistence
-            draft_input = st.text_area(
+            # Bind text area to session state via key
+            st.text_area(
                 "DRAFT TEXT", 
                 height=350, 
                 placeholder="Paste your rough draft here...",
-                value=st.session_state['ce_draft']
+                key="ce_draft"
             )
-            # Update state on change
-            st.session_state['ce_draft'] = draft_input
             
-            # Context Inputs (Synced with Helper Function)
+            # Context Inputs
             cc1, cc2, cc3 = st.columns(3)
             with cc1: 
-                # TRIGGER: Changing this updates the Confidence Meter
+                # Trigger: Changing this updates the Confidence Meter
                 content_type = st.selectbox("CONTENT TYPE", [
                     "Internal Email", 
                     "Press Release", 
@@ -1745,12 +1701,14 @@ elif app_mode == "COPY EDITOR":
                     "Social Campaign"   
                 ])
             with cc2: 
-                sender = st.text_input("SENDER / VOICE", placeholder="e.g. CEO, Support Team")
+                # Persisted Sender
+                st.text_input("SENDER / VOICE", placeholder="e.g. CEO", key="ce_sender")
             with cc3: 
-                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors, Staff")
+                # Persisted Audience
+                st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors", key="ce_audience")
                 
         with c2: 
-            # --- DYNAMIC CALIBRATION METER (Fixed) ---
+            # --- DYNAMIC CALIBRATION METER ---
             profile_data = st.session_state['profiles'][active_profile]
             metrics = calculate_copy_confidence(profile_data, content_type)
             
@@ -1772,6 +1730,9 @@ elif app_mode == "COPY EDITOR":
                         {metrics['action']}
                     </div>
                 """, unsafe_allow_html=True)
+                if st.button("GO TO CALIBRATION", type="secondary"):
+                    st.session_state['app_mode'] = "BRAND MANAGER"
+                    st.rerun()
             
             st.markdown("<br>", unsafe_allow_html=True)
             edit_intensity = st.select_slider(
@@ -1782,7 +1743,8 @@ elif app_mode == "COPY EDITOR":
             )
             
             if st.button("REWRITE AND ALIGN", type="primary", use_container_width=True):
-                if draft_input:
+                # Access via state key
+                if st.session_state['ce_draft']:
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         
                         # --- SMART CONTEXT BUILDING ---
@@ -1808,12 +1770,12 @@ elif app_mode == "COPY EDITOR":
                         {inputs.get('wiz_guardrails', '')}
                         """
                         
-                        # 3. Engineered Prompt using "Chain of Thought"
+                        # 3. Engineered Prompt
                         prompt_wrapper = f"""
                         CONTEXT: 
-                        - Type: {content_type} (Use appropriate formatting/structure)
-                        - Sender: {sender} (Adopt this persona's authority level)
-                        - Audience: {audience} (Adjust vocabulary and empathy to match)
+                        - Type: {content_type}
+                        - Sender: {st.session_state['ce_sender']}
+                        - Audience: {st.session_state['ce_audience']}
                         - Intensity: {edit_intensity}
                         
                         TASK: Rewrite the draft below to match the Brand Rules.
@@ -1831,7 +1793,7 @@ elif app_mode == "COPY EDITOR":
                         [The new text]
                         
                         DRAFT CONTENT: 
-                        {draft_input}
+                        {st.session_state['ce_draft']}
                         """
                         
                         # Call Logic
@@ -1856,11 +1818,10 @@ elif app_mode == "COPY EDITOR":
                             if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
                             from datetime import datetime
                             
-                            # Log the CONFIDENCE score, not a fake score
                             log_entry = {
                                 "timestamp": datetime.now().strftime("%H:%M"),
                                 "type": "COPY EDIT",
-                                "name": f"{content_type} ({audience})",
+                                "name": f"{content_type} ({st.session_state['ce_audience']})",
                                 "score": metrics['score'], # Uses the real confidence metric
                                 "verdict": "REWRITTEN",
                                 "result_data": rewrite,
@@ -3374,6 +3335,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
