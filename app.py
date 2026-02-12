@@ -1260,34 +1260,49 @@ elif app_mode == "VISUAL COMPLIANCE":
     if not is_admin and sub_status != 'active':
         show_paywall()
     
-    # --- HELPER: ASSET LIBRARY RETRIEVAL ---
+    # --- HELPER: ASSET LIBRARY RETRIEVAL (UPDATED) ---
     def get_all_visual_assets(profile_data):
-        """Parses Visual DNA to find ALL saved images, returning a dict of {name: image_obj}."""
+        """Parses Visual DNA AND Social DNA to find ALL saved images."""
         inputs = profile_data.get('inputs', {})
-        visual_dna = inputs.get('visual_dna', '')
         assets = {}
         
-        if not visual_dna: return assets
+        # WE NOW SCAN BOTH VISUAL AND SOCIAL DNA
+        sources = [inputs.get('visual_dna', ''), inputs.get('social_dna', '')]
 
         import base64
         from io import BytesIO
-        
-        chunks = visual_dna.split("----------------\n")
-        for chunk in chunks:
-            if "[VISUAL_REF:" in chunk:
-                # Extract Name from Header [ASSET: TYPE - NAME]
-                lines = chunk.strip().split('\n')
-                name = lines[0].replace("[ASSET:", "").replace("]", "").strip()
-                
-                # Extract Image
-                for line in lines:
-                    if line.startswith("[VISUAL_REF:"):
-                        b64 = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
-                        if b64.startswith("data:image"): b64 = b64.split(",")[1]
-                        try:
-                            image_data = base64.b64decode(b64)
-                            assets[name] = Image.open(BytesIO(image_data))
-                        except: pass
+
+        for source_text in sources:
+            if not source_text: continue
+            
+            chunks = source_text.split("----------------\n")
+            for chunk in chunks:
+                if "[VISUAL_REF:" in chunk:
+                    # Extract Name from Header [ASSET: TYPE - NAME]
+                    lines = chunk.strip().split('\n')
+                    name = "Unknown Asset"
+                    if lines and "[ASSET:" in lines[0]:
+                        name = lines[0].replace("[ASSET:", "").replace("]", "").strip()
+                    
+                    # Extract Image
+                    for line in lines:
+                        if line.startswith("[VISUAL_REF:"):
+                            b64 = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
+                            if b64.startswith("data:image"): 
+                                try:
+                                    b64_clean = b64.split(",")[1]
+                                    image_data = base64.b64decode(b64_clean)
+                                    
+                                    # Handle Duplicates (e.g. multiple "LinkedIn Post" assets)
+                                    key = name
+                                    count = 2
+                                    while key in assets:
+                                        key = f"{name} ({count})"
+                                        count += 1
+                                        
+                                    assets[key] = Image.open(BytesIO(image_data))
+                                except: 
+                                    pass
         return assets
 
     # --- HELPER: COLLAGE MAKER ---
@@ -1360,7 +1375,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                     "Presentation Slide"
                 ])
                 
-                # Retrieve All Assets
+                # Retrieve All Assets (Updated Function)
                 all_assets = get_all_visual_assets(profile_data)
                 
                 # Determine Smart Defaults based on Asset Type
@@ -1402,7 +1417,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                         st.info("No visual references selected. Auditing based on Text Rules only.")
                 else:
                     st.warning("⚠️ No visual assets found in Brand Manager.")
-                    st.caption("The engine will rely on your Color Palette and Tone rules.")
+                    st.caption("The engine will rely on your Color Palette and Tone rules. Upload assets in 'Social Media' or 'Visual ID' to enable comparison.")
                     selected_asset_names = []
 
             st.divider()
@@ -3335,6 +3350,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
