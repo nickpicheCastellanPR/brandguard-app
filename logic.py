@@ -124,8 +124,16 @@ class SignetLogic:
         # 1. THE STABLE CORE
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # 2. THE RESEARCHER
-        self.search_model = genai.GenerativeModel('gemini-2.0-flash')
+        # 2. THE RESEARCHER (Correctly configured with Tools)
+        tools_config = [
+            {'google_search_retrieval': {
+                'dynamic_retrieval_config': {
+                    'mode': 'dynamic',
+                    'dynamic_threshold': 0.3
+                }
+            }}
+        ]
+        self.search_model = genai.GenerativeModel('gemini-2.0-flash', tools=tools_config)
 
     def _safe_generate(self, model_instance, prompt, images=None, retries=3):
         """
@@ -228,9 +236,9 @@ class SignetLogic:
         reference_instruction = ""
         if reference_image:
             reference_instruction = """
-            CRITICAL: I have provided two images. 
-            - Image 1: The 'CANDIDATE' asset being audited.
-            - Image 2: The 'GOLD STANDARD REFERENCE' from the brand kit.
+            CRITICAL: I have provided two sets of images. 
+            - First Image(s): The 'CANDIDATE' asset being audited.
+            - Following Image(s): The 'GOLD STANDARD REFERENCE' from the brand kit.
             COMPARE the Candidate against the Reference. Does it match the aesthetic, logo placement, and quality?
             """
 
@@ -274,7 +282,10 @@ class SignetLogic:
             # Build inputs: Prompt + Candidate + Reference (if exists)
             inputs = [image]
             if reference_image:
-                inputs.append(reference_image)
+                if isinstance(reference_image, list):
+                    inputs.extend(reference_image)
+                else:
+                    inputs.append(reference_image)
             
             # UPGRADE: Wrapper now handles lists correctly
             response = self._safe_generate(self.model, prompt, inputs)
@@ -379,6 +390,7 @@ class SignetLogic:
     def run_content_generator(self, topic, format_type, key_points, profile_text):
         prompt = f"Create a {format_type} about {topic}. Key points: {key_points}.\n\nBRAND RULES:\n{profile_text}"
         try:
+            # THIS NOW USES THE SEARCH-ENABLED MODEL
             response = self._safe_generate(self.search_model, prompt)
             return response.text
         except Exception as e:
