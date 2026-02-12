@@ -2870,17 +2870,23 @@ elif app_mode == "BRAND MANAGER":
         inputs = profile_obj.get('inputs', {})
         score = 0
         
-        # 1. Basics (40%)
+        # 1. Basics (40%) - The Strategy Layer
         if inputs.get('wiz_name'): score += 10
         if inputs.get('wiz_mission'): score += 10
         if inputs.get('wiz_values'): score += 10
         if inputs.get('wiz_archetype'): score += 10
         
-        # 2. DNA Layers (60%)
-        # Check if length > 50 chars (arbitrary minimum for "real" content)
-        if len(inputs.get('social_dna', '')) > 50: score += 20
-        if len(inputs.get('voice_dna', '')) > 50: score += 20
-        if len(inputs.get('visual_dna', '')) > 50: score += 20
+        # 2. DNA Layers (60%) - The Asset Layer
+        # UPDATED LOGIC: Checks for specific "Injected" markers OR text length.
+        # This prevents the score from failing if the AI analysis is concise.
+        
+        has_social = len(inputs.get('social_dna', '')) > 20 or "[ASSET:" in inputs.get('social_dna', '')
+        has_voice = len(inputs.get('voice_dna', '')) > 20 or "[ASSET:" in inputs.get('voice_dna', '')
+        has_visual = len(inputs.get('visual_dna', '')) > 20 or "[ASSET:" in inputs.get('visual_dna', '')
+
+        if has_social: score += 20
+        if has_voice: score += 20
+        if has_visual: score += 20
         
         profile_obj['calibration_score'] = min(score, 100)
         return profile_obj
@@ -3350,6 +3356,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
