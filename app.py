@@ -1230,13 +1230,25 @@ elif app_mode == "VISUAL COMPLIANCE":
             color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
+            letter-spacing: 1px !important;
         }
-        div.stButton > button[kind="primary"]:hover {
-            background-color: #f0c05a !important;
-            color: #1b2a2e !important;
+        .score-card {
+            background-color: #1E1E1E;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
         }
-        div.stButton > button[kind="primary"] p {
-            color: #1b2a2e !important;
+        .metric-label {
+            color: #888;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ab8f59;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1248,25 +1260,62 @@ elif app_mode == "VISUAL COMPLIANCE":
     if not is_admin and sub_status != 'active':
         show_paywall()
     
-    # --- HELPER: EXTRACT REFERENCE IMAGE ---
-    def get_primary_reference_image(dna_text):
-        """Finds the first [VISUAL_REF] in the DNA and converts it back to an image."""
-        if not dna_text: return None
+    # --- HELPER: ASSET LIBRARY RETRIEVAL ---
+    def get_all_visual_assets(profile_data):
+        """Parses Visual DNA to find ALL saved images, returning a dict of {name: image_obj}."""
+        inputs = profile_data.get('inputs', {})
+        visual_dna = inputs.get('visual_dna', '')
+        assets = {}
+        
+        if not visual_dna: return assets
+
         import base64
         from io import BytesIO
-        try:
-            for line in dna_text.split('\n'):
-                if line.startswith("[VISUAL_REF:"):
-                    # Extract base64 string
-                    b64_str = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
-                    if b64_str.startswith("data:image"):
-                        b64_str = b64_str.split(",")[1]
-                    
-                    image_data = base64.b64decode(b64_str)
-                    return Image.open(BytesIO(image_data))
-        except Exception:
-            return None
-        return None
+        
+        chunks = visual_dna.split("----------------\n")
+        for chunk in chunks:
+            if "[VISUAL_REF:" in chunk:
+                # Extract Name from Header [ASSET: TYPE - NAME]
+                lines = chunk.strip().split('\n')
+                name = lines[0].replace("[ASSET:", "").replace("]", "").strip()
+                
+                # Extract Image
+                for line in lines:
+                    if line.startswith("[VISUAL_REF:"):
+                        b64 = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
+                        if b64.startswith("data:image"): b64 = b64.split(",")[1]
+                        try:
+                            image_data = base64.b64decode(b64)
+                            assets[name] = Image.open(BytesIO(image_data))
+                        except: pass
+        return assets
+
+    # --- HELPER: COLLAGE MAKER ---
+    def create_reference_collage(image_list):
+        """Stitches multiple reference images into one 'Reference Sheet' for the AI."""
+        if not image_list: return None
+        if len(image_list) == 1: return image_list[0]
+        
+        # Resize all to same height (e.g., 300px) to make a clean strip
+        target_height = 300
+        resized_imgs = []
+        total_width = 0
+        
+        for img in image_list:
+            aspect = img.width / img.height
+            new_width = int(target_height * aspect)
+            resized = img.resize((new_width, target_height))
+            resized_imgs.append(resized)
+            total_width += new_width + 10 # 10px padding
+            
+        # Create canvas
+        collage = Image.new('RGB', (total_width, target_height), (255, 255, 255))
+        x_offset = 0
+        for img in resized_imgs:
+            collage.paste(img, (x_offset, 0))
+            x_offset += img.width + 10
+            
+        return collage
 
     # 1. Check if Profile is Active
     active_profile_name = st.session_state.get('active_profile_name')
@@ -1289,28 +1338,146 @@ elif app_mode == "VISUAL COMPLIANCE":
                     st.rerun()
             
             st.divider()
+            # Result Display Logic is below...
+        else:
+            # --- UPLOAD & CONFIGURATION ---
+            c1, c2 = st.columns([1, 1])
             
-            # Show Candidate vs Reference (If available)
-            if image:
-                # Try to fetch reference for context
-                ref_img = None
-                if isinstance(profile_data, dict) and "inputs" in profile_data:
-                    ref_img = get_primary_reference_image(profile_data['inputs'].get('visual_dna', ''))
+            with c1:
+                st.markdown("### 1. UPLOAD CANDIDATE")
+                uploaded_file = st.file_uploader("Upload the draft to check", type=['png', 'jpg', 'jpeg'])
+                if uploaded_file:
+                    image = Image.open(uploaded_file)
+                    st.image(image, caption="Candidate", use_container_width=True)
+            
+            with c2:
+                st.markdown("### 2. CONTEXT & STANDARDS")
+                asset_type = st.selectbox("What are we auditing?", [
+                    "Social Media Post",
+                    "Website/Landing Page",
+                    "Email Header/Banner",
+                    "Print/Flyer",
+                    "Presentation Slide"
+                ])
                 
-                if ref_img:
-                    c_can, c_ref = st.columns(2)
-                    with c_can: st.image(image, caption="CANDIDATE ASSET", width=350)
-                    with c_ref: st.image(ref_img, caption="GOLD STANDARD REFERENCE", width=350)
+                # Retrieve All Assets
+                all_assets = get_all_visual_assets(profile_data)
+                
+                # Determine Smart Defaults based on Asset Type
+                default_selections = []
+                # 1. Always look for Logo
+                for name in all_assets.keys():
+                    if "LOGO" in name.upper(): default_selections.append(name)
+                
+                # 2. Look for Context Matches
+                keyword_map = {
+                    "Social Media Post": "SOCIAL",
+                    "Website/Landing Page": "WEB",
+                    "Email Header/Banner": "EMAIL",
+                    "Print/Flyer": "PRINT",
+                    "Presentation Slide": "SLIDE"
+                }
+                key = keyword_map.get(asset_type, "")
+                for name in all_assets.keys():
+                    if key and key in name.upper() and name not in default_selections:
+                        default_selections.append(name)
+                
+                # Cap defaults at 3 to allow room for user choice
+                default_selections = default_selections[:3]
+
+                st.markdown("##### 3. REFERENCE ANCHORS")
+                if all_assets:
+                    selected_asset_names = st.multiselect(
+                        "Compare against (Max 5 recommended):", 
+                        options=list(all_assets.keys()),
+                        default=default_selections
+                    )
+                    
+                    # Preview the Reference Sheet
+                    if selected_asset_names:
+                        selected_imgs = [all_assets[n] for n in selected_asset_names]
+                        collage = create_reference_collage(selected_imgs)
+                        st.image(collage, caption="Active Reference Sheet (The 'Gold Standard')", use_container_width=True)
+                    else:
+                        st.info("No visual references selected. Auditing based on Text Rules only.")
                 else:
-                    st.image(image, caption="CANDIDATE ASSET", width=400)
+                    st.warning("⚠️ No visual assets found in Brand Manager.")
+                    st.caption("The engine will rely on your Color Palette and Tone rules.")
+                    selected_asset_names = []
+
+            st.divider()
+
+            if st.button("RUN COMPLIANCE CHECK", type="primary", use_container_width=True):
+                if uploaded_file:
+                    with st.spinner("ANALYZING PIXELS & CALCULATING COMPLIANCE..."):
+                        
+                        inputs = profile_data.get('inputs', {})
+                        
+                        # 1. PREPARE VISUAL REFERENCE (COLLAGE)
+                        reference_image_obj = None
+                        if selected_asset_names:
+                            imgs = [all_assets[n] for n in selected_asset_names]
+                            reference_image_obj = create_reference_collage(imgs)
+                        
+                        # 2. BUILD TEXT DNA (THE FALLBACK KING)
+                        def clean_dna(text):
+                            if not text: return ""
+                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+
+                        visual_dna_clean = clean_dna(inputs.get('visual_dna', ''))
+                        
+                        visual_context = f"""
+                        CORE IDENTITY (THE LAW):
+                        - Primary Palette (Hex): {', '.join(inputs.get('palette_primary', []))}
+                        - Typography/Style Rules: {visual_dna_clean}
+                        - Brand Voice: {inputs.get('wiz_tone', 'N/A')}
+                        - Core Values: {inputs.get('wiz_values', 'N/A')}
+                        
+                        CONTEXT:
+                        - Asset Type: {asset_type}
+                        
+                        GUARDRAILS (DO NOT VIOLATE):
+                        {inputs.get('wiz_guardrails', '')}
+                        """
+                        
+                        try:
+                            # Pass the Collage as the single reference image
+                            result = logic_engine.run_visual_audit(image, visual_context, reference_image=reference_image_obj)
+                            
+                            # Save State
+                            st.session_state['active_audit_result'] = result
+                            st.session_state['active_audit_image'] = image
+                            
+                            # Log
+                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
+                            from datetime import datetime
+                            log_entry = {
+                                "timestamp": datetime.now().strftime("%H:%M"),
+                                "type": "VISUAL AUDIT",
+                                "name": uploaded_file.name,
+                                "score": result.get('score', 0),
+                                "verdict": result.get('verdict', 'N/A'),
+                                "result_data": str(result),
+                                "image_data": image
+                            }
+                            st.session_state['activity_log'].insert(0, log_entry)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"System Error: {e}")
+                else:
+                    st.warning("Please upload an image.")
+
+        # --- RESULTS DISPLAY (If State Exists) ---
+        if st.session_state.get('active_audit_result'):
+            result = st.session_state['active_audit_result']
             
-            # --- SCORING DISPLAY ---
+            # Score Header
             score = result.get('score', 0)
             bd = result.get('breakdown', {})
-            
-            score_color = "#ff4b4b" # Red
-            if score > 60: score_color = "#ffa421" # Orange
-            if score > 85: score_color = "#09ab3b" # Green
+            score_color = "#ff4b4b" 
+            if score > 60: score_color = "#ffa421"
+            if score > 85: score_color = "#09ab3b"
             
             c1, c2 = st.columns([1, 2])
             with c1:
@@ -1342,7 +1509,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                 render_bar("IDENTITY INTEGRITY", bd.get('identity', {}).get('score', 0), "(25%)")
                 render_bar("TONE & COPY", bd.get('tone', {}).get('score', 0), "(20%)")
                 render_bar("TYPOGRAPHY", bd.get('typography', {}).get('score', 0), "(15%)")
-                render_bar("VIBE & ARCHETYPE", bd.get('vibe', {}).get('score', 0), "(15%)")
+                render_bar("VISUAL AESTHETIC", bd.get('vibe', {}).get('score', 0), "(15%)") # RENAMED
 
             st.divider()
             
@@ -1392,94 +1559,8 @@ elif app_mode == "VISUAL COMPLIANCE":
                 **2. IDENTITY:** {r_id}  
                 **3. TONE & COPY:** {r_tone}
                 **4. TYPOGRAPHY:** {r_typo}  
-                **5. VIBE:** {r_vibe}
+                **5. VISUAL AESTHETIC:** {r_vibe}
                 """)
-
-        else:
-            # --- NO CACHE: SHOW UPLOADER ---
-            st.markdown("Upload a creative asset to test it against your Brand Profile.")
-            uploaded_file = st.file_uploader("UPLOAD ASSET (Image)", type=['png', 'jpg', 'jpeg'])
-            
-            if uploaded_file:
-                image = Image.open(uploaded_file)
-                st.image(image, caption="CANDIDATE ASSET", width=400)
-                st.divider()
-
-                if st.button("RUN COMPLIANCE CHECK", type="primary"):
-                    with st.spinner("ANALYZING PIXELS, TEXT & CONTEXT..."):
-                        
-                        visual_context = ""
-                        reference_image = None
-                        
-                        if isinstance(profile_data, dict) and "inputs" in profile_data:
-                            inputs = profile_data['inputs']
-                            
-                            # 1. EXTRACT REFERENCE IMAGE FROM DNA
-                            reference_image = get_primary_reference_image(inputs.get('visual_dna', ''))
-                            
-                            # 2. BUILD CLEAN TEXT CONTEXT
-                            def clean_dna(text):
-                                if not text: return ""
-                                return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
-
-                            visual_dna_clean = clean_dna(inputs.get('visual_dna', ''))
-                            social_dna_clean = clean_dna(inputs.get('social_dna', ''))
-                            
-                            visual_context = f"""
-                            1. VISUAL STRATEGY:
-                            - Primary Colors: {', '.join(inputs.get('palette_primary', []))}
-                            - Secondary Colors: {', '.join(inputs.get('palette_secondary', []))}
-                            
-                            2. DESIGN DNA (GOLD STANDARDS):
-                            {visual_dna_clean}
-                            
-                            3. SOCIAL MEDIA VISUALS (IF RELEVANT):
-                            {social_dna_clean}
-                            
-                            4. GUARDRAILS (DO NOT VIOLATE):
-                            {inputs.get('wiz_guardrails', '')}
-                            """
-                        else:
-                            # Fallback for old profiles
-                            visual_context = profile_data.get('final_text', '')
-                        
-                        try:
-                            # 1. RUN AUDIT (Passing Ref Image if logic engine supports it)
-                            # Note: We pass reference_image to the engine. If the engine doesn't support it yet,
-                            # it needs to be updated. For now, we pass it as a kwargs or modified arg.
-                            # Assuming standard signature: run_visual_audit(candidate, context, reference=None)
-                            
-                            # Since I cannot see logic.py, I will attempt to pass it.
-                            # If logic.py isn't updated, this might error, but this is the correct App-side implementation.
-                            try:
-                                result = logic_engine.run_visual_audit(image, visual_context, reference_image=reference_image)
-                            except TypeError:
-                                # Fallback if logic.py hasn't been updated to accept reference_image
-                                result = logic_engine.run_visual_audit(image, visual_context)
-                            
-                            # 2. SAVE TO STATE
-                            st.session_state['active_audit_result'] = result
-                            st.session_state['active_audit_image'] = image
-                            
-                            # 3. LOG TO DASHBOARD
-                            from datetime import datetime
-                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
-                            
-                            log_entry = {
-                                "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "VISUAL AUDIT",
-                                "name": uploaded_file.name,
-                                "score": result.get('score', 0),
-                                "verdict": result.get('verdict', 'N/A'),
-                                "result_data": result,
-                                "image_data": image
-                            }
-                            st.session_state['activity_log'].insert(0, log_entry)
-                            
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"System Error: {e}")
                             
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
@@ -3516,6 +3597,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
