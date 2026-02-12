@@ -2877,9 +2877,6 @@ elif app_mode == "BRAND MANAGER":
         if inputs.get('wiz_archetype'): score += 10
         
         # 2. DNA Layers (60%) - The Asset Layer
-        # UPDATED LOGIC: Checks for specific "Injected" markers OR text length.
-        # This prevents the score from failing if the AI analysis is concise.
-        
         has_social = len(inputs.get('social_dna', '')) > 20 or "[ASSET:" in inputs.get('social_dna', '')
         has_voice = len(inputs.get('voice_dna', '')) > 20 or "[ASSET:" in inputs.get('voice_dna', '')
         has_visual = len(inputs.get('visual_dna', '')) > 20 or "[ASSET:" in inputs.get('visual_dna', '')
@@ -2920,9 +2917,13 @@ elif app_mode == "BRAND MANAGER":
                 inputs = profile_obj['inputs']
                 
                 # --- SAFETY INIT ---
+                # Ensure all required keys exist to prevent errors
                 for key in ['social_dna', 'voice_dna', 'visual_dna']:
                     if key not in inputs: inputs[key] = ""
+                for key in ['palette_primary', 'palette_secondary', 'palette_accent']:
+                    if key not in inputs: inputs[key] = []
                 
+                # 1. STRATEGY
                 with st.expander("1. STRATEGY", expanded=True):
                     new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
                     idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
@@ -2948,11 +2949,70 @@ elif app_mode == "BRAND MANAGER":
                     new_mission = st.text_area("MISSION", inputs['wiz_mission'])
                     new_values = st.text_area("VALUES", inputs['wiz_values'])
                 
+                # 2. VOICE
                 with st.expander("2. VOICE"):
                     new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
                 
+                # 3. GUARDRAILS
                 with st.expander("3. GUARDRAILS"):
                     new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
+
+                # 4. VISUAL IDENTITY (PALETTE) - NEW SECTION ADDED HERE
+                with st.expander("4. VISUAL IDENTITY (PALETTE)"):
+                    st.markdown("##### COLOR PALETTE")
+                    st.caption("Define the hex codes for the automated Visual Audit.")
+
+                    # PRIMARY COLORS
+                    st.markdown("**PRIMARY COLORS**")
+                    if not inputs['palette_primary']: inputs['palette_primary'] = []
+                    for i, color in enumerate(inputs['palette_primary']):
+                        c1, c2 = st.columns([4,1])
+                        with c1:
+                            new_color = st.color_picker(f"Primary {i+1}", color, key=f"mgr_p_{i}")
+                            inputs['palette_primary'][i] = new_color
+                        with c2:
+                            if st.button("REMOVE", key=f"mgr_del_p_{i}", type="secondary"):
+                                inputs['palette_primary'].pop(i)
+                                st.rerun()
+                    if st.button("ADD PRIMARY COLOR", key="mgr_add_p"):
+                        inputs['palette_primary'].append("#000000")
+                        st.rerun()
+
+                    st.markdown("---")
+                    
+                    # SECONDARY COLORS
+                    st.markdown("**SECONDARY COLORS**")
+                    if not inputs['palette_secondary']: inputs['palette_secondary'] = []
+                    for i, color in enumerate(inputs['palette_secondary']):
+                        c1, c2 = st.columns([4,1])
+                        with c1:
+                            new_color = st.color_picker(f"Secondary {i+1}", color, key=f"mgr_s_{i}")
+                            inputs['palette_secondary'][i] = new_color
+                        with c2:
+                            if st.button("REMOVE", key=f"mgr_del_s_{i}", type="secondary"):
+                                inputs['palette_secondary'].pop(i)
+                                st.rerun()
+                    if st.button("ADD SECONDARY COLOR", key="mgr_add_s"):
+                        inputs['palette_secondary'].append("#000000")
+                        st.rerun()
+
+                    st.markdown("---")
+
+                    # ACCENT COLORS
+                    st.markdown("**ACCENT COLORS**")
+                    if not inputs['palette_accent']: inputs['palette_accent'] = []
+                    for i, color in enumerate(inputs['palette_accent']):
+                        c1, c2 = st.columns([4,1])
+                        with c1:
+                            new_color = st.color_picker(f"Accent {i+1}", color, key=f"mgr_a_{i}")
+                            inputs['palette_accent'][i] = new_color
+                        with c2:
+                            if st.button("REMOVE", key=f"mgr_del_a_{i}", type="secondary"):
+                                inputs['palette_accent'].pop(i)
+                                st.rerun()
+                    if st.button("ADD ACCENT COLOR", key="mgr_add_a"):
+                        inputs['palette_accent'].append("#000000")
+                        st.rerun()
                 
                 # --- CALIBRATION & ASSETS ---
                 st.markdown("### CALIBRATION LAB & ASSET LIBRARY")
@@ -3197,6 +3257,7 @@ elif app_mode == "BRAND MANAGER":
                     
                     p_p = ", ".join(inputs['palette_primary'])
                     p_s = ", ".join(inputs['palette_secondary'])
+                    p_a = ", ".join(inputs['palette_accent'])
                     
                     # 2. Update Score
                     profile_obj = update_calibration_score(profile_obj)
@@ -3226,6 +3287,7 @@ elif app_mode == "BRAND MANAGER":
                     3. VISUALS
                     - Primary: {p_p}
                     - Secondary: {p_s}
+                    - Accents: {p_a}
                     
                     [VISUAL DNA & ASSETS]
                     {clean_dna_for_llm(inputs['visual_dna'])}
@@ -3356,6 +3418,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
