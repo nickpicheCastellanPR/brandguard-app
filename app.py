@@ -3138,6 +3138,18 @@ elif app_mode == "BRAND MANAGER":
                             
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_social_analysis'] = ""
+
+                            # LOG TO DB
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="ASSET INJECTION",
+                                asset_name=f"Social: {cal_platform}",
+                                score=profile_obj.get('calibration_score', 0),
+                                verdict="ADDED SOCIAL",
+                                metadata={"type": "social_dna", "content": edit_social[:50]+"..."}
+                            )
+
                             st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
                     
@@ -3163,6 +3175,17 @@ elif app_mode == "BRAND MANAGER":
                                         inputs['social_dna'] = inputs['social_dna'].replace(asset['full_text'], "")
                                         profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                        
+                                        # LOG DELETION
+                                        db.log_event(
+                                            org_id=st.session_state.get('org_id', 'Unknown'),
+                                            username=st.session_state.get('username', 'Unknown'),
+                                            activity_type="ASSET DELETED",
+                                            asset_name=asset['header'],
+                                            score=profile_obj.get('calibration_score', 0),
+                                            verdict="REMOVED",
+                                            metadata={"type": "social_dna"}
+                                        )
                                         st.rerun()
                     else:
                         st.caption("No social assets calibrated.")
@@ -3221,6 +3244,18 @@ elif app_mode == "BRAND MANAGER":
                             
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_voice_analysis'] = ""
+
+                            # LOG TO DB
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="ASSET INJECTION",
+                                asset_name=f"Voice: {voice_type}",
+                                score=profile_obj.get('calibration_score', 0),
+                                verdict="ADDED VOICE",
+                                metadata={"type": "voice_dna", "content": edit_voice[:50]+"..."}
+                            )
+
                             st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
 
@@ -3241,6 +3276,17 @@ elif app_mode == "BRAND MANAGER":
                                         inputs['voice_dna'] = inputs['voice_dna'].replace(asset['full_text'], "")
                                         profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                        
+                                        # LOG DELETION
+                                        db.log_event(
+                                            org_id=st.session_state.get('org_id', 'Unknown'),
+                                            username=st.session_state.get('username', 'Unknown'),
+                                            activity_type="ASSET DELETED",
+                                            asset_name=asset['header'],
+                                            score=profile_obj.get('calibration_score', 0),
+                                            verdict="REMOVED",
+                                            metadata={"type": "voice_dna"}
+                                        )
                                         st.rerun()
                     else:
                         st.caption("No voice assets calibrated.")
@@ -3283,6 +3329,18 @@ elif app_mode == "BRAND MANAGER":
                             
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_vis_analysis'] = ""
+
+                            # LOG TO DB
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="ASSET INJECTION",
+                                asset_name=f"Visual: {vis_type}",
+                                score=profile_obj.get('calibration_score', 0),
+                                verdict="ADDED VISUAL",
+                                metadata={"type": "visual_dna", "content": edit_vis[:50]+"..."}
+                            )
+
                             st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
 
@@ -3308,6 +3366,17 @@ elif app_mode == "BRAND MANAGER":
                                         inputs['visual_dna'] = inputs['visual_dna'].replace(asset['full_text'], "")
                                         profile_obj = update_calibration_score(profile_obj)
                                         db.save_profile(st.session_state['user_id'], target, profile_obj)
+
+                                        # LOG DELETION
+                                        db.log_event(
+                                            org_id=st.session_state.get('org_id', 'Unknown'),
+                                            username=st.session_state.get('username', 'Unknown'),
+                                            activity_type="ASSET DELETED",
+                                            asset_name=asset['header'],
+                                            score=profile_obj.get('calibration_score', 0),
+                                            verdict="REMOVED",
+                                            metadata={"type": "visual_dna"}
+                                        )
                                         st.rerun()
                     else:
                         st.caption("No visual assets calibrated.")
@@ -3383,6 +3452,17 @@ elif app_mode == "BRAND MANAGER":
                     
                     # 4. DB Commit
                     db.save_profile(st.session_state['user_id'], target, profile_obj)
+
+                    # LOG STRATEGY UPDATE
+                    db.log_event(
+                        org_id=st.session_state.get('org_id', 'Unknown'),
+                        username=st.session_state.get('username', 'Unknown'),
+                        activity_type="STRATEGY UPDATE",
+                        asset_name=target,
+                        score=profile_obj.get('calibration_score', 0),
+                        verdict="REFINED",
+                        metadata={"name": new_name, "arch": new_arch}
+                    )
                     
                     st.success(f"Strategy Saved. Calibration Score: {profile_obj.get('calibration_score', 0)}%")
                     st.rerun()
@@ -3393,11 +3473,33 @@ elif app_mode == "BRAND MANAGER":
                 if st.button("SAVE RAW CHANGES"):
                     st.session_state['profiles'][target] = new_raw
                     db.save_profile(st.session_state['user_id'], target, new_raw)
+
+                    # LOG RAW EDIT
+                    db.log_event(
+                        org_id=st.session_state.get('org_id', 'Unknown'),
+                        username=st.session_state.get('username', 'Unknown'),
+                        activity_type="STRATEGY UPDATE",
+                        asset_name=target,
+                        score=0,
+                        verdict="RAW EDIT",
+                        metadata={"type": "raw_text_override"}
+                    )
                     st.success("SAVED")
 
             if st.button("DELETE PROFILE"): 
                 del st.session_state['profiles'][target]
                 db.delete_profile(st.session_state['user_id'], target)
+
+                # LOG DELETION
+                db.log_event(
+                    org_id=st.session_state.get('org_id', 'Unknown'),
+                    username=st.session_state.get('username', 'Unknown'),
+                    activity_type="PROFILE DELETED",
+                    asset_name=target,
+                    score=0,
+                    verdict="DESTROYED",
+                    metadata={}
+                )
                 st.rerun()
             
 # --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
@@ -3497,6 +3599,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
