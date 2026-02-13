@@ -7,6 +7,7 @@ from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
 import html
+import sqlite3
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -3626,6 +3627,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         conn.close()
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
