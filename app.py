@@ -1123,18 +1123,46 @@ if app_mode == "DASHBOARD":
             st.rerun()
             
     with c3:
-        if st.button("\nLOAD DEMO\nLoad Castellan sample data"):
+        # --- REPLACED: "ASTRA DYNAMICS" SYNTHETIC DEMO ---
+        if st.button("\nLOAD DEMO\nUse 'Astra Dynamics' Sample"):
              demo_data = {
-                 "final_text": "1. STRATEGY: Mission: Architecting Strategic Narratives... Archetype: The Ruler.\n2. VOICE: Professional...",
+                 "final_text": """
+                 1. STRATEGY
+                 Brand: ASTRA DYNAMICS
+                 Archetype: The Ruler (Control, Precision, Future)
+                 Mission: To architect the infrastructure of tomorrow through uncompromising aerospace engineering.
+                 Values: Absolute Precision, Zero Tolerance for Failure, Infinite Reach.
+                 
+                 2. VOICE
+                 Tone: Authoritative, Clinical, Minimalist.
+                 Keywords: Kinetic, Orbital, Systems-Level.
+                 Guardrails: Never use exclamation points. Never use slang. Always use active voice.
+                 
+                 3. VISUALS
+                 Primary Palette: #000000, #FFFFFF
+                 Secondary Palette: #FF4500 (Ignition Orange)
+                 Accent: #808080
+                 """,
                  "inputs": {
-                     "wiz_name": "Castellan PR", "wiz_archetype": "The Ruler", "wiz_tone": "Professional, Direct",
-                     "wiz_mission": "Architecting narratives.", "wiz_values": "Precision, Power.",
-                     "wiz_guardrails": "No fluff.", "palette_primary": ["#24363b"], "palette_secondary": ["#ab8f59"], "palette_accent": ["#f5f5f0"]
-                 }
+                     "wiz_name": "Astra Dynamics", 
+                     "wiz_archetype": "The Ruler", 
+                     "wiz_tone": "Clinical, Authoritative",
+                     "wiz_mission": "Architecting the infrastructure of tomorrow.", 
+                     "wiz_values": "Precision, Zero Tolerance.",
+                     "wiz_guardrails": "No exclamation points. No slang.", 
+                     "palette_primary": ["#000000", "#FFFFFF"], 
+                     "palette_secondary": ["#FF4500"], 
+                     "palette_accent": ["#808080"],
+                     "social_dna": "[ASSET: LINKEDIN POST]\nAnalysis: High contrast imagery. Short, punchy sentences. Focus on engineering specs rather than marketing fluff.",
+                     "visual_dna": "Minimalist aerospace aesthetic. High contrast black and white."
+                 },
+                 "calibration_score": 100
              }
-             st.session_state['profiles']["Castellan PR (Demo)"] = demo_data
-             db.save_profile(st.session_state['user_id'], "Castellan PR (Demo)", demo_data)
-             st.session_state['active_profile_name'] = "Castellan PR (Demo)"
+             
+             st.session_state['profiles']["Astra Dynamics (Demo)"] = demo_data
+             db.save_profile(st.session_state['user_id'], "Astra Dynamics (Demo)", demo_data)
+             st.session_state['active_profile_name'] = "Astra Dynamics (Demo)"
+             st.success("DEMO LOADED: ASTRA DYNAMICS")
              st.rerun()
 
     # --- UPLOAD DRAWER (Conditional) ---
@@ -1211,11 +1239,10 @@ if app_mode == "DASHBOARD":
             # Action Button
             if st.button("LOAD SNAPSHOT", key=f"restore_{i}"):
                 if entry['type'] == "VISUAL AUDIT":
-                    # --- BUG FIX STARTS HERE ---
+                    # --- BUG FIX: SAFE DESERIALIZATION ---
                     import ast
                     raw_data = entry['result_data']
                     
-                    # Convert String back to Dictionary if needed
                     if isinstance(raw_data, str):
                         try:
                             # ast.literal_eval is safer than eval() for parsing python dict strings
@@ -3433,6 +3460,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
