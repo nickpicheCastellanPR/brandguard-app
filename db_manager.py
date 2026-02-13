@@ -6,73 +6,76 @@ import os
 from datetime import datetime
 
 # --- CONFIG ---
+# We use a new DB file to ensure a clean schema migration
 if os.path.exists("/app/data"):
     DB_FOLDER = "/app/data"
 else:
     DB_FOLDER = "."
 
-DB_NAME = os.path.join(DB_FOLDER, "users_v2.db")
+# SWITCHING TO V3 DB TO FORCE CLEAN SCHEMA
+DB_NAME = os.path.join(DB_FOLDER, "signet_studio_v3.db")
 
-# Initialize Argon2 Hasher
 ph = PasswordHasher()
 
-# --- 1. SETUP & MIGRATION ---
+# --- 1. SETUP & SCHEMA ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
-    # Users Table
+    # USERS: Added 'org_id'
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             email TEXT,
             password_hash TEXT,
             is_admin BOOLEAN DEFAULT 0,
+            org_id TEXT DEFAULT 'DEFAULT_ORG',
             subscription_status TEXT DEFAULT 'trial',
             created_at TEXT
         )
     ''')
 
-    # Profiles Table
+    # PROFILES: Added 'org_id' (Shared Ownership)
     c.execute('''
         CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
+            org_id TEXT,
             name TEXT,
             data TEXT,
             created_at TEXT,
-            UNIQUE(user_id, name)
+            updated_by TEXT,
+            UNIQUE(org_id, name)
         )
     ''')
 
-    # Logs Table
+    # RICH LOGS: The "God View" Data Structure
     c.execute('''
-        CREATE TABLE IF NOT EXISTS generation_logs (
+        CREATE TABLE IF NOT EXISTS activity_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            org_id TEXT,
             username TEXT,
             timestamp TEXT,
-            inputs_json TEXT,
-            output_text TEXT,
-            estimated_cost REAL
+            activity_type TEXT,   -- e.g. "VISUAL AUDIT", "COPY EDIT"
+            asset_name TEXT,      -- e.g. "Q3 Report.pdf"
+            score INTEGER,        -- e.g. 85
+            verdict TEXT,         -- e.g. "APPROVED", "FAILED"
+            metadata_json TEXT,   -- The full result data
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
     conn.commit()
     conn.close()
 
-# --- 2. SECURITY (ARGON2) ---
-def create_user(username, email, password, is_admin=False):
-    """Creates a new user with ARGON2 hashing."""
-    # Hash the password (Argon2 handles salt automatically)
+# --- 2. AUTH & USER MANAGEMENT ---
+def create_user(username, email, password, org_id="Castellan PR", is_admin=False):
     hashed = ph.hash(password)
-    
     conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
     try:
-        c.execute('''
-            INSERT INTO users (username, email, password_hash, is_admin, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (username, email, hashed, is_admin, datetime.now()))
+        conn.execute('''
+            INSERT INTO users (username, email, password_hash, org_id, is_admin, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (username, email, hashed, org_id, is_admin, datetime.now()))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -81,36 +84,24 @@ def create_user(username, email, password, is_admin=False):
         conn.close()
 
 def check_login(username, password):
-    """Verifies password using Argon2 and returns user info + email."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    # Critical: Fetch Email for the Paywall check
-    c.execute('SELECT password_hash, is_admin, subscription_status, email FROM users WHERE username = ?', (username,))
+    c.execute('SELECT password_hash, is_admin, subscription_status, email, org_id FROM users WHERE username = ?', (username,))
     data = c.fetchone()
     conn.close()
 
     if data:
         stored_hash = data[0]
         try:
-            # Verify the password
             ph.verify(stored_hash, password)
-            
-            # Check if hash needs updating (Argon2 feature)
-            if ph.check_needs_rehash(stored_hash):
-                # We could update it here, but skipping for simplicity
-                pass
-                
             return {
                 "username": username, 
                 "is_admin": bool(data[1]), 
                 "status": data[2],
-                "email": data[3]
+                "email": data[3],
+                "org_id": data[4]  # CRITICAL: Return the Org ID
             }
         except VerifyMismatchError:
-            # Password wrong
-            return None
-        except Exception as e:
-            print(f"Auth Error: {e}")
             return None
     return None
 
@@ -123,20 +114,40 @@ def get_user_count():
     conn.close()
     return count
 
-# --- 3. PROFILE MANAGEMENT ---
-def save_profile(username, profile_name, profile_data):
+# --- 3. STUDIO PROFILE MANAGEMENT (Org-Based) ---
+def save_profile(user_id, profile_name, profile_data):
+    # NOTE: In Studio Mode, we need the Org ID. 
+    # For now, we fetch it from the user, or assume 'Castellan PR' if checking context.
+    # To fix your app structure, we will update app.py to pass org_id, 
+    # but for compatibility, we look up the user's org here.
+    
     conn = sqlite3.connect(DB_NAME)
+    
+    # 1. Find User's Org
+    org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (user_id,)).fetchone()
+    org_id = org_res[0] if org_res else "Castellan PR"
+    
     data_json = json.dumps(profile_data)
+    
+    # 2. Save to Org (Not just User)
     conn.execute('''
-        INSERT OR REPLACE INTO profiles (user_id, name, data, created_at)
-        VALUES (?, ?, ?, ?)
-    ''', (username, profile_name, data_json, datetime.now()))
+        INSERT OR REPLACE INTO profiles (org_id, name, data, created_at, updated_by)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (org_id, profile_name, data_json, datetime.now(), user_id))
+    
     conn.commit()
     conn.close()
 
 def get_profiles(username):
+    # Fetch profiles for the USER'S ORGANIZATION
     conn = sqlite3.connect(DB_NAME)
-    rows = conn.execute("SELECT name, data FROM profiles WHERE user_id = ?", (username,)).fetchall()
+    
+    # 1. Find User's Org
+    org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
+    org_id = org_res[0] if org_res else "Castellan PR"
+    
+    # 2. Fetch All Profiles for that Org
+    rows = conn.execute("SELECT name, data FROM profiles WHERE org_id = ?", (org_id,)).fetchall()
     conn.close()
     
     profiles = {}
@@ -149,46 +160,45 @@ def get_profiles(username):
 
 def delete_profile(username, profile_name):
     conn = sqlite3.connect(DB_NAME)
-    conn.execute("DELETE FROM profiles WHERE user_id = ? AND name = ?", (username, profile_name))
+    # Get Org
+    org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
+    org_id = org_res[0] if org_res else "Castellan PR"
+    
+    conn.execute("DELETE FROM profiles WHERE org_id = ? AND name = ?", (org_id, profile_name))
     conn.commit()
     conn.close()
 
-# --- 4. LOGGING ---
-def log_generation(username, inputs_dict, output_text, token_usage_est):
+# --- 4. THE GOD VIEW (Rich Logging) ---
+def log_event(org_id, username, activity_type, asset_name, score, verdict, metadata):
+    """Logs an event to the persistent Studio timeline."""
     conn = sqlite3.connect(DB_NAME)
-    inputs_json = json.dumps(inputs_dict)
+    meta_json = json.dumps(metadata, default=str) # safe serialization
+    
     conn.execute('''
-        INSERT INTO generation_logs (username, timestamp, inputs_json, output_text, estimated_cost)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (username, datetime.now(), inputs_json, output_text, token_usage_est))
+        INSERT INTO activity_log (org_id, username, timestamp, activity_type, asset_name, score, verdict, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (org_id, username, datetime.now().strftime("%H:%M"), activity_type, asset_name, score, verdict, meta_json))
+    
     conn.commit()
     conn.close()
 
-# --- 5. ADMIN VIEWS ---
-def get_all_users():
+def get_org_logs(org_id, limit=20):
+    """Fetches the timeline for the entire agency."""
     conn = sqlite3.connect(DB_NAME)
-    users = conn.execute("SELECT username, email, is_admin, subscription_status, created_at FROM users").fetchall()
+    # Return as list of dictionaries
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute('''
+        SELECT * FROM activity_log 
+        WHERE org_id = ? 
+        ORDER BY id DESC LIMIT ?
+    ''', (org_id, limit)).fetchall()
     conn.close()
-    return users
+    
+    return [dict(row) for row in rows]
 
-def get_all_logs():
-    conn = sqlite3.connect(DB_NAME)
-    logs = conn.execute("SELECT username, timestamp, inputs_json, estimated_cost FROM generation_logs ORDER BY id DESC LIMIT 50").fetchall()
-    conn.close()
-    return logs
-
-# --- 6. SUBSCRIPTION HELPERS ---
-def get_user_status(username):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT subscription_status FROM users WHERE username = ?", (username,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else "trial"
-
+# --- 5. SUBSCRIPTION ---
 def update_user_status(username, new_status):
     conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("UPDATE users SET subscription_status = ? WHERE username = ?", (new_status, username))
+    conn.execute("UPDATE users SET subscription_status = ? WHERE username = ?", (new_status, username))
     conn.commit()
     conn.close()
