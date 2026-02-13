@@ -2283,23 +2283,18 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
     def calculate_social_confidence(profile_data, target_platform):
         """
         Calculates confidence based on LMM Few-Shot Learning research.
-        Thresholds: 
-        - 0 Assets: Zero-Shot (Low Confidence)
-        - 1-2 Assets: One-Shot (Medium Confidence - Pattern Unstable)
-        - 3+ Assets: Few-Shot (High Confidence - Pattern Stable)
         """
         inputs = profile_data.get('inputs', {})
         social_dna = inputs.get('social_dna', '')
         
         # 1. Count Specific Assets (The "N-Shot" Count)
-        # Handle "X (Twitter)" -> "X"
         if target_platform:
             clean_plat = target_platform.upper().split(" ")[0] 
             asset_count = social_dna.upper().count(f"ASSET: {clean_plat}")
         else:
             asset_count = 0
         
-        # 2. Determine Score & Rationale based on Research Thresholds
+        # 2. Determine Score & Rationale
         if asset_count >= 3:
             score = 85
             color = "#09ab3b" # Green
@@ -2333,7 +2328,6 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         st.warning("NO PROFILE SELECTED. Please choose a Brand Profile from the sidebar.")
     else:
         # --- STATE INITIALIZATION (GLOBAL PERSISTENCE) ---
-        # Initialize keys if they don't exist to prevent KeyErrors
         if 'sm_topic' not in st.session_state: st.session_state['sm_topic'] = ""
         if 'sm_platform' not in st.session_state: st.session_state['sm_platform'] = "LinkedIn"
         if 'sm_goal' not in st.session_state: st.session_state['sm_goal'] = "Reach (Awareness)"
@@ -2477,19 +2471,21 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                             
                             st.session_state['sm_results'] = options
                             
-                            # Log
-                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
-                            from datetime import datetime
-                            log_entry = {
-                                "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "SOCIAL GEN",
-                                "name": f"{st.session_state['sm_platform']}: {st.session_state['sm_topic']}",
-                                "score": metrics['score'],
-                                "verdict": "CREATED",
-                                "result_data": response,
-                                "image_data": None
-                            }
-                            st.session_state['activity_log'].insert(0, log_entry)
+                            # LOG TO DB (GOD MODE)
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="SOCIAL GEN",
+                                asset_name=f"{st.session_state['sm_platform']}: {st.session_state['sm_topic']}",
+                                score=metrics['score'],
+                                verdict="CREATED",
+                                metadata={
+                                    "platform": st.session_state['sm_platform'],
+                                    "goal": st.session_state['sm_goal'],
+                                    "topic": st.session_state['sm_topic'],
+                                    "options": options
+                                }
+                            )
                             st.rerun()
                             
                         except Exception as e:
@@ -3490,6 +3486,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
