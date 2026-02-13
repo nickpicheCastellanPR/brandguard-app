@@ -1898,20 +1898,21 @@ elif app_mode == "COPY EDITOR":
                             st.session_state['ce_result'] = rewrite
                             st.session_state['ce_rationale'] = rationale
                             
-                            # LOG TO DASHBOARD
-                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
-                            from datetime import datetime
-                            
-                            log_entry = {
-                                "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "COPY EDIT",
-                                "name": f"{content_type} ({st.session_state['ce_audience']})",
-                                "score": metrics['score'], # Uses the real confidence metric
-                                "verdict": "REWRITTEN",
-                                "result_data": rewrite,
-                                "image_data": None
-                            }
-                            st.session_state['activity_log'].insert(0, log_entry)
+                            # LOG TO DB (GOD MODE)
+                            # This writes to the shared Agency Timeline
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="COPY EDIT",
+                                asset_name=f"{content_type} ({st.session_state['ce_audience']})",
+                                score=metrics['score'],
+                                verdict="REWRITTEN",
+                                metadata={
+                                    "draft": st.session_state['ce_draft'],
+                                    "rewrite": rewrite,
+                                    "rationale": rationale
+                                }
+                            )
                             st.rerun()
                             
                         except Exception as e:
@@ -3487,6 +3488,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
