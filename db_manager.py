@@ -244,3 +244,12 @@ def update_user_status(username, new_status):
     conn.execute("UPDATE users SET subscription_status = ? WHERE username = ?", (new_status, username))
     conn.commit()
     conn.close()
+
+def get_user_status(username):
+    """Retrieves the subscription status for a given user."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT subscription_status FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    return result[0] if result else "trial"
