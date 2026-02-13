@@ -727,17 +727,16 @@ if not st.session_state['authenticated']:
         st.markdown("<h4 style='text-align: center; color: #ab8f59; margin-bottom: 20px; letter-spacing: 2px;'>ACCESS TERMINAL</h4>", unsafe_allow_html=True)
         
         # --- NEW: SELF-SEALING ADMIN SETUP ---
-        # This checks if the DB is empty. If so, it lets you create the Admin.
         if db.get_user_count() == 0:
             st.warning("⚠️ SYSTEM RESET: CREATE ADMIN ACCOUNT")
             with st.form("setup_admin_hero"):
                 new_admin_user = st.text_input("Admin Username")
                 new_admin_pass = st.text_input("Admin Password", type="password")
                 new_admin_email = st.text_input("Admin Email")
+                new_admin_org = st.text_input("Admin Org / Agency Name")
                 if st.form_submit_button("Initialize System"):
                     if new_admin_user and new_admin_pass:
-                        # Auto-assign Admin to Castellan PR for the Demo
-                        db.create_user(new_admin_user, new_admin_email, new_admin_pass, org_id="Castellan PR", is_admin=True)
+                        db.create_user(new_admin_user, new_admin_email, new_admin_pass, org_id=new_admin_org, is_admin=True)
                         st.success("Admin Created! Please Log In.")
                         st.rerun()
             st.divider()
@@ -760,12 +759,11 @@ if not st.session_state['authenticated']:
                     st.session_state['user_id'] = user_data['username'] 
                     st.session_state['username'] = user_data['username']
                     # --- NEW: ORG CONTEXT ---
-                    st.session_state['org_id'] = user_data.get('org_id', 'Castellan PR')
+                    st.session_state['org_id'] = user_data.get('org_id', user_data['username']) # Default to self if no org
                     st.session_state['is_admin'] = user_data['is_admin']
                     
-                    # 3. SYNC SUBSCRIPTION STATUS (The Bouncer Check)
+                    # 3. SYNC SUBSCRIPTION STATUS
                     user_email = user_data.get('email', '')
-                    # This checks Lemon Squeezy and updates the DB
                     status = sub_manager.sync_user_status(user_data['username'], user_email)
                     st.session_state['status'] = status
                     
@@ -779,13 +777,14 @@ if not st.session_state['authenticated']:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user")
             r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
             r_email = st.text_input("EMAIL", key="r_email") 
+            # --- REAL MVP: ORG CREATION ---
+            r_org = st.text_input("ORGANIZATION / AGENCY NAME", key="r_org")
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("CREATE ACCOUNT", width="stretch"):
-                # --- NEW: AUTO-JOIN STUDIO ---
-                # For Beta, everyone joins "Castellan PR". In prod, this would be an Invite Code.
-                if db.create_user(r_user, r_email, r_pass, org_id="Castellan PR"):
-                    st.success("Account created! You have been added to: Castellan PR. Please log in.")
+                # Create user as Admin of their new Org
+                if db.create_user(r_user, r_email, r_pass, org_id=r_org, is_admin=True):
+                    st.success(f"Account created! You are the Admin of {r_org}. Please log in.")
                 else:
                     st.error("Username already taken.")
 
@@ -948,21 +947,24 @@ with st.sidebar:
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # ADMIN TOOLS
+    # ADMIN TOOLS (Conditional)
+    st.divider()
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
+    # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
     if st.session_state.get('is_admin', False) or raw_user == "NICK_ADMIN":
-         st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
+         st.button("TEAM MANAGEMENT", width="stretch", on_click=set_page, args=("TEAM MANAGEMENT",))
 
     # Footer Spacer
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
     
     # 5. TRUST FOOTER
-    st.markdown("""
+    current_org = st.session_state.get('org_id', 'Unknown')
+    st.markdown(f"""
         <div style='font-size: 0.7rem; color: #5c6b61; margin-top: 10px; margin-bottom: 20px;'>
             <strong>SECURE INSTANCE</strong><br>
-            Data isolated to Castellan PR.<br>
+            Org: {current_org}<br>
             End-to-End Encrypted.
         </div>
     """, unsafe_allow_html=True)
@@ -974,45 +976,6 @@ with st.sidebar:
         st.rerun()
 
 # --- BRIDGE VARIABLES ---
-app_mode = st.session_state.get('app_mode', 'DASHBOARD')
-active_profile = st.session_state.get('active_profile_name')
-    
-def set_page(page):
-    st.session_state['app_mode'] = page
-        
-    st.button("DASHBOARD", width="stretch", on_click=set_page, args=("DASHBOARD",))
-    st.button("VISUAL COMPLIANCE", width="stretch", on_click=set_page, args=("VISUAL COMPLIANCE",))
-    
-    # Writing Tools
-    st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
-    st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
-    st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
-    
-    # Admin Tools (Bottom)
-    st.divider()
-    st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
-    
-    if st.session_state.get('is_admin', False):
-         st.button("ADMIN CONSOLE", width="stretch", on_click=set_page, args=("ADMIN CONSOLE",))
-
-    st.divider()
-    
-    # 5. TRUST FOOTER
-    st.markdown("""
-        <div style='font-size: 0.7rem; color: #5c6b61; margin-top: 10px; margin-bottom: 20px;'>
-            <strong>SECURE INSTANCE</strong><br>
-            Data isolated to Castellan PR.<br>
-            End-to-End Encrypted.
-        </div>
-    """, unsafe_allow_html=True)
-
-    if st.button("LOGOUT", width="stretch"):
-        st.session_state['authenticated'] = False
-        st.session_state['username'] = None
-        st.session_state['profiles'] = {}
-        st.rerun()
-
-# --- CRITICAL VARIABLES (Must be defined for other modules) ---
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
         
@@ -1225,7 +1188,7 @@ if app_mode == "DASHBOARD":
     c_head, c_org = st.columns([3, 1])
     with c_head: st.markdown("### OPERATIONAL LOG")
     with c_org: 
-        current_org = st.session_state.get('org_id', 'Castellan PR')
+        current_org = st.session_state.get('org_id', 'Unknown')
         st.caption(f"ORG: {current_org.upper()}")
     
     # FETCH REAL DATA FROM DB
@@ -1528,7 +1491,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                             
                             # LOG TO DB (GOD MODE)
                             db.log_event(
-                                org_id=st.session_state.get('org_id', 'Castellan PR'),
+                                org_id=st.session_state.get('org_id', 'Unknown'),
                                 username=st.session_state.get('username', 'Unknown'),
                                 activity_type="VISUAL AUDIT",
                                 asset_name=uploaded_file.name,
@@ -1637,6 +1600,51 @@ elif app_mode == "VISUAL COMPLIANCE":
                 **4. TYPOGRAPHY:** {r_typo}  
                 **5. VISUAL AESTHETIC:** {r_vibe}
                 """)
+    
+    # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
+    if app_mode == "TEAM MANAGEMENT":
+        st.title("TEAM MANAGEMENT")
+        
+        # Check permissions
+        if not st.session_state.get('is_admin', False) and raw_user != "NICK_ADMIN":
+            st.error("ACCESS DENIED. This area is restricted to Organization Admins.")
+            st.stop()
+            
+        current_org = st.session_state.get('org_id', 'Unknown')
+        st.markdown(f"**ORGANIZATION:** {current_org}")
+        st.divider()
+        
+        c1, c2 = st.columns([2, 1])
+        
+        with c1:
+            st.markdown("### ACTIVE SEATS")
+            users = db.get_users_by_org(current_org)
+            if users:
+                import pandas as pd
+                df = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "CREATED AT"])
+                df['IS ADMIN'] = df['IS ADMIN'].apply(lambda x: "ADMIN" if x else "MEMBER")
+                st.dataframe(df, hide_index=True, use_container_width=True)
+            else:
+                st.info("No team members found.")
+                
+        with c2:
+            st.markdown("### ADD TEAM MEMBER")
+            with st.form("add_team_member"):
+                new_user = st.text_input("USERNAME")
+                new_email = st.text_input("EMAIL")
+                new_pass = st.text_input("TEMP PASSWORD", type="password")
+                submitted = st.form_submit_button("CREATE SEAT")
+                
+                if submitted:
+                    if new_user and new_pass:
+                        # CREATE USER LINKED TO CURRENT ORG
+                        if db.create_user(new_user, new_email, new_pass, org_id=current_org, is_admin=False):
+                            st.success(f"User {new_user} added to {current_org}!")
+                            st.rerun()
+                        else:
+                            st.error("Operation Failed: Either the username exists OR you have reached your Seat Limit.")
+                    else:
+                        st.warning("All fields required.")
                             
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
@@ -3479,6 +3487,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
