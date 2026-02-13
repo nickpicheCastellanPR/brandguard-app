@@ -3502,10 +3502,10 @@ elif app_mode == "BRAND MANAGER":
                 )
                 st.rerun()
             
-# --- ADMIN DASHBOARD (CASTELLAN STYLED) ---
+# --- ADMIN DASHBOARD (GOD MODE) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
-    with st.expander("Show Admin Dashboard"):
+    with st.expander("GOD MODE: SYSTEM OVERVIEW"):
         # Custom CSS for the Admin Panel to match the Theme
         st.markdown("""
         <style>
@@ -3540,65 +3540,93 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         </style>
         """, unsafe_allow_html=True)
 
-        st.markdown("<h3 style='color: #ab8f59; letter-spacing: 0.1em;'>SYSTEM OVERVIEW</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #ab8f59; letter-spacing: 0.1em;'>GLOBAL SYSTEM STATUS</h3>", unsafe_allow_html=True)
         
         # 1. METRICS ROW
-        users = db.get_all_users()
-        logs = db.get_all_logs()
+        # Note: We need a 'get_all_users' that returns everything for the Super Admin.
+        # Ideally, db_manager should have a 'get_global_users' function, but we can reuse existing logic if we build it right.
+        
+        # We will assume db.get_all_users() returns global list if no filter applied (based on previous context).
+        # If your db_manager doesn't have a global fetch, we might need to add it, but for now we use what we have.
+        
+        # WARNING: db_manager needs a 'get_all_users' (Global) vs 'get_users_by_org' (Local).
+        # I will assume 'get_users_by_org(None)' or similar might be needed, but sticking to existing pattern:
+        # Let's use raw SQL here for the God Mode if the function is missing, or rely on a "Global" fetch if available.
+        # Since I can't edit DB manager again in this turn, I will use a direct connection for God Mode to ensure it works.
+        
+        conn = sqlite3.connect(db.DB_NAME)
+        
+        # Global Counts
+        user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        org_count = conn.execute("SELECT COUNT(DISTINCT org_id) FROM users").fetchone()[0]
+        log_count = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
         
         m1, m2, m3 = st.columns(3)
-        with m1: st.metric("TOTAL OPERATIVES", len(users) if users else 0)
-        with m2: st.metric("TOTAL GENERATIONS", len(logs) if logs else 0)
-        with m3: st.metric("SYSTEM STATUS", "ONLINE", delta_color="normal")
+        with m1: st.metric("TOTAL USERS", user_count)
+        with m2: st.metric("ACTIVE ORGANIZATIONS", org_count)
+        with m3: st.metric("TOTAL ACTIONS LOGGED", log_count)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
         # 2. TABS FOR DATA
-        tab_users, tab_logs = st.tabs(["OPERATIVE DATABASE", "GENERATION LOGS"])
+        tab_users, tab_logs = st.tabs(["GLOBAL USER DATABASE", "GLOBAL AUDIT LOGS"])
         
         import pandas as pd
 
         with tab_users:
-            if users:
-                # SECURITY NOTE: st.dataframe is 'Safe by Design'. It renders scripts as text, preventing XSS.
-                df_users = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS ADMIN", "SUB STATUS", "CREATED AT"])
-                # Clean up the view
-                df_users['IS ADMIN'] = df_users['IS ADMIN'].apply(lambda x: "ADMIN" if x else "USER")
-                st.dataframe(df_users, width="stretch", hide_index=True)
+            users_raw = conn.execute("SELECT username, email, org_id, is_admin, created_at FROM users").fetchall()
+            if users_raw:
+                df_users = pd.DataFrame(users_raw, columns=["USERNAME", "EMAIL", "ORG_ID", "ROLE", "CREATED_AT"])
+                df_users['ROLE'] = df_users['ROLE'].apply(lambda x: "ADMIN" if x else "USER")
+                st.dataframe(df_users, width="stretch", hide_index=True, use_container_width=True)
             else:
                 st.info("No users found.")
 
         with tab_logs:
-            if logs:
-                # FIX: Matched columns to the 4 returned by the Database (Username, Time, Inputs, Cost)
-                # This prevents the "Shape mismatch" crash.
-                df_logs = pd.DataFrame(logs, columns=["OPERATIVE", "TIMESTAMP", "INPUTS (JSON)", "EST. COST"])
+            # Fetch last 100 logs globally
+            logs_raw = conn.execute("SELECT timestamp, org_id, username, activity_type, asset_name, verdict, metadata_json FROM activity_log ORDER BY id DESC LIMIT 100").fetchall()
+            
+            if logs_raw:
+                df_logs = pd.DataFrame(logs_raw, columns=["TIME", "ORG", "USER", "ACTION", "ASSET", "VERDICT", "META"])
                 
                 # Filter for readability
-                display_cols = ["TIMESTAMP", "OPERATIVE", "EST. COST"]
+                display_cols = ["TIME", "ORG", "USER", "ACTION", "VERDICT"]
+                
                 selection = st.dataframe(
                     df_logs[display_cols], 
                     width="stretch", 
                     hide_index=True,
                     on_select="rerun", 
-                    selection_mode="single-row"
+                    selection_mode="single-row",
+                    use_container_width=True
                 )
                 
                 # Detail View (The Inspector)
-                st.markdown("<h5 style='color: #ab8f59; margin-top: 20px;'>LOG INSPECTOR</h5>", unsafe_allow_html=True)
+                st.markdown("<h5 style='color: #ab8f59; margin-top: 20px;'>DEEP INSPECTOR</h5>", unsafe_allow_html=True)
                 if selection and len(selection.selection.rows) > 0:
                     row_idx = selection.selection.rows[0]
                     selected_log = df_logs.iloc[row_idx]
                     
-                    st.caption("INPUT DATA")
-                    st.json(selected_log["INPUTS (JSON)"])
+                    c_meta, c_raw = st.columns(2)
+                    with c_meta:
+                        st.caption("ACTION METADATA")
+                        st.write(f"**Org:** {selected_log['ORG']}")
+                        st.write(f"**User:** {selected_log['USER']}")
+                        st.write(f"**Asset:** {selected_log['ASSET']}")
+                    
+                    with c_raw:
+                        st.caption("PAYLOAD (JSON)")
+                        st.json(selected_log["META"])
                     
                 else:
-                    st.caption("Select a log entry above to inspect payload.")
+                    st.caption("Select a log entry above to audit the specific JSON payload.")
             else:
-                st.info("No logs generated yet.")
+                st.info("No global logs generated yet.")
+        
+        conn.close()
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
