@@ -2208,20 +2208,22 @@ elif app_mode == "CONTENT GENERATOR":
                             st.session_state['cg_result'] = draft
                             st.session_state['cg_rationale'] = rationale
                             
-                            # LOGGING
-                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
-                            from datetime import datetime
-                            
-                            log_entry = {
-                                "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "GENERATOR",
-                                "name": f"{content_type}: {st.session_state['cg_topic']}",
-                                "score": metrics['score'], # Log the SPECIFIC confidence score
-                                "verdict": "CREATED",
-                                "result_data": draft,
-                                "image_data": None
-                            }
-                            st.session_state['activity_log'].insert(0, log_entry)
+                            # LOGGING TO DB (GOD MODE)
+                            # Records: Type, Topic, Draft, and Confidence Score
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="GENERATOR",
+                                asset_name=f"{content_type}: {st.session_state['cg_topic']}",
+                                score=metrics['score'],
+                                verdict="CREATED",
+                                metadata={
+                                    "topic": st.session_state['cg_topic'],
+                                    "key_points": st.session_state['cg_key_points'],
+                                    "draft": draft,
+                                    "rationale": rationale
+                                }
+                            )
                             st.rerun()
                             
                         except Exception as e:
@@ -3488,6 +3490,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
