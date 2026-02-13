@@ -33,9 +33,11 @@ except Exception as e:
     st.error(f"🚨 CRITICAL STARTUP ERROR: {e}")
     st.code(f"Details: {type(e).__name__}", language="text")
     st.stop()
-if 'db_init' not in st.session_state:
+
+# Initialize DB (This will create the V3 schema from db_manager)
+if 'db_init_v3' not in st.session_state:
     db.init_db()
-    st.session_state['db_init'] = True
+    st.session_state['db_init_v3'] = True
 
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
 st.markdown("""
@@ -224,6 +226,7 @@ st.markdown("""
 if 'authenticated' not in st.session_state: st.session_state['authenticated'] = False
 if 'user_id' not in st.session_state: st.session_state['user_id'] = None
 if 'username' not in st.session_state: st.session_state['username'] = None
+if 'org_id' not in st.session_state: st.session_state['org_id'] = None # NEW: Org Context
 
 # WIZARD STATE DEFAULTS
 def init_wizard_state():
@@ -733,7 +736,8 @@ if not st.session_state['authenticated']:
                 new_admin_email = st.text_input("Admin Email")
                 if st.form_submit_button("Initialize System"):
                     if new_admin_user and new_admin_pass:
-                        db.create_user(new_admin_user, new_admin_email, new_admin_pass, is_admin=True)
+                        # Auto-assign Admin to Castellan PR for the Demo
+                        db.create_user(new_admin_user, new_admin_email, new_admin_pass, org_id="Castellan PR", is_admin=True)
                         st.success("Admin Created! Please Log In.")
                         st.rerun()
             st.divider()
@@ -755,6 +759,8 @@ if not st.session_state['authenticated']:
                     st.session_state['authenticated'] = True
                     st.session_state['user_id'] = user_data['username'] 
                     st.session_state['username'] = user_data['username']
+                    # --- NEW: ORG CONTEXT ---
+                    st.session_state['org_id'] = user_data.get('org_id', 'Castellan PR')
                     st.session_state['is_admin'] = user_data['is_admin']
                     
                     # 3. SYNC SUBSCRIPTION STATUS (The Bouncer Check)
@@ -776,8 +782,10 @@ if not st.session_state['authenticated']:
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("CREATE ACCOUNT", width="stretch"):
-                if db.create_user(r_user, r_email, r_pass):
-                    st.success("Account created! Please log in.")
+                # --- NEW: AUTO-JOIN STUDIO ---
+                # For Beta, everyone joins "Castellan PR". In prod, this would be an Invite Code.
+                if db.create_user(r_user, r_email, r_pass, org_id="Castellan PR"):
+                    st.success("Account created! You have been added to: Castellan PR. Please log in.")
                 else:
                     st.error("Username already taken.")
 
@@ -1212,36 +1220,48 @@ if app_mode == "DASHBOARD":
                 st.rerun()
         st.divider()
 
-    # --- ACTIVITY FEED ---
+    # --- ACTIVITY FEED (REAL-TIME DB STUDIO MODE) ---
     st.divider()
-    st.markdown("### OPERATIONAL LOG")
+    c_head, c_org = st.columns([3, 1])
+    with c_head: st.markdown("### OPERATIONAL LOG")
+    with c_org: 
+        current_org = st.session_state.get('org_id', 'Castellan PR')
+        st.caption(f"ORG: {current_org.upper()}")
     
-    if 'activity_log' not in st.session_state or not st.session_state['activity_log']:
-        st.info("No activity recorded yet.")
+    # FETCH REAL DATA FROM DB
+    logs = db.get_org_logs(current_org)
+    
+    if not logs:
+        st.info("No agency activity recorded yet.")
     else:
-        for i, entry in enumerate(st.session_state['activity_log']):
+        for entry in logs:
             # Render Row
-            score = entry.get('score', 0)
+            score = entry['score']
             color = "#ff4b4b"
             if score > 60: color = "#ffa421"
             if score > 85: color = "#09ab3b"
             
-            # Use HTML for the Data Grid
+            # User Badge Color Logic
+            user_badge_color = "#3d3d3d"
+            if "Sarah" in entry['username']: user_badge_color = "#ab8f59" # Gold for Admin (example)
+            
             st.markdown(f"""
                 <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; margin-bottom: 5px;">
                     <div style="flex: 1; color: #5c6b61; font-size: 0.8rem;">{entry['timestamp']}</div>
-                    <div style="flex: 2; font-weight: bold; color: #f5f5f0;">{entry['type']}</div>
-                    <div style="flex: 3; color: #a0a0a0;">{entry['name']}</div>
+                    <div style="flex: 2; font-weight: bold; color: #f5f5f0;">
+                         <span style="background:{user_badge_color}; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">{entry['username']}</span>
+                    </div>
+                    <div style="flex: 2; font-weight: bold; color: #a0a0a0; font-size: 0.8rem;">{entry['activity_type']}</div>
+                    <div style="flex: 3; color: #f5f5f0;">{entry['asset_name']}</div>
                     <div style="flex: 2; color: {color}; font-weight: 800;">{entry['verdict']} ({score})</div>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Action Button
-            if st.button("LOAD SNAPSHOT", key=f"restore_{i}"):
-                if entry['type'] == "VISUAL AUDIT":
-                    # --- BUG FIX: SAFE DESERIALIZATION ---
+            # Action Button (Snapshot)
+            if st.button("LOAD SNAPSHOT", key=f"restore_{entry['id']}"):
+                if entry['activity_type'] == "VISUAL AUDIT":
                     import ast
-                    raw_data = entry['result_data']
+                    raw_data = entry['metadata_json']
                     
                     if isinstance(raw_data, str):
                         try:
@@ -1254,7 +1274,8 @@ if app_mode == "DASHBOARD":
                         restored_data = raw_data
                     
                     st.session_state['active_audit_result'] = restored_data
-                    st.session_state['active_audit_image'] = entry['image_data']
+                    # Note: We can't restore the image itself from a text log unless we stored base64.
+                    # For Beta, we just restore the data.
                     
                     # Redirect
                     st.session_state['app_mode'] = "VISUAL COMPLIANCE"
@@ -1505,19 +1526,17 @@ elif app_mode == "VISUAL COMPLIANCE":
                             st.session_state['active_audit_result'] = result
                             st.session_state['active_audit_image'] = image
                             
-                            # Log
-                            if 'activity_log' not in st.session_state: st.session_state['activity_log'] = []
-                            from datetime import datetime
-                            log_entry = {
-                                "timestamp": datetime.now().strftime("%H:%M"),
-                                "type": "VISUAL AUDIT",
-                                "name": uploaded_file.name,
-                                "score": result.get('score', 0),
-                                "verdict": result.get('verdict', 'N/A'),
-                                "result_data": str(result),
-                                "image_data": image
-                            }
-                            st.session_state['activity_log'].insert(0, log_entry)
+                            # LOG TO DB (GOD MODE)
+                            db.log_event(
+                                org_id=st.session_state.get('org_id', 'Castellan PR'),
+                                username=st.session_state.get('username', 'Unknown'),
+                                activity_type="VISUAL AUDIT",
+                                asset_name=uploaded_file.name,
+                                score=result.get('score', 0),
+                                verdict=result.get('verdict', 'N/A'),
+                                metadata=result
+                            )
+                            
                             st.rerun()
                             
                         except Exception as e:
@@ -3460,6 +3479,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
