@@ -1096,9 +1096,9 @@ if app_mode == "DASHBOARD":
                 </li>
             </ol>
         </div>
-        """, unsafe_allow_html=True)    
+        """, unsafe_allow_html=True)     
 
-    # --- EXACT CSS RESTORATION (USER PROVIDED) ---
+    # --- EXACT CSS RESTORATION ---
     st.markdown("""<style>
         div[data-testid*="Column"] .stButton button {
             background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
@@ -1110,7 +1110,7 @@ if app_mode == "DASHBOARD":
         div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
     </style>""", unsafe_allow_html=True)
 
-    # --- ACTION BUTTONS (Restored Text & Logic) ---
+    # --- ACTION BUTTONS ---
     c1, c2, c3 = st.columns(3)
     
     with c1: 
@@ -1140,19 +1140,18 @@ if app_mode == "DASHBOARD":
     # --- UPLOAD DRAWER (Conditional) ---
     if st.session_state.get('dashboard_upload_open'):
         st.markdown("<br>", unsafe_allow_html=True)
-        # Using a container (not columns) to avoid triggering the Button CSS
         with st.container():
             st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0; margin-bottom: 20px;"><h3 style="color: #f5f5f0; margin:0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0; margin:0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
             
             dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
             
-            # Using simple layout to avoid CSS collision
             if dash_pdf:
                 if st.button("PROCESS & INGEST", type="primary"):
                     with st.spinner("ANALYZING PDF STRUCTURE..."):
                         try:
-                            raw_text = logic.extract_text_from_pdf(dash_pdf)
-                            extracted_data = logic.generate_brand_rules_from_pdf(raw_text)
+                            # FIX: Changed 'logic' to 'logic_engine' to match your global class instance
+                            raw_text = logic_engine.extract_text_from_pdf(dash_pdf)
+                            extracted_data = logic_engine.generate_brand_rules_from_pdf(raw_text)
                             
                             new_profile = {
                                 "inputs": {
@@ -1185,8 +1184,7 @@ if app_mode == "DASHBOARD":
                 st.rerun()
         st.divider()
 
-    # --- ACTIVITY FEED (New Feature) ---
-    # NOTE: We avoid st.columns for buttons here to prevent the "Cool Card" CSS from affecting them.
+    # --- ACTIVITY FEED ---
     st.divider()
     st.markdown("### OPERATIONAL LOG")
     
@@ -1210,11 +1208,28 @@ if app_mode == "DASHBOARD":
                 </div>
             """, unsafe_allow_html=True)
             
-            # Action Button (Outside of columns to stay small)
+            # Action Button
             if st.button("LOAD SNAPSHOT", key=f"restore_{i}"):
                 if entry['type'] == "VISUAL AUDIT":
-                    st.session_state['active_audit_result'] = entry['result_data']
+                    # --- BUG FIX STARTS HERE ---
+                    import ast
+                    raw_data = entry['result_data']
+                    
+                    # Convert String back to Dictionary if needed
+                    if isinstance(raw_data, str):
+                        try:
+                            # ast.literal_eval is safer than eval() for parsing python dict strings
+                            restored_data = ast.literal_eval(raw_data)
+                        except Exception as e:
+                            st.error(f"Corrupted Snapshot Data: {e}")
+                            restored_data = {}
+                    else:
+                        restored_data = raw_data
+                    
+                    st.session_state['active_audit_result'] = restored_data
                     st.session_state['active_audit_image'] = entry['image_data']
+                    
+                    # Redirect
                     st.session_state['app_mode'] = "VISUAL COMPLIANCE"
                     st.rerun()
             
@@ -3418,6 +3433,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
