@@ -16,6 +16,16 @@ DB_NAME = os.path.join(DB_FOLDER, "signet_studio_v3.db")
 
 ph = PasswordHasher()
 
+# --- SEAT LIMIT CONFIGURATION ---
+# usage: checks 'subscription_status' of the Org Admin
+SEAT_LIMITS = {
+    "trial": 1,
+    "solo": 1,
+    "agency": 5,
+    "enterprise": 20,
+    "active": 5  # Fallback for generic active status
+}
+
 # --- 1. SETUP & SCHEMA ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -67,8 +77,38 @@ def init_db():
     conn.close()
 
 # --- 2. AUTH & USER MANAGEMENT ---
+
+def check_seat_availability(org_id):
+    """Returns True if the Org has space for a new user."""
+    conn = sqlite3.connect(DB_NAME)
+    
+    # 1. Count current users
+    cursor = conn.execute("SELECT COUNT(*) FROM users WHERE org_id = ?", (org_id,))
+    current_count = cursor.fetchone()[0]
+    
+    # 2. Get Org Tier (via Admin's status)
+    # We assume the user with is_admin=1 defines the tier
+    cursor = conn.execute("SELECT subscription_status FROM users WHERE org_id = ? AND is_admin = 1", (org_id,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    # Default to trial limits if no admin found (shouldn't happen)
+    status = result[0] if result else "trial"
+    limit = SEAT_LIMITS.get(status.lower(), 1) # Default to 1 seat if status unknown
+    
+    return current_count < limit
+
 def create_user(username, email, password, org_id=None, is_admin=False):
+    """Creates a user. Enforces seat limits if adding to an existing Org."""
     hashed = ph.hash(password)
+    
+    # SEAT CHECK
+    if org_id:
+        # If this is a new Org (count is 0), this check passes (0 < limit).
+        # If adding to existing Org, it enforces the limit.
+        if not check_seat_availability(org_id):
+            return False
+
     conn = sqlite3.connect(DB_NAME)
     try:
         conn.execute('''
@@ -146,7 +186,6 @@ def get_profiles(username):
     
     # 1. Find User's Org
     org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
-    # Fallback to username if no Org
     org_id = org_res[0] if org_res and org_res[0] else username
     
     # 2. Fetch All Profiles for that Org
