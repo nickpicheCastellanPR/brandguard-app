@@ -2814,6 +2814,17 @@ elif app_mode == "BRAND ARCHITECT":
                         # FORCE SWITCH TO NEW PROFILE
                         st.session_state['active_profile_name'] = profile_name
 
+                        # LOG TO DB (GOD MODE)
+                        db.log_event(
+                            org_id=st.session_state.get('org_id', 'Unknown'),
+                            username=st.session_state.get('username', 'Unknown'),
+                            activity_type="PROFILE CREATED",
+                            asset_name=profile_name,
+                            score=100, # Baseline score for creation
+                            verdict="SUCCESS",
+                            metadata={"method": "Wizard Generator"}
+                        )
+
                         st.session_state['wiz_samples_list'] = []
                         st.session_state['wiz_social_list'] = []
                         st.session_state['wiz_logo_list'] = []
@@ -3486,6 +3497,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No logs generated yet.")
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
+
 
 
 
