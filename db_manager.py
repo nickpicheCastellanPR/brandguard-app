@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 
 # --- CONFIG ---
-# We use a new DB file to ensure a clean schema migration
 if os.path.exists("/app/data"):
     DB_FOLDER = "/app/data"
 else:
@@ -29,7 +28,7 @@ def init_db():
             email TEXT,
             password_hash TEXT,
             is_admin BOOLEAN DEFAULT 0,
-            org_id TEXT DEFAULT 'DEFAULT_ORG',
+            org_id TEXT,
             subscription_status TEXT DEFAULT 'trial',
             created_at TEXT
         )
@@ -68,7 +67,7 @@ def init_db():
     conn.close()
 
 # --- 2. AUTH & USER MANAGEMENT ---
-def create_user(username, email, password, org_id="Castellan PR", is_admin=False):
+def create_user(username, email, password, org_id=None, is_admin=False):
     hashed = ph.hash(password)
     conn = sqlite3.connect(DB_NAME)
     try:
@@ -99,7 +98,7 @@ def check_login(username, password):
                 "is_admin": bool(data[1]), 
                 "status": data[2],
                 "email": data[3],
-                "org_id": data[4]  # CRITICAL: Return the Org ID
+                "org_id": data[4]
             }
         except VerifyMismatchError:
             return None
@@ -114,18 +113,21 @@ def get_user_count():
     conn.close()
     return count
 
+def get_users_by_org(org_id):
+    """Returns list of users belonging to a specific Org."""
+    conn = sqlite3.connect(DB_NAME)
+    users = conn.execute("SELECT username, email, is_admin, created_at FROM users WHERE org_id = ?", (org_id,)).fetchall()
+    conn.close()
+    return users
+
 # --- 3. STUDIO PROFILE MANAGEMENT (Org-Based) ---
 def save_profile(user_id, profile_name, profile_data):
-    # NOTE: In Studio Mode, we need the Org ID. 
-    # For now, we fetch it from the user, or assume 'Castellan PR' if checking context.
-    # To fix your app structure, we will update app.py to pass org_id, 
-    # but for compatibility, we look up the user's org here.
-    
     conn = sqlite3.connect(DB_NAME)
     
-    # 1. Find User's Org
+    # 1. Resolve Org ID from User
     org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (user_id,)).fetchone()
-    org_id = org_res[0] if org_res else "Castellan PR"
+    # Fallback to user_id itself if no Org exists (Solo Mode)
+    org_id = org_res[0] if org_res and org_res[0] else user_id 
     
     data_json = json.dumps(profile_data)
     
@@ -144,7 +146,8 @@ def get_profiles(username):
     
     # 1. Find User's Org
     org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
-    org_id = org_res[0] if org_res else "Castellan PR"
+    # Fallback to username if no Org
+    org_id = org_res[0] if org_res and org_res[0] else username
     
     # 2. Fetch All Profiles for that Org
     rows = conn.execute("SELECT name, data FROM profiles WHERE org_id = ?", (org_id,)).fetchall()
@@ -162,7 +165,7 @@ def delete_profile(username, profile_name):
     conn = sqlite3.connect(DB_NAME)
     # Get Org
     org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
-    org_id = org_res[0] if org_res else "Castellan PR"
+    org_id = org_res[0] if org_res and org_res[0] else username
     
     conn.execute("DELETE FROM profiles WHERE org_id = ? AND name = ?", (org_id, profile_name))
     conn.commit()
