@@ -3264,31 +3264,40 @@ elif app_mode == "BRAND MANAGER":
                             voice_audience = st.text_input("AUDIENCE (TARGET)", placeholder="e.g. Investors", key="cal_audience_voice")
                     
                     with c2:
-                        v_file = st.file_uploader("UPLOAD SOURCE MATERIAL (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                        v_file = st.file_uploader("UPLOAD SOURCE MATERIAL (PDF/DOCX/TXT)", type=["pdf", "docx", "txt"], key="cal_up_voice")
                         st.caption("Engine requires 3+ samples per cluster for high fidelity.")
                     
                     if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
                     
                     if v_file and st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice"):
                         with st.spinner("DECONSTRUCTING RHETORICAL PATTERNS..."):
-                            if v_file.type == "application/pdf":
-                                raw_txt = logic_engine.extract_text_from_pdf(v_file)
-                            else:
-                                raw_txt = str(v_file.read(), "utf-8")
-                            
-                            prompt = f"""
-                            TASK: Extract the 'Voice DNA' from this text.
-                            ROLE: Expert Linguist.
-                            CONTEXT: This belongs to the '{voice_type}' cluster.
-                            CONSTRAINTS: No chat. No emojis. Bullet points only.
-                            INPUT TEXT: {raw_txt[:10000]}
-                            OUTPUT FORMAT:
-                            - SYNTAX ARCHITECTURE: (e.g. Complex, Fragmented)
-                            - LEXICON TIER: (e.g. Academic, Slang, Corporate)
-                            - RHETORICAL MECHANICS: (e.g. Metaphors, Questions)
-                            - TONAL FREQUENCY: (e.g. Urgent, Calm, Witty)
-                            """
-                            st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
+                            try:
+                                raw_txt = ""
+                                if v_file.type == "application/pdf":
+                                    raw_txt = logic_engine.extract_text_from_pdf(v_file)
+                                elif v_file.name.endswith(".docx"):
+                                    # PYTHON-DOCX HANDLER
+                                    import docx
+                                    doc = docx.Document(v_file)
+                                    raw_txt = "\n".join([para.text for para in doc.paragraphs])
+                                else:
+                                    raw_txt = str(v_file.read(), "utf-8")
+                                
+                                prompt = f"""
+                                TASK: Extract the 'Voice DNA' from this text.
+                                ROLE: Expert Linguist.
+                                CONTEXT: This belongs to the '{voice_type}' cluster.
+                                CONSTRAINTS: No chat. No emojis. Bullet points only.
+                                INPUT TEXT: {raw_txt[:10000]}
+                                OUTPUT FORMAT:
+                                - SYNTAX ARCHITECTURE: (e.g. Complex, Fragmented)
+                                - LEXICON TIER: (e.g. Academic, Slang, Corporate)
+                                - RHETORICAL MECHANICS: (e.g. Metaphors, Questions)
+                                - TONAL FREQUENCY: (e.g. Urgent, Calm, Witty)
+                                """
+                                st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
+                            except Exception as e:
+                                st.error(f"Analysis Failed: {e}")
 
                     if st.session_state['man_voice_analysis']:
                         st.markdown("#### ANALYSIS REVIEW")
@@ -3565,7 +3574,7 @@ elif app_mode == "BRAND MANAGER":
                     metadata={}
                 )
                 st.rerun()
-
+                
 # --- ADMIN DASHBOARD (GOD MODE) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
@@ -3680,5 +3689,6 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
