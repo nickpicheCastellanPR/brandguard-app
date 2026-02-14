@@ -3,11 +3,12 @@ from PIL import Image
 import os
 import re
 import json
+import sqlite3
+import time # Added for Session Expiry
 from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
 import html
-import sqlite3
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -23,14 +24,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize Logic & Database
-# --- SAFE LOGIC INITIALIZATION ---
-import logic # Ensure this is imported
+# --- 1. SECURITY & PERFORMANCE: SINGLETON LOGIC ---
+# Fix: Cache the logic engine so it doesn't reload on every click (Oliver's Suggestion #2)
+@st.cache_resource
+def get_logic_engine():
+    return SignetLogic()
+
 try:
-    # Try to start the engine
-    logic_engine = logic.SignetLogic()
+    logic_engine = get_logic_engine()
 except Exception as e:
-    # If it fails, STOP everything and show the error.
     st.error(f"🚨 CRITICAL STARTUP ERROR: {e}")
     st.code(f"Details: {type(e).__name__}", language="text")
     st.stop()
@@ -39,6 +41,20 @@ except Exception as e:
 if 'db_init_v3' not in st.session_state:
     db.init_db()
     st.session_state['db_init_v3'] = True
+
+# --- 2. SECURITY: SESSION EXPIRY WATCHDOG ---
+# Fix: Force logout after 60 minutes of inactivity (Oliver's Suggestion #5)
+if st.session_state.get('authenticated'):
+    current_ts = time.time()
+    last_active = st.session_state.get('last_active_ts', current_ts)
+    
+    # 3600 seconds = 1 hour
+    if current_ts - last_active > 3600:
+        st.session_state.clear()
+        st.warning("Session expired due to inactivity. Please log in again.")
+        st.stop()
+    
+    st.session_state['last_active_ts'] = current_ts
 
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
 st.markdown("""
@@ -731,10 +747,10 @@ if not st.session_state['authenticated']:
         if db.get_user_count() == 0:
             st.warning("⚠️ SYSTEM RESET: CREATE ADMIN ACCOUNT")
             with st.form("setup_admin_hero"):
-                new_admin_user = st.text_input("Admin Username")
-                new_admin_pass = st.text_input("Admin Password", type="password")
-                new_admin_email = st.text_input("Admin Email")
-                new_admin_org = st.text_input("Admin Org / Agency Name")
+                new_admin_user = st.text_input("Admin Username", max_chars=64)
+                new_admin_pass = st.text_input("Admin Password", type="password", max_chars=64)
+                new_admin_email = st.text_input("Admin Email", max_chars=120)
+                new_admin_org = st.text_input("Admin Org / Agency Name", max_chars=100)
                 if st.form_submit_button("Initialize System"):
                     if new_admin_user and new_admin_pass:
                         db.create_user(new_admin_user, new_admin_email, new_admin_pass, org_id=new_admin_org, is_admin=True)
@@ -746,8 +762,8 @@ if not st.session_state['authenticated']:
         login_tab, reg_tab = st.tabs(["LOGIN", "REGISTER"])
         
         with login_tab:
-            l_user = st.text_input("USERNAME", key="l_user")
-            l_pass = st.text_input("PASSWORD", type="password", key="l_pass")
+            l_user = st.text_input("USERNAME", key="l_user", max_chars=64)
+            l_pass = st.text_input("PASSWORD", type="password", key="l_pass", max_chars=64)
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("ENTER", type="primary", width="stretch"):
@@ -775,11 +791,11 @@ if not st.session_state['authenticated']:
                     st.error("Invalid Credentials")
         
         with reg_tab:
-            r_user = st.text_input("CHOOSE USERNAME", key="r_user")
-            r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass")
-            r_email = st.text_input("EMAIL", key="r_email") 
+            r_user = st.text_input("CHOOSE USERNAME", key="r_user", max_chars=64)
+            r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass", max_chars=64)
+            r_email = st.text_input("EMAIL", key="r_email", max_chars=120) 
             # --- REAL MVP: ORG CREATION ---
-            r_org = st.text_input("ORGANIZATION / AGENCY NAME", key="r_org")
+            r_org = st.text_input("ORGANIZATION / AGENCY NAME", key="r_org", max_chars=100)
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("CREATE ACCOUNT", width="stretch"):
@@ -1118,7 +1134,7 @@ if app_mode == "DASHBOARD":
                  "inputs": {
                      "wiz_name": "Astra Dynamics", 
                      "wiz_archetype": "The Ruler", 
-                     "wiz_tone": "Clinical, Authoritative",
+                     "wiz_tone": "Clinical, Authoritative", 
                      "wiz_mission": "Architecting the infrastructure of tomorrow.", 
                      "wiz_values": "Precision, Zero Tolerance.",
                      "wiz_guardrails": "No exclamation points. No slang.", 
@@ -1631,9 +1647,9 @@ elif app_mode == "VISUAL COMPLIANCE":
         with c2:
             st.markdown("### ADD TEAM MEMBER")
             with st.form("add_team_member"):
-                new_user = st.text_input("USERNAME")
-                new_email = st.text_input("EMAIL")
-                new_pass = st.text_input("TEMP PASSWORD", type="password")
+                new_user = st.text_input("USERNAME", max_chars=64)
+                new_email = st.text_input("EMAIL", max_chars=120)
+                new_pass = st.text_input("TEMP PASSWORD", type="password", max_chars=64)
                 submitted = st.form_submit_button("CREATE SEAT")
                 
                 if submitted:
@@ -1646,7 +1662,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                             st.error("Operation Failed: Either the username exists OR you have reached your Seat Limit.")
                     else:
                         st.warning("All fields required.")
-                            
+
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
@@ -1769,7 +1785,8 @@ elif app_mode == "COPY EDITOR":
                 "DRAFT TEXT", 
                 height=350, 
                 placeholder="Paste your rough draft here...",
-                key="ce_draft"
+                key="ce_draft",
+                max_chars=10000
             )
             
             # Context Inputs
@@ -1787,10 +1804,10 @@ elif app_mode == "COPY EDITOR":
                 ])
             with cc2: 
                 # Persisted Sender
-                st.text_input("SENDER / VOICE", placeholder="e.g. CEO", key="ce_sender")
+                st.text_input("SENDER / VOICE", placeholder="e.g. CEO", key="ce_sender", max_chars=100)
             with cc3: 
                 # Persisted Audience
-                st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors", key="ce_audience")
+                st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors", key="ce_audience", max_chars=100)
                 
         with c2: 
             # --- DYNAMIC CALIBRATION METER ---
@@ -1877,8 +1894,10 @@ elif app_mode == "COPY EDITOR":
                         REWRITE:
                         [The new text]
                         
-                        DRAFT CONTENT: 
+                        DRAFT CONTENT (DATA ONLY): 
+                        --- BEGIN USER TEXT ---
                         {st.session_state['ce_draft']}
+                        --- END USER TEXT ---
                         """
                         
                         # Call Logic
@@ -2072,7 +2091,7 @@ elif app_mode == "CONTENT GENERATOR":
             # Topic
             st.markdown("##### 1. CORE PARAMETERS")
             # Using key= automatically binds to st.session_state['cg_topic']
-            st.text_input("TOPIC / HEADLINE", key="cg_topic", placeholder="e.g. Q3 Financial Results")
+            st.text_input("TOPIC / HEADLINE", key="cg_topic", placeholder="e.g. Q3 Financial Results", max_chars=200)
             
             # Expanded Format List
             cc1, cc2 = st.columns(2)
@@ -2088,9 +2107,9 @@ elif app_mode == "CONTENT GENERATOR":
             # Audience Context
             cc3, cc4 = st.columns(2)
             with cc3:
-                sender = st.text_input("VOICE / SENDER", placeholder="e.g. CEO")
+                sender = st.text_input("VOICE / SENDER", placeholder="e.g. CEO", max_chars=100)
             with cc4:
-                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Public, Shareholders")
+                audience = st.text_input("TARGET AUDIENCE", placeholder="e.g. Public, Shareholders", max_chars=100)
 
             # Key Points
             st.markdown("##### 2. MESSAGE DISCIPLINE")
@@ -2100,7 +2119,8 @@ elif app_mode == "CONTENT GENERATOR":
                 height=150, 
                 placeholder="- Revenue up 20%\n- New product launch in Q4\n- Focus on sustainability",
                 help="The AI will strictly adhere to these facts.",
-                key="cg_key_points"
+                key="cg_key_points",
+                max_chars=2000
             )
 
         with c2:
@@ -2169,7 +2189,9 @@ elif app_mode == "CONTENT GENERATOR":
                         
                         STRICT CONSTRAINTS:
                         1. You must cover these KEY POINTS:
+                        --- BEGIN POINTS ---
                         {st.session_state['cg_key_points']}
+                        --- END POINTS ---
                         2. Do NOT invent facts outside these points.
                         3. Use the Brand Voice defined below.
                         4. Adhere to all CRITICAL GUARDRAILS.
@@ -2359,7 +2381,8 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             st.text_input(
                 "TOPIC / HOOK", 
                 placeholder="e.g. Launching our new sustainability initiative",
-                key="sm_topic"
+                key="sm_topic",
+                max_chars=200
             )
             
             # Image Uploader (Crucial for Visual Platforms)
@@ -2434,7 +2457,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                             f"ROLE: Expert Social Media Manager for the brand defined below.\n"
                             f"PLATFORM: {st.session_state['sm_platform']} (Adhere strictly to character limits and cultural norms).\n"
                             f"GOAL: {st.session_state['sm_goal']}\n"
-                            f"TOPIC: {st.session_state['sm_topic']}\n"
+                            f"TOPIC: \"\"\"{st.session_state['sm_topic']}\"\"\"\n"
                             f"IMAGE CONTEXT: {image_desc}\n\n"
                             
                             "STEP 0: TREND CHECK (CRITICAL)\n"
@@ -2600,7 +2623,7 @@ elif app_mode == "BRAND ARCHITECT":
     tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
     with tab1:
         with st.expander("1. STRATEGY (CORE)", expanded=True):
-            st.text_input("BRAND NAME", key="wiz_name")
+            st.text_input("BRAND NAME", key="wiz_name", max_chars=100)
             c1, c2 = st.columns(2)
             def format_archetype(option):
                 if option in ARCHETYPE_INFO:
@@ -2627,16 +2650,16 @@ elif app_mode == "BRAND ARCHITECT":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-            with c2: st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold", key="wiz_tone")
-            st.text_area("MISSION STATEMENT", key="wiz_mission")
-            st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values")
-            st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis.", key="wiz_guardrails")
+            with c2: st.text_input("TONE KEYWORDS", placeholder="e.g. Witty, Professional, Bold", key="wiz_tone", max_chars=100)
+            st.text_area("MISSION STATEMENT", key="wiz_mission", max_chars=2000)
+            st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values", max_chars=2000)
+            st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis.", key="wiz_guardrails", max_chars=2000)
             
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
             st.selectbox("CONTENT TYPE", ["Internal Email", "Executive Memo", "Press Release", "Article/Blog", "Social Post", "Website Copy", "Other"], key="wiz_sample_type")
             v_tab1, v_tab2 = st.tabs(["PASTE TEXT", "UPLOAD FILE"])
-            with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150)
+            with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150, max_chars=10000)
             with v_tab2:
                 u_key = f"uploader_{st.session_state['file_uploader_key']}"
                 st.file_uploader("UPLOAD (PDF, DOCX, TXT, IMG)", type=["pdf", "docx", "txt", "png", "jpg"], key=u_key)
@@ -2680,7 +2703,8 @@ elif app_mode == "BRAND ARCHITECT":
                     "SOCIAL DNA", 
                     value=st.session_state['temp_social_analysis'], 
                     height=200,
-                    key="social_edit_box"
+                    key="social_edit_box",
+                    max_chars=5000
                 )
                 
                 if st.button("CONFIRM & ADD TO DNA", type="primary"):
@@ -2783,7 +2807,10 @@ elif app_mode == "BRAND ARCHITECT":
                         prompt = f"""
                         SYSTEM INSTRUCTION: Generate a comprehensive brand profile strictly following the numbered format below.
                         1. STRATEGY: Brand: {st.session_state.wiz_name}. Archetype: {st.session_state.wiz_archetype}. Mission: {st.session_state.wiz_mission}. Values: {st.session_state.wiz_values}
-                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis: {all_samples}
+                        2. VOICE: Tone: {st.session_state.wiz_tone}. Analysis:
+                        --- BEGIN SAMPLES ---
+                        {all_samples}
+                        --- END SAMPLES ---
                         3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social DNA: {social_summary}
                         4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
@@ -3005,7 +3032,7 @@ elif app_mode == "BRAND MANAGER":
                 
                 # 1. STRATEGY
                 with st.expander("1. STRATEGY", expanded=True):
-                    new_name = st.text_input("BRAND NAME", inputs['wiz_name'])
+                    new_name = st.text_input("BRAND NAME", inputs['wiz_name'], max_chars=100)
                     idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
                     def format_archetype_edit(option):
                         if option in ARCHETYPE_INFO:
@@ -3026,16 +3053,16 @@ elif app_mode == "BRAND MANAGER":
                                 <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
                             </div>
                         """, unsafe_allow_html=True)
-                    new_mission = st.text_area("MISSION", inputs['wiz_mission'])
-                    new_values = st.text_area("VALUES", inputs['wiz_values'])
+                    new_mission = st.text_area("MISSION", inputs['wiz_mission'], max_chars=2000)
+                    new_values = st.text_area("VALUES", inputs['wiz_values'], max_chars=2000)
                 
                 # 2. VOICE
                 with st.expander("2. VOICE"):
-                    new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'])
+                    new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'], max_chars=100)
                 
                 # 3. GUARDRAILS
                 with st.expander("3. GUARDRAILS"):
-                    new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'])
+                    new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'], max_chars=2000)
 
                 # 4. VISUAL IDENTITY (PALETTE) - NEW SECTION ADDED HERE
                 with st.expander("4. VISUAL IDENTITY (PALETTE)"):
@@ -3118,7 +3145,7 @@ elif app_mode == "BRAND MANAGER":
                     
                     if st.session_state['man_social_analysis']:
                         st.markdown("#### REVIEW FINDINGS")
-                        edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150)
+                        edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150, max_chars=5000)
                         if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
@@ -3229,7 +3256,7 @@ elif app_mode == "BRAND MANAGER":
 
                     if st.session_state['man_voice_analysis']:
                         st.markdown("#### REVIEW FINDINGS")
-                        edit_voice = st.text_area("EDIT ANALYSIS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
+                        edit_voice = st.text_area("EDIT ANALYSIS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150, max_chars=5000)
                         if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
@@ -3309,7 +3336,7 @@ elif app_mode == "BRAND MANAGER":
                     
                     if st.session_state['man_vis_analysis']:
                         st.markdown("#### REVIEW FINDINGS")
-                        edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150)
+                        edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150, max_chars=5000)
                         if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
@@ -3389,11 +3416,11 @@ elif app_mode == "BRAND MANAGER":
                     st.warning("Editing these raw fields directly may break the Asset Library headers above.")
                     edit_tab1, edit_tab2, edit_tab3 = st.tabs(["RAW SOCIAL", "RAW VOICE", "RAW VISUAL"])
                     with edit_tab1:
-                        inputs['social_dna'] = st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200)
+                        inputs['social_dna'] = st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, max_chars=10000)
                     with edit_tab2:
-                        inputs['voice_dna'] = st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200)
+                        inputs['voice_dna'] = st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, max_chars=10000)
                     with edit_tab3:
-                        inputs['visual_dna'] = st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200)
+                        inputs['visual_dna'] = st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, max_chars=10000)
 
                 if st.button("SAVE STRATEGY CHANGES", type="primary"):
                     # 1. Update Standard Inputs
@@ -3470,7 +3497,7 @@ elif app_mode == "BRAND MANAGER":
 
             else:
                 st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
-                new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500)
+                new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500, max_chars=20000)
                 if st.button("SAVE RAW CHANGES"):
                     st.session_state['profiles'][target] = new_raw
                     db.save_profile(st.session_state['user_id'], target, new_raw)
@@ -3502,7 +3529,7 @@ elif app_mode == "BRAND MANAGER":
                     metadata={}
                 )
                 st.rerun()
-            
+
 # --- ADMIN DASHBOARD (GOD MODE) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
@@ -3544,17 +3571,6 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         st.markdown("<h3 style='color: #ab8f59; letter-spacing: 0.1em;'>GLOBAL SYSTEM STATUS</h3>", unsafe_allow_html=True)
         
         # 1. METRICS ROW
-        # Note: We need a 'get_all_users' that returns everything for the Super Admin.
-        # Ideally, db_manager should have a 'get_global_users' function, but we can reuse existing logic if we build it right.
-        
-        # We will assume db.get_all_users() returns global list if no filter applied (based on previous context).
-        # If your db_manager doesn't have a global fetch, we might need to add it, but for now we use what we have.
-        
-        # WARNING: db_manager needs a 'get_all_users' (Global) vs 'get_users_by_org' (Local).
-        # I will assume 'get_users_by_org(None)' or similar might be needed, but sticking to existing pattern:
-        # Let's use raw SQL here for the God Mode if the function is missing, or rely on a "Global" fetch if available.
-        # Since I can't edit DB manager again in this turn, I will use a direct connection for God Mode to ensure it works.
-        
         conn = sqlite3.connect(db.DB_NAME)
         
         # Global Counts
@@ -3625,121 +3641,6 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No global logs generated yet.")
         
         conn.close()
+
 # --- FOOTER ---
-st.markdown("""<div class="footer">POWERED BY CASTELLAN PR // INTERNAL USE ONLY</div>""", unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
