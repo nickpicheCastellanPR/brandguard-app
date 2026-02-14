@@ -965,7 +965,6 @@ with st.sidebar:
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
     # ADMIN TOOLS (Conditional)
-    st.divider()
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
@@ -3644,3 +3643,4 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
