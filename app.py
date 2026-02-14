@@ -3217,24 +3217,60 @@ elif app_mode == "BRAND MANAGER":
                     else:
                         st.caption("No social assets calibrated.")
 
-                # --- 2. VOICE INJECTOR ---
+                # --- 2. VOICE INJECTOR (FORTIFICATION PROTOCOL) ---
                 with cal_tab2:
-                    c1, c2 = st.columns(2)
+                    c1, c2 = st.columns([1, 1])
                     with c1:
-                        # NEW: Asset Type Dropdown
-                        voice_type = st.selectbox("ASSET TYPE", ["Email", "Press Release", "Blog Post", "Internal Memo", "Website Copy", "Other"], key="cal_type_voice")
-                        # NEW: Sender Dropdown
-                        voice_sender = st.selectbox("SENDER", ["CEO", f"{inputs['wiz_name']}", "HR Department", "Marketing Team", "Customer Support", "Other"], key="cal_sender_voice")
-                        # NEW: Audience Dropdown
-                        voice_audience = st.selectbox("TARGET AUDIENCE", ["Employees (Internal)", "Investors/Board", "Journalists & Media", "Customers", "General Public", "Other"], key="cal_audience_voice")
+                        # THE 5 CLUSTERS
+                        VOICE_CLUSTERS = {
+                            "Corporate Affairs": {
+                                "role": "STANDARDIZATION & RECORD",
+                                "desc": "Upload Press Releases and Fact Sheets. Maintains objective accuracy and establishes the baseline narrative."
+                            },
+                            "Crisis & Response": {
+                                "role": "DEFENSE & MITIGATION",
+                                "desc": "Upload Holding Statements and Apologies. Fortifies reputation during volatility. Prioritizes empathy and rapid stabilization."
+                            },
+                            "Internal Leadership": {
+                                "role": "ALIGNMENT & MORALE",
+                                "desc": "Upload Memos and All-Hands updates. Strengthens cultural cohesion and transmits directives from the top down."
+                            },
+                            "Thought Leadership": {
+                                "role": "INFLUENCE & AUTHORITY",
+                                "desc": "Upload Op-Eds and Speeches. Penetrates new markets via argumentation and distinct perspective."
+                            },
+                            "Brand Marketing": {
+                                "role": "GROWTH & CONVERSION",
+                                "desc": "Upload Newsletters and Copy. Drives action through persuasion and benefit-driven framing."
+                            }
+                        }
+                        
+                        voice_type = st.selectbox("COMMUNICATION CLUSTER", list(VOICE_CLUSTERS.keys()), key="cal_type_voice")
+                        
+                        # THE EXPLAINER BLOCK (Dynamic)
+                        info = VOICE_CLUSTERS[voice_type]
+                        st.markdown(f"""
+                            <div style="background-color: #1b2a2e; border-left: 3px solid #ab8f59; padding: 15px; margin-top: 5px; margin-bottom: 20px;">
+                                <strong style="color: #ab8f59; font-size: 0.75rem; letter-spacing: 1px; display: block; margin-bottom: 5px;">{info['role']}</strong>
+                                <span style="color: #d0d0d0; font-size: 0.85rem; line-height: 1.4;">{info['desc']}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                        # TUNERS (Metadata only, not separate buckets)
+                        cc1, cc2 = st.columns(2)
+                        with cc1:
+                            voice_sender = st.text_input("SENDER (CONTEXT)", placeholder="e.g. CEO", key="cal_sender_voice")
+                        with cc2:
+                            voice_audience = st.text_input("AUDIENCE (TARGET)", placeholder="e.g. Investors", key="cal_audience_voice")
                     
                     with c2:
-                        v_file = st.file_uploader("UPLOAD TEXT SAMPLE (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                        v_file = st.file_uploader("UPLOAD SOURCE MATERIAL (PDF/TXT)", type=["pdf", "txt"], key="cal_up_voice")
+                        st.caption("Engine requires 3+ samples per cluster for high fidelity.")
                     
                     if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
                     
-                    if v_file and st.button("ANALYZE TONE", type="primary", key="btn_cal_voice"):
-                        with st.spinner("EXTRACTING PATTERNS..."):
+                    if v_file and st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice"):
+                        with st.spinner("DECONSTRUCTING RHETORICAL PATTERNS..."):
                             if v_file.type == "application/pdf":
                                 raw_txt = logic_engine.extract_text_from_pdf(v_file)
                             else:
@@ -3243,47 +3279,48 @@ elif app_mode == "BRAND MANAGER":
                             prompt = f"""
                             TASK: Extract the 'Voice DNA' from this text.
                             ROLE: Expert Linguist.
+                            CONTEXT: This belongs to the '{voice_type}' cluster.
                             CONSTRAINTS: No chat. No emojis. Bullet points only.
                             INPUT TEXT: {raw_txt[:10000]}
                             OUTPUT FORMAT:
-                            - SENTENCE STRUCTURE: (e.g. Complex, Fragmented)
-                            - VOCABULARY LEVEL: (e.g. Academic, Slang, Corporate)
-                            - RHETORICAL DEVICES: (e.g. Metaphors, Questions)
-                            - EMOTIONAL RESONANCE: (e.g. Urgent, Calm, Witty)
+                            - SYNTAX ARCHITECTURE: (e.g. Complex, Fragmented)
+                            - LEXICON TIER: (e.g. Academic, Slang, Corporate)
+                            - RHETORICAL MECHANICS: (e.g. Metaphors, Questions)
+                            - TONAL FREQUENCY: (e.g. Urgent, Calm, Witty)
                             """
                             st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
 
                     if st.session_state['man_voice_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_voice = st.text_area("EDIT ANALYSIS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150, max_chars=5000)
-                        if st.button("CONFIRM & INJECT (VOICE)", type="primary"):
+                        st.markdown("#### ANALYSIS REVIEW")
+                        edit_voice = st.text_area("EXTRACTED PATTERNS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
+                        
+                        if st.button("CONFIRM & FORTIFY ENGINE", type="primary"):
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%Y-%m-%d")
                             
-                            # UPDATED: Inject new metadata into the header
-                            header_meta = f"TYPE: {voice_type.upper()} | SENDER: {voice_sender.upper()} | AUDIENCE: {voice_audience.upper()}"
+                            # UPDATED HEADER WITH NEW TAXONOMY
+                            header_meta = f"CLUSTER: {voice_type.upper()} | SENDER: {voice_sender.upper()} | AUDIENCE: {voice_audience.upper()}"
                             injection = f"\n\n[ASSET: {header_meta} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
                             
                             inputs['voice_dna'] += injection
                             
-                            # UPDATE SCORE
+                            # Update Score & DB
                             profile_obj = update_calibration_score(profile_obj)
-                            
                             db.save_profile(st.session_state['user_id'], target, profile_obj)
                             st.session_state['man_voice_analysis'] = ""
 
-                            # LOG TO DB
+                            # Log
                             db.log_event(
                                 org_id=st.session_state.get('org_id', 'Unknown'),
                                 username=st.session_state.get('username', 'Unknown'),
                                 activity_type="ASSET INJECTION",
                                 asset_name=f"Voice: {voice_type}",
                                 score=profile_obj.get('calibration_score', 0),
-                                verdict="ADDED VOICE",
-                                metadata={"type": "voice_dna", "content": edit_voice[:50]+"..."}
+                                verdict="FORTIFIED",
+                                metadata={"cluster": voice_type}
                             )
 
-                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
+                            st.success(f"Cluster Fortified. Calibration Score: {profile_obj.get('calibration_score', 0)}%.")
                             st.rerun()
 
                     # LIBRARY VIEW
@@ -3643,4 +3680,5 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
