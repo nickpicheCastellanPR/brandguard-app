@@ -983,7 +983,7 @@ with st.sidebar:
 
         # --- DIAGNOSTICS & CAPABILITIES TOOLTIP ---
         if 'clusters' in cal_data and cal_data['clusters']:
-            with st.expander("🔍 ENGINE DIAGNOSTICS"):
+            with st.expander("ENGINE DIAGNOSTICS"):
                 # 1. Cluster Health Table
                 for name, data in cal_data['clusters'].items():
                     # Explicit dark text color for legibility
@@ -3755,6 +3755,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
