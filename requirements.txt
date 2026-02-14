@@ -9,3 +9,4 @@ argon2-cffi
 requests
 scikit-learn
 numpy
+python-docx
