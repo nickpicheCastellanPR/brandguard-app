@@ -881,11 +881,17 @@ with st.sidebar:
             margin-bottom: 5px;
         }
 
-        /* 4. Expander Styling (Dark Text for Cream Sidebar) */
+        /* 4. Expander Styling - Force Visibility */
         .streamlit-expanderHeader {
             color: #24363b !important;
             font-size: 0.8rem !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
+            background-color: rgba(171, 143, 89, 0.1) !important;
+            border-radius: 4px;
+        }
+        .streamlit-expanderContent {
+            color: #24363b !important;
+            font-size: 0.8rem !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -941,15 +947,13 @@ with st.sidebar:
         st.session_state['active_profile_name'] = active_profile_selection
         st.rerun()
     
-    # --- DYNAMIC SCORE & DIAGNOSTICS ---
     if active_profile_selection != "Create New..." and active_profile_selection in st.session_state['profiles']:
         current_profile = st.session_state['profiles'][active_profile_selection]
         
-        # Calculate Real-Time Score
+        # --- DYNAMIC SCORE CALCULATION ---
         cal_data = calculate_calibration_score(current_profile)
         score = cal_data['score']
         
-        # Visual Bar
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
@@ -967,17 +971,41 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
 
-        # DIAGNOSTICS TOOLTIP (The "Why")
+        # --- DIAGNOSTICS & CAPABILITIES TOOLTIP ---
         if 'clusters' in cal_data and cal_data['clusters']:
-            with st.expander("ENGINE DIAGNOSTICS"):
+            with st.expander("🔍 ENGINE DIAGNOSTICS"):
+                # 1. Cluster Health
                 for name, data in cal_data['clusters'].items():
+                    # Color coding logic for text
+                    text_col = "#24363b" # Dark Teal (Default)
+                    if data['status'] == "EMPTY": text_col = "#888"
+                    
                     st.markdown(f"""
-                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px; color:#3d3d3d;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px; color:{text_col}; font-weight: 600;">
                         <span>{data['icon']} {name}</span>
-                        <span style="color:#5c6b61;">{data['count']} Samples</span>
+                        <span>{data['count']}/3</span>
                     </div>
                     """, unsafe_allow_html=True)
-                st.caption("Target: 3+ samples per cluster.")
+                
+                st.markdown("---")
+                
+                # 2. System Capabilities (What can I do?)
+                st.markdown("**SYSTEM CAPABILITIES:**")
+                if score < 40:
+                    st.caption("⚠️ **GENERIC:** Engine relies on generic training. Risk of hallucination.")
+                elif score < 90:
+                    st.caption("⚠️ **PARTIAL:** Safe for fortified clusters only. Verify output of unfortified clusters.")
+                else:
+                    st.caption("✅ **OPERATIONAL:** Engine is fully fortified across all domains.")
+                
+                # 3. Next Step (How to increase confidence)
+                st.markdown("**NEXT STEP:**")
+                # Find the first weak cluster
+                weakest = next((k for k, v in cal_data['clusters'].items() if v['count'] < 3), None)
+                if weakest:
+                    st.caption(f"Upload {3 - cal_data['clusters'][weakest]['count']} more **{weakest}** samples to fortify.")
+                else:
+                    st.caption("System fully calibrated.")
 
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
@@ -992,8 +1020,7 @@ with st.sidebar:
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
-    # ADMIN TOOLS (Conditional)
-    st.divider()
+    # ADMIN TOOLS (NO DIVIDER)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
@@ -3718,6 +3745,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
