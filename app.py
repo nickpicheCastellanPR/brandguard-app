@@ -881,17 +881,27 @@ with st.sidebar:
             margin-bottom: 5px;
         }
 
-        /* 4. Expander Styling - Force Visibility */
-        .streamlit-expanderHeader {
-            color: #24363b !important;
-            font-size: 0.8rem !important;
-            font-weight: 700 !important;
-            background-color: rgba(171, 143, 89, 0.1) !important;
+        /* 4. Expander Styling - CRITICAL FIX FOR LEGIBILITY */
+        /* Forces the expander to be opaque Cream so text is readable */
+        div[data-testid="stExpander"] {
+            background-color: #f5f5f0 !important;
+            border: 1px solid #ab8f59 !important;
             border-radius: 4px;
-        }
-        .streamlit-expanderContent {
             color: #24363b !important;
-            font-size: 0.8rem !important;
+        }
+        div[data-testid="stExpander"] details {
+            background-color: #f5f5f0 !important;
+        }
+        div[data-testid="stExpander"] summary {
+            color: #24363b !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="stExpander"] div[role="group"] {
+            color: #24363b !important;
+        }
+        /* Target the specific p tags inside if needed */
+        div[data-testid="stExpander"] p, div[data-testid="stExpander"] span {
+            color: #24363b !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -973,15 +983,12 @@ with st.sidebar:
 
         # --- DIAGNOSTICS & CAPABILITIES TOOLTIP ---
         if 'clusters' in cal_data and cal_data['clusters']:
-            with st.expander("ENGINE DIAGNOSTICS"):
-                # 1. Cluster Health
+            with st.expander("🔍 ENGINE DIAGNOSTICS"):
+                # 1. Cluster Health Table
                 for name, data in cal_data['clusters'].items():
-                    # Color coding logic for text
-                    text_col = "#24363b" # Dark Teal (Default)
-                    if data['status'] == "EMPTY": text_col = "#888"
-                    
+                    # Explicit dark text color for legibility
                     st.markdown(f"""
-                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px; color:{text_col}; font-weight: 600;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px; color:#24363b; font-weight:600;">
                         <span>{data['icon']} {name}</span>
                         <span>{data['count']}/3</span>
                     </div>
@@ -989,23 +996,26 @@ with st.sidebar:
                 
                 st.markdown("---")
                 
-                # 2. System Capabilities (What can I do?)
-                st.markdown("**SYSTEM CAPABILITIES:**")
+                # 2. System Capabilities (Instructional)
+                st.markdown("<span style='color:#24363b; font-weight:800; font-size:0.75rem;'>SYSTEM CAPABILITIES:</span>", unsafe_allow_html=True)
                 if score < 40:
-                    st.caption("⚠️ **GENERIC:** Engine relies on generic training. Risk of hallucination.")
+                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **UNSAFE:** Engine relies on generic training. High risk of hallucination.</span>", unsafe_allow_html=True)
                 elif score < 90:
-                    st.caption("⚠️ **PARTIAL:** Safe for fortified clusters only. Verify output of unfortified clusters.")
+                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **PARTIAL:** Safe for fortified clusters (green) only. Verify output carefully.</span>", unsafe_allow_html=True)
                 else:
-                    st.caption("✅ **OPERATIONAL:** Engine is fully fortified across all domains.")
+                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>✅ **OPERATIONAL:** Engine is fully fortified across all domains.</span>", unsafe_allow_html=True)
                 
-                # 3. Next Step (How to increase confidence)
-                st.markdown("**NEXT STEP:**")
+                st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
+
+                # 3. Next Step (Actionable)
+                st.markdown("<span style='color:#24363b; font-weight:800; font-size:0.75rem;'>NEXT OBJECTIVE:</span>", unsafe_allow_html=True)
                 # Find the first weak cluster
                 weakest = next((k for k, v in cal_data['clusters'].items() if v['count'] < 3), None)
                 if weakest:
-                    st.caption(f"Upload {3 - cal_data['clusters'][weakest]['count']} more **{weakest}** samples to fortify.")
+                    needed = 3 - cal_data['clusters'][weakest]['count']
+                    st.markdown(f"<span style='color:#24363b; font-size:0.75rem;'>Upload {needed} more **{weakest}** samples to fortify this cluster.</span>", unsafe_allow_html=True)
                 else:
-                    st.caption("System fully calibrated.")
+                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>System fully calibrated.</span>", unsafe_allow_html=True)
 
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
@@ -3745,6 +3755,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
