@@ -880,6 +880,13 @@ with st.sidebar:
             margin-top: 10px !important;
             margin-bottom: 5px;
         }
+
+        /* 4. Expander Styling (Dark Text for Cream Sidebar) */
+        .streamlit-expanderHeader {
+            color: #24363b !important;
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -934,48 +941,43 @@ with st.sidebar:
         st.session_state['active_profile_name'] = active_profile_selection
         st.rerun()
     
+    # --- DYNAMIC SCORE & DIAGNOSTICS ---
     if active_profile_selection != "Create New..." and active_profile_selection in st.session_state['profiles']:
         current_profile = st.session_state['profiles'][active_profile_selection]
         
-        # --- DYNAMIC SCORE CALCULATION ---
-        # Try to get saved score, or calculate on fly
-        score = current_profile.get('calibration_score', 0)
+        # Calculate Real-Time Score
+        cal_data = calculate_calibration_score(current_profile)
+        score = cal_data['score']
         
-        # Fallback calculation if key missing (backward compatibility)
-        if score == 0 and isinstance(current_profile, dict) and "inputs" in current_profile:
-            inp = current_profile['inputs']
-            raw_score = 0
-            if inp.get('wiz_name'): raw_score += 10
-            if inp.get('wiz_mission'): raw_score += 10
-            if inp.get('wiz_values'): raw_score += 10
-            if len(inp.get('social_dna', '')) > 50: raw_score += 20
-            if len(inp.get('voice_dna', '')) > 50: raw_score += 20
-            if len(inp.get('visual_dna', '')) > 50: raw_score += 20
-            score = min(raw_score, 100)
-
-        # Color Logic
-        score_color = "#ff4b4b" # Red
-        status_label = "LOW DATA"
-        if score > 40: 
-            score_color = "#ffa421" # Orange
-            status_label = "CALIBRATING"
-        if score > 75: 
-            score_color = "#09ab3b" # Green
-            status_label = "LOCKED ON"
-        
+        # Visual Bar
         st.markdown(f"""
             <style>
                 .sb-container {{ margin-bottom: 0px; margin-top: 10px; }}
                 .sb-track {{ width: 100%; height: 6px; background: #dcdcd9; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }}
-                .sb-fill {{ height: 100%; width: {score}%; background: {score_color}; border-radius: 999px; transition: width 0.5s ease; }}
-                .sb-status {{ font-size: 0.75rem; font-weight: 800; color: {score_color}; }}
+                .sb-fill {{ height: 100%; width: {score}%; background: {cal_data['color']}; border-radius: 999px; transition: width 0.5s ease; }}
+                .sb-status {{ font-size: 0.7rem; font-weight: 800; color: {cal_data['color']}; display: flex; justify-content: space-between; }}
             </style>
             <div class="sb-container">
                 <span style="font-size: 0.7rem; font-weight: 700; color: #5c6b61;">ENGINE CONFIDENCE</span>
                 <div class="sb-track"><div class="sb-fill"></div></div>
-                <div class="sb-status">{status_label} ({score}%)</div>
+                <div class="sb-status">
+                    <span>{cal_data['status_label']}</span>
+                    <span>{score}%</span>
+                </div>
             </div>
         """, unsafe_allow_html=True)
+
+        # DIAGNOSTICS TOOLTIP (The "Why")
+        if 'clusters' in cal_data and cal_data['clusters']:
+            with st.expander("ENGINE DIAGNOSTICS"):
+                for name, data in cal_data['clusters'].items():
+                    st.markdown(f"""
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px; color:#3d3d3d;">
+                        <span>{data['icon']} {name}</span>
+                        <span style="color:#5c6b61;">{data['count']} Samples</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.caption("Target: 3+ samples per cluster.")
 
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
@@ -991,6 +993,7 @@ with st.sidebar:
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
     
     # ADMIN TOOLS (Conditional)
+    st.divider()
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
@@ -3715,6 +3718,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
