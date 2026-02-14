@@ -342,79 +342,105 @@ def activate_profile(profile_name):
     st.session_state['nav_selection'] = "BRAND MANAGER"
     
 def calculate_calibration_score(profile_data):
+    """
+    Advanced 'Cluster Density' Scoring.
+    Total = 100.
+    - Strategy: 20
+    - Visuals: 15
+    - Social: 15
+    - Voice Clusters: 50 (10 pts per fortified cluster)
+    """
     score = 0
-    missing = []
+    breakdown = []
     
-    # CASE A: STRUCTURED DATA (Created via Wizard)
-    # We check what the USER actually entered, ignoring AI filler text.
+    # CASE A: STRUCTURED DATA
     if isinstance(profile_data, dict) and 'inputs' in profile_data:
         inputs = profile_data['inputs']
         
-        # 1. STRATEGY (40 pts)
-        # Name & Archetype are required to exist, so we give small points for them
-        if inputs.get('wiz_mission'): score += 15
-        else: missing.append("Mission Statement")
+        # 1. STRATEGY (20 PTS)
+        strat_score = 0
+        if inputs.get('wiz_mission'): strat_score += 5
+        if inputs.get('wiz_values'): strat_score += 5
+        if inputs.get('wiz_guardrails'): strat_score += 5
+        if inputs.get('wiz_archetype'): strat_score += 5
+        score += strat_score
+
+        # 2. VISUALS (15 PTS)
+        vis_score = 0
+        if inputs.get('palette_primary'): vis_score += 5
+        # Count Visual Assets
+        v_blob = inputs.get('visual_dna', '')
+        if "[ASSET:" in v_blob: vis_score += 10
+        score += vis_score
+
+        # 3. SOCIAL (15 PTS)
+        soc_score = 0
+        s_blob = inputs.get('social_dna', '')
+        s_count = s_blob.count("[ASSET:")
+        if s_count >= 3: soc_score = 15
+        elif s_count >= 1: soc_score = 5
+        score += soc_score
+
+        # 4. VOICE CLUSTERS (50 PTS - The Heavy Lifting)
+        # We define the 5 specific keys we are looking for
+        voice_blob = inputs.get('voice_dna', '')
+        clusters = {
+            "Corporate": "Corporate Affairs",
+            "Crisis": "Crisis & Response",
+            "Internal": "Internal Leadership",
+            "Thought": "Thought Leadership",
+            "Marketing": "Brand Marketing"
+        }
+        
+        cluster_health = {}
+        voice_score = 0
+        
+        for key, full_name in clusters.items():
+            # Count occurrences of specific cluster headers
+            count = voice_blob.upper().count(f"CLUSTER: {full_name.upper()}")
             
-        if inputs.get('wiz_values'): score += 15
-        else: missing.append("Core Values")
+            if count >= 3:
+                points = 10
+                status = "FORTIFIED"
+                icon = "✅"
+            elif count >= 1:
+                points = 3
+                status = "UNSTABLE"
+                icon = "⚠️"
+            else:
+                points = 0
+                status = "EMPTY"
+                icon = "❌"
+            
+            voice_score += points
+            cluster_health[key] = {"count": count, "status": status, "icon": icon}
         
-        if inputs.get('wiz_guardrails'): score += 10
-        else: missing.append("Guardrails")
+        score += voice_score
 
-        # 2. VOICE (30 pts)
-        # We check the wizard sample list length if available, otherwise check input text length
-        # (Session state might be cleared, so we check the 'wiz_tone' and text content implied)
-        if inputs.get('wiz_tone'): score += 10
-        else: missing.append("Tone Keywords")
-        
-        # We need to detect if samples were actually added. 
-        # Since 'inputs' stores raw strings, we check if the AI text contains the "Analysis:" marker 
-        # which implies samples were processed.
-        final_text = profile_data.get('final_text', '')
-        if "Analysis: TYPE:" in final_text or "Analysis: File" in final_text:
-            score += 20
-        else:
-             missing.append("Writing Samples")
-
-        # 3. VISUALS (30 pts)
-        # Check if palettes are not default
-        p_prim = inputs.get('palette_primary', [])
-        if p_prim and p_prim != ["#24363b"]: score += 10
-        
-        if "Logo Variant" in final_text: score += 10
-        if "Platform:" in final_text and "Analysis:" in final_text: score += 10
-
-    # CASE B: UNSTRUCTURED (Uploaded PDF)
-    # We fall back to text parsing
+    # CASE B: LEGACY/PDF (Fallback)
     else:
+        # Simple length check for unstructured data
         text_data = str(profile_data.get('final_text', '') if isinstance(profile_data, dict) else profile_data)
-        
-        # Simple keywords aren't enough, check for length
-        if len(text_data) > 1000: score += 50 # Volume check
-        if "STRATEGY" in text_data: score += 10
-        if "VOICE" in text_data: score += 10
-        if "VISUALS" in text_data: score += 10
-        if "social" in text_data.lower(): score += 20
+        score = min(len(text_data) // 50, 100) # 5000 chars = 100%
+        cluster_health = {}
 
-    # STATUS LOGIC
+    # FINAL STATUS LABEL
+    score = min(score, 100)
     if score < 40:
-        status_label = "Foundation"
-        color = "#3d3d3d" 
-        msg = "⚠️ <b>Low Data.</b> Add Mission, Values, and Samples to train the engine."
+        status_label = "LOW DATA"
+        color = "#ff4b4b" 
     elif score < 80:
-        status_label = "Developing"
-        color = "#ab8f59" 
-        msg = "💡 <b>Refinement:</b> Engine needs more Writing Samples to capture nuance."
+        status_label = "DEVELOPING"
+        color = "#ffa421" 
     else:
-        status_label = "Calibrated"
-        color = "#4E8065" 
-        msg = "✅ <b>Ready:</b> Signet is calibrated to your brand voice."
+        status_label = "FORTIFIED"
+        color = "#09ab3b" 
 
     return {
-        "score": min(score, 100), # Cap at 100
+        "score": score,
         "status_label": status_label,
         "color": color,
-        "message": msg
+        "clusters": cluster_health
     }
 # --- HELPER: ASSET-AWARE CONFIDENCE ENGINE ---
 def calculate_content_confidence(profile_data, content_type):
@@ -3689,6 +3715,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
