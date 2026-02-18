@@ -147,7 +147,42 @@ st.markdown("""
         border-color: var(--c-gold-muted) !important;
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
+    /* --- EXPANDER HEADER FIXES --- */
 
+    /* 1. Target the Expander Header Container */
+    .streamlit-expanderHeader {
+        background-color: var(--c-navy-dark) !important; /* Ensure background matches */
+        color: var(--c-gold-muted) !important; /* Force text to Gold */
+        border: 1px solid var(--c-gold-muted) !important; /* Optional: Clean border */
+        border-radius: 4px;
+    }
+
+    /* 2. Target the Internal Text (p or div) inside the Header */
+    .streamlit-expanderHeader p,
+    .streamlit-expanderHeader div,
+    .streamlit-expanderHeader span {
+        color: var(--c-gold-muted) !important;
+        font-weight: 600 !important;
+    }
+
+    /* 3. Target the SVG Arrow (The little dropdown icon) */
+    .streamlit-expanderHeader svg {
+        fill: var(--c-gold-muted) !important;
+        stroke: var(--c-gold-muted) !important;
+    }
+
+    /* 4. Hover State for Expander */
+    .streamlit-expanderHeader:hover {
+        border-color: var(--c-gold-signal) !important; /* Brighten border on hover */
+    }
+    
+    .streamlit-expanderHeader:hover p,
+    .streamlit-expanderHeader:hover div,
+    .streamlit-expanderHeader:hover svg {
+        color: var(--c-gold-signal) !important; /* Brighten text on hover */
+        fill: var(--c-gold-signal) !important;
+    }
+    
 /* --- DROPDOWN & POPOVER FIXES --- */
 
     /* 1. Target the portal and all parent containers (Existing Logic Preserved) */
@@ -3821,6 +3856,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
