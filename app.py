@@ -1136,7 +1136,6 @@ with st.sidebar:
     
     # ADMIN TOOLS (NO DIVIDER)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
-    st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     st.button("TEAM MANAGEMENT", width="stretch", on_click=set_page, args=("TEAM MANAGEMENT",))
     # Footer Spacer
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
@@ -4284,6 +4283,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
