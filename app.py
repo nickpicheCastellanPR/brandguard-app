@@ -3747,23 +3747,33 @@ elif app_mode == "BRAND MANAGER":
 if app_mode == "TEAM MANAGEMENT":
     st.title("TEAM MANAGEMENT")
     
-    # Check permissions
-    if not st.session_state.get('is_admin', False) and raw_user != "NICK_ADMIN":
+    # Check permissions (Standard Admin OR God Mode)
+    # We use st.session_state.get('username') as the reliable source
+    current_username = st.session_state.get('username', 'Unknown')
+    is_admin = st.session_state.get('is_admin', False)
+    
+    if not is_admin and current_username != "NICK_ADMIN":
         st.error("ACCESS DENIED. This area is restricted to Organization Admins.")
         st.stop()
         
     current_org = st.session_state.get('org_id', 'Unknown')
-    current_username = st.session_state.get('username')
     
-    # Get subscription status for seat limits
+    # Get subscription status
     user_status = db.get_user_status(current_username)
-    seat_limits = {
-        "trial": 1,
-        "solo": 1,
-        "agency": 5,
-        "enterprise": 20
-    }
-    max_seats = seat_limits.get(user_status, 1)
+    
+    # --- GOD MODE OVERRIDE ---
+    if current_username == "NICK_ADMIN":
+        user_status = "unlimited"
+        max_seats = 99999
+    else:
+        # Standard Limits
+        seat_limits = {
+            "trial": 1,
+            "solo": 1,
+            "agency": 5,
+            "enterprise": 20
+        }
+        max_seats = seat_limits.get(user_status, 1)
     
     st.markdown(f"**ORGANIZATION:** {current_org}")
     st.markdown(f"**SUBSCRIPTION TIER:** {user_status.upper()}")
@@ -3777,7 +3787,14 @@ if app_mode == "TEAM MANAGEMENT":
     st.markdown(f"### SEAT USAGE: {current_seats} / {max_seats}")
     
     # Visual progress bar
-    usage_pct = (current_seats / max_seats) * 100 if max_seats > 0 else 0
+    # For unlimited, we cap the visual percentage so the bar doesn't look broken
+    if max_seats > 1000:
+        usage_pct = 1 # Just show a sliver for unlimited
+        display_text = f"{current_seats} / ∞ SEATS"
+    else:
+        usage_pct = (current_seats / max_seats) * 100 if max_seats > 0 else 0
+        display_text = f"{current_seats} / {max_seats} SEATS"
+
     if usage_pct < 70:
         bar_color = "#5c6b61"  # Green
     elif usage_pct < 90:
@@ -3790,7 +3807,7 @@ if app_mode == "TEAM MANAGEMENT":
         <div style='background: {bar_color}; height: 100%; width: {usage_pct}%;'></div>
         <div style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                     color: #f5f5f0; font-weight: 700; font-size: 0.85rem;'>
-            {current_seats} / {max_seats} SEATS
+            {display_text}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3915,8 +3932,11 @@ if app_mode == "TEAM MANAGEMENT":
             st.markdown(f"Your {user_status.upper()} tier allows {max_seats} seat(s).")
             st.markdown("Upgrade your subscription to add more team members.")
         else:
-            seats_remaining = max_seats - current_seats
-            st.info(f"{seats_remaining} seat(s) available")
+            if max_seats > 1000:
+                 st.info(f"UNLIMITED seats available")
+            else:
+                 seats_remaining = max_seats - current_seats
+                 st.info(f"{seats_remaining} seat(s) available")
             
             with st.form("add_team_member"):
                 new_user = st.text_input("USERNAME", max_chars=64)
@@ -3948,7 +3968,8 @@ if app_mode == "TEAM MANAGEMENT":
             "trial": "1 seat, limited features",
             "solo": "1 seat, full platform",
             "agency": "5 seats, team features",
-            "enterprise": "20 seats, premium support"
+            "enterprise": "20 seats, premium support",
+            "unlimited": "Unlimited seats, God Mode"
         }
         st.caption(f"**{user_status.upper()}:** {tier_info.get(user_status, 'Contact support')}")
         
@@ -3957,7 +3978,8 @@ if app_mode == "TEAM MANAGEMENT":
 
 # ===================================================================
 # END OF TEAM MANAGEMENT MODULE
-# ===================================================================                
+# ===================================================================
+
 # --- ADMIN DASHBOARD (GOD MODE) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
@@ -4072,6 +4094,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
