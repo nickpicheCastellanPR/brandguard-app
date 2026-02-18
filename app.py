@@ -148,30 +148,48 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
     
-    /* Fix Dropdown Menu Items - EXPANDED MENUS */
-    ul[data-baseweb="menu"] {
+    /* Fix Dropdown Menu Items - NUCLEAR OPTION */
+    
+    /* Target every possible dropdown container */
+    ul[data-baseweb="menu"],
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    div[role="presentation"],
+    div[data-baseweb="menu"],
+    .stSelectbox ul[data-baseweb="menu"],
+    [data-baseweb="select"] ul[data-baseweb="menu"] {
         background-color: var(--c-gold-muted) !important;
+        background: var(--c-gold-muted) !important;
         border: 1px solid var(--c-gold-muted) !important;
     }
     
-    ul[data-baseweb="menu"] li {
+    /* Target the list items */
+    ul[data-baseweb="menu"] li,
+    li[role="option"] {
         color: var(--c-teal-deep) !important;
         background-color: var(--c-gold-muted) !important;
-        -webkit-text-fill-color: var(--c-teal-deep) !important;  /* THIS IS THE CRITICAL LINE */
+        background: var(--c-gold-muted) !important;
+        -webkit-text-fill-color: var(--c-teal-deep) !important;
         padding: 10px 15px !important;
         transition: all 0.2s ease;
     }
     
-    ul[data-baseweb="menu"] li:hover {
+    /* Hover state */
+    ul[data-baseweb="menu"] li:hover,
+    li[role="option"]:hover {
         background-color: #c9a867 !important;
+        background: #c9a867 !important;
         color: var(--c-teal-deep) !important;
-        -webkit-text-fill-color: var(--c-teal-deep) !important;  /* AND HERE */
+        -webkit-text-fill-color: var(--c-teal-deep) !important;
     }
     
-    ul[data-baseweb="menu"] li[aria-selected="true"] {
+    /* Selected state */
+    ul[data-baseweb="menu"] li[aria-selected="true"],
+    li[role="option"][aria-selected="true"] {
         background-color: var(--c-teal-deep) !important;
+        background: var(--c-teal-deep) !important;
         color: var(--c-gold-muted) !important;
-        -webkit-text-fill-color: var(--c-gold-muted) !important;  /* AND HERE */
+        -webkit-text-fill-color: var(--c-gold-muted) !important;
     }
 
     /* 6. BUTTONS (GLOBAL) */
@@ -3775,6 +3793,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
