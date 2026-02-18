@@ -3739,7 +3739,7 @@ elif app_mode == "BRAND MANAGER":
                     metadata={}
                 )
                 st.rerun()
-    
+                
 # ===================================================================
 # TEAM MANAGEMENT MODULE - COMPLETE REPLACEMENT
 # ===================================================================
@@ -3747,12 +3747,15 @@ elif app_mode == "BRAND MANAGER":
 if app_mode == "TEAM MANAGEMENT":
     st.title("TEAM MANAGEMENT")
     
-    # Check permissions (Standard Admin OR God Mode)
-    # We use st.session_state.get('username') as the reliable source
+    # Check permissions
     current_username = st.session_state.get('username', 'Unknown')
+    current_email = st.session_state.get('email', '')
     is_admin = st.session_state.get('is_admin', False)
     
-    if not is_admin and current_username != "NICK_ADMIN":
+    # CASE INSENSITIVE CHECK for God Mode User
+    is_god_mode = (current_username.lower() == "nick_admin")
+    
+    if not is_admin and not is_god_mode:
         st.error("ACCESS DENIED. This area is restricted to Organization Admins.")
         st.stop()
         
@@ -3762,7 +3765,7 @@ if app_mode == "TEAM MANAGEMENT":
     user_status = db.get_user_status(current_username)
     
     # --- GOD MODE OVERRIDE ---
-    if current_username == "NICK_ADMIN":
+    if is_god_mode:
         user_status = "unlimited"
         max_seats = 99999
     else:
@@ -3784,23 +3787,26 @@ if app_mode == "TEAM MANAGEMENT":
     current_seats = len(users) if users else 0
     
     # --- SEAT USAGE INDICATOR ---
-    st.markdown(f"### SEAT USAGE: {current_seats} / {max_seats}")
+    if is_god_mode:
+         st.markdown(f"### SEAT USAGE: {current_seats} / ∞ (GOD MODE)")
+    else:
+         st.markdown(f"### SEAT USAGE: {current_seats} / {max_seats}")
     
     # Visual progress bar
-    # For unlimited, we cap the visual percentage so the bar doesn't look broken
-    if max_seats > 1000:
+    if is_god_mode or max_seats > 1000:
         usage_pct = 1 # Just show a sliver for unlimited
-        display_text = f"{current_seats} / ∞ SEATS"
+        bar_color = "#5c6b61" # Green
+        display_text = "UNLIMITED ACCESS"
     else:
         usage_pct = (current_seats / max_seats) * 100 if max_seats > 0 else 0
         display_text = f"{current_seats} / {max_seats} SEATS"
-
-    if usage_pct < 70:
-        bar_color = "#5c6b61"  # Green
-    elif usage_pct < 90:
-        bar_color = "#eeba2b"  # Orange
-    else:
-        bar_color = "#bd0000"  # Red
+        
+        if usage_pct < 70:
+            bar_color = "#5c6b61"  # Green
+        elif usage_pct < 90:
+            bar_color = "#eeba2b"  # Orange
+        else:
+            bar_color = "#bd0000"  # Red
     
     st.markdown(f"""
     <div style='background: rgba(27, 42, 46, 0.6); height: 30px; border: 1px solid #5c6b61; position: relative;'>
@@ -3932,7 +3938,7 @@ if app_mode == "TEAM MANAGEMENT":
             st.markdown(f"Your {user_status.upper()} tier allows {max_seats} seat(s).")
             st.markdown("Upgrade your subscription to add more team members.")
         else:
-            if max_seats > 1000:
+            if is_god_mode:
                  st.info(f"UNLIMITED seats available")
             else:
                  seats_remaining = max_seats - current_seats
@@ -4094,6 +4100,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
