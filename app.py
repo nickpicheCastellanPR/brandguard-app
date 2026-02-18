@@ -912,14 +912,14 @@ if not st.session_state['authenticated']:
     # 2. BALANCED COLUMNS
     c1, c2 = st.columns([1, 1], gap="large")
     
-    # --- LEFT COLUMN: THE PITCH ---
+# --- LEFT COLUMN: THE PITCH ---
     with c1:
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=180)
         else:
             st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em; margin-bottom: 20px;'>SIGNET</div>", unsafe_allow_html=True)
             
-        # IMPORTANT: NO INDENTATION INSIDE THE STRING TO PREVENT CODE BLOCK RENDERING
+        # FIX: HTML is flush-left to prevent "Black Box" code block rendering
         st.markdown("""
 <div class="login-content-left">
 <h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
@@ -4448,6 +4448,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
