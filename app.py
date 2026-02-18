@@ -2698,7 +2698,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                 
 # ===================================================================
 # 6. BRAND ARCHITECT (UNIFIED MODULE)
-# Merges Creation (Architect) and Editing (Manager)
+# Replaces "BRAND ARCHITECT" and "BRAND MANAGER"
 # ===================================================================
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
@@ -2876,13 +2876,13 @@ elif app_mode == "BRAND ARCHITECT":
                 st.session_state['extraction_error'] = str(e)
 
     # --- MAIN INTERFACE: TABS ---
-    main_tab1, main_tab2, main_tab3 = st.tabs(["CREATE BLUEPRINT", "IMPORT GUIDELINES", "MANAGE BLUEPRINTS"])
+    main_tab1, main_tab2, main_tab3 = st.tabs(["CREATE BLUEPRINT", "MANAGE BLUEPRINTS", "IMPORT GUIDELINES"])
 
     # -----------------------------------------------------------
     # TAB 1: CREATE NEW BLUEPRINT
     # -----------------------------------------------------------
     with main_tab1:
-        st.markdown("### BLUEPRINT CREATOR")
+        st.markdown("### ARCHITECT NEW BRAND")
         st.caption("Build a new brand profile from scratch.")
         
         with st.expander("1. STRATEGY (CORE)", expanded=True):
@@ -3137,33 +3137,10 @@ elif app_mode == "BRAND ARCHITECT":
                         else: st.error(f"Error: {e}")
 
     # -----------------------------------------------------------
-    # TAB 2: IMPORT FROM PDF
+    # TAB 2: MANAGE BLUEPRINTS (THE OLD MANAGER)
     # -----------------------------------------------------------
     with main_tab2:
-        st.markdown("### AUTO-FILL FROM GUIDELINES")
-        st.caption("Upload a PDF to automatically populate the Blueprint fields.")
-        
-        # The uploader needs the key match the callback
-        st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
-        
-        # The button simply triggers the callback
-        st.button("EXTRACT & MAP TO BLUEPRINT", type="primary", on_click=extract_and_map_pdf)
-    
-        # Display Messages based on the flags set in callback
-        if st.session_state.get('extraction_success'):
-            st.success("✅ Extraction Complete! Switch to the 'CREATE NEW BLUEPRINT' tab to review.")
-            # Clear flag so it doesn't stay forever
-            st.session_state['extraction_success'] = False
-        
-        if st.session_state.get('extraction_error'):
-            st.error(f"Extraction Error: {st.session_state['extraction_error']}")
-            st.session_state['extraction_error'] = None
-
-    # -----------------------------------------------------------
-    # TAB 3: MANAGE LIBRARY (THE OLD MANAGER)
-    # -----------------------------------------------------------
-    with main_tab3:
-        st.markdown("### PROFILE LIBRARY")
+        st.markdown("### BRAND MANAGER")
         st.caption("Edit, refine, and inject new assets into existing profiles.")
         
         if st.session_state['profiles']:
@@ -3763,7 +3740,58 @@ elif app_mode == "BRAND ARCHITECT":
                     new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500, max_chars=20000)
                     if st.button("SAVE RAW CHANGES"):
                         st.session_state['profiles'][target] = new_raw
-                        db.save_profile(st.session_state['
+                        db.save_profile(st.session_state['user_id'], target, new_raw)
+
+                        # LOG RAW EDIT
+                        db.log_event(
+                            org_id=st.session_state.get('org_id', 'Unknown'),
+                            username=st.session_state.get('username', 'Unknown'),
+                            activity_type="STRATEGY UPDATE",
+                            asset_name=target,
+                            score=0,
+                            verdict="RAW EDIT",
+                            metadata={"type": "raw_text_override"}
+                        )
+                        st.success("SAVED")
+
+                if st.button("DELETE PROFILE"): 
+                    del st.session_state['profiles'][target]
+                    db.delete_profile(st.session_state['user_id'], target)
+
+                    # LOG DELETION
+                    db.log_event(
+                        org_id=st.session_state.get('org_id', 'Unknown'),
+                        username=st.session_state.get('username', 'Unknown'),
+                        activity_type="PROFILE DELETED",
+                        asset_name=target,
+                        score=0,
+                        verdict="DESTROYED",
+                        metadata={}
+                    )
+                    st.rerun()
+    
+    # -----------------------------------------------------------
+    # TAB 3: IMPORT GUIDELINES (THE PDF INGESTOR)
+    # -----------------------------------------------------------
+    with main_tab3:
+        st.markdown("### AUTO-FILL FROM GUIDELINES")
+        st.caption("Upload a PDF to automatically populate the Blueprint fields.")
+        
+        # The uploader needs the key match the callback
+        st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
+        
+        # The button simply triggers the callback
+        st.button("EXTRACT & MAP TO BLUEPRINT", type="primary", on_click=extract_and_map_pdf)
+    
+        # Display Messages based on the flags set in callback
+        if st.session_state.get('extraction_success'):
+            st.success("✅ Extraction Complete! Switch to the 'CREATE BLUEPRINT' tab to review.")
+            # Clear flag so it doesn't stay forever
+            st.session_state['extraction_success'] = False
+        
+        if st.session_state.get('extraction_error'):
+            st.error(f"Extraction Error: {st.session_state['extraction_error']}")
+            st.session_state['extraction_error'] = None
                 
 # ===================================================================
 # TEAM MANAGEMENT MODULE 
@@ -4256,6 +4284,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
