@@ -333,7 +333,41 @@ st.markdown("""
         border-top: 1px solid #30363d;
         z-index: 100;
     }
+
+    /* Login Feature List Icons */
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 20px 0;
+    }
     
+    .feature-list li {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        line-height: 1.6;
+    }
+    
+    .feature-icon {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        margin-right: 12px;
+        margin-top: 2px;
+        color: #ab8f59;
+        stroke-width: 2;
+    }
+    
+    .feature-text {
+        flex: 1;
+        color: #3d3d3d;
+    }
+    
+    .feature-text strong {
+        color: #24363b;
+        font-weight: 600;
+    }
+
     /* CLEANUP */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -4300,6 +4334,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
