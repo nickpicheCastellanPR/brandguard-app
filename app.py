@@ -148,10 +148,27 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
     
-    /* Fix Dropdown Menu Items */
+    /* Fix Dropdown Menu Items - EXPANDED MENUS */
+    ul[data-baseweb="menu"] {
+        background-color: var(--c-gold-muted) !important;
+        border: 1px solid var(--c-gold-muted) !important;
+    }
+    
     ul[data-baseweb="menu"] li {
-        color: #FFFFFF !important;
-        background-color: var(--c-teal-dark) !important;
+        color: var(--c-teal-deep) !important;  /* Dark text on gold background */
+        background-color: var(--c-gold-muted) !important;
+        padding: 10px 15px !important;
+        transition: all 0.2s ease;
+    }
+    
+    ul[data-baseweb="menu"] li:hover {
+        background-color: #c9a867 !important;  /* Slightly lighter gold on hover */
+        color: var(--c-teal-deep) !important;
+    }
+    
+    ul[data-baseweb="menu"] li[aria-selected="true"] {
+        background-color: var(--c-teal-deep) !important;  /* Selected item dark */
+        color: var(--c-gold-muted) !important;  /* Gold text */
     }
 
     /* 6. BUTTONS (GLOBAL) */
@@ -3755,6 +3772,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
