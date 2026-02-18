@@ -919,6 +919,59 @@ if not st.session_state['authenticated']:
         else:
             st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em; margin-bottom: 20px;'>SIGNET</div>", unsafe_allow_html=True)
             
+        # IMPORTANT: NO INDENTATION INSIDE THE STRING TO PREVENT CODE BLOCK RENDERING
+        st.markdown("""
+<div class="login-content-left">
+<h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
+<p class="subheadline">
+When content velocity exceeds founder bandwidth, signal degradation begins. 
+Signet prevents brand drift through algorithmic governance—measuring every 
+output against your authoritative baseline before it reaches stakeholders.
+</p>
+<ul class="feature-list">
+<li>
+<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+</svg>
+<span class="feature-text">
+<strong>Voice DNA Calibration:</strong> 3-5 gold-standard assets lock your executive voice
+</span>
+</li>
+<li>
+<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="12" cy="12" r="10"></circle>
+<line x1="22" y1="12" x2="18" y2="12"></line>
+<line x1="6" y1="12" x2="2" y2="12"></line>
+<line x1="12" y1="6" x2="12" y2="2"></line>
+<line x1="12" y1="22" x2="12" y2="18"></line>
+</svg>
+<span class="feature-text">
+<strong>Visual Compliance Engine:</strong> Audit every image against palette specifications
+</span>
+</li>
+<li>
+<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="12" cy="12" r="2"></circle>
+<path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+</svg>
+<span class="feature-text">
+<strong>Signal Integrity Score:</strong> Quantify consistency across your publishing perimeter
+</span>
+</li>
+</ul>
+</div>
+""", unsafe_allow_html=True)
+    
+    # 2. BALANCED COLUMNS
+    c1, c2 = st.columns([1, 1], gap="large")
+    
+    # --- LEFT COLUMN: THE PITCH ---
+    with c1:
+        if os.path.exists("Signet_Logo_Color.png"):
+            st.image("Signet_Logo_Color.png", width=180)
+        else:
+            st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em; margin-bottom: 20px;'>SIGNET</div>", unsafe_allow_html=True)
+            
         st.markdown("""
             <div class="login-content-left">
                 <h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
@@ -4395,6 +4448,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
