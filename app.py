@@ -2876,7 +2876,7 @@ elif app_mode == "BRAND ARCHITECT":
     # --- MAIN INTERFACE: TABS ---
     main_tab1, main_tab2, main_tab3 = st.tabs(["BUILD NEW BRAND", "MANAGE BRAND", "IMPORT BRAND FROM PDF"])
 
-    # -----------------------------------------------------------
+# -----------------------------------------------------------
     # TAB 1: BUILD NEW BRAND (FORMERLY WIZARD)
     # -----------------------------------------------------------
     with main_tab1:
@@ -2948,6 +2948,26 @@ elif app_mode == "BRAND ARCHITECT":
                 s_file = None
                 s_text = None
                 if wiz_soc_mode == "Upload Image":
+                    # --- CSS FIX FOR UPLOADER STYLE ---
+                    st.markdown("""
+                        <style>
+                        [data-testid='stFileUploader'] section {
+                            background-color: rgba(36, 54, 59, 0.05) !important;
+                            border: 1px dashed #ab8f59 !important;
+                        }
+                        [data-testid='stFileUploader'] section > div {
+                            color: #24363b !important;
+                        }
+                        [data-testid='stFileUploader'] section small {
+                            color: #5c6b61 !important;
+                        }
+                        [data-testid='stFileUploader'] button {
+                            border-color: #ab8f59 !important;
+                            color: #24363b !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                    # ----------------------------------
                     s_key = f"social_up_{st.session_state['social_uploader_key']}"
                     s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
                 else:
@@ -4280,6 +4300,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
