@@ -1132,6 +1132,7 @@ with st.sidebar:
     st.button("COPY EDITOR", width="stretch", on_click=set_page, args=("COPY EDITOR",))
     st.button("CONTENT GENERATOR", width="stretch", on_click=set_page, args=("CONTENT GENERATOR",))
     st.button("SOCIAL MEDIA ASSISTANT", width="stretch", on_click=set_page, args=("SOCIAL MEDIA ASSISTANT",))
+    st.button("ACTIVITY LOG", width="stretch", on_click=set_page, args=("ACTIVITY LOG",))
     
     # ADMIN TOOLS (NO DIVIDER)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
@@ -3986,6 +3987,137 @@ if app_mode == "TEAM MANAGEMENT":
 # END OF TEAM MANAGEMENT MODULE
 # ===================================================================
 
+# ===================================================================
+# FULL ACTIVITY LOG MODULE - NEW MODULE
+# Add this AFTER the Team Management section in app.py
+# Also add navigation button: st.button("ACTIVITY LOG", ...)
+# ===================================================================
+
+elif app_mode == "ACTIVITY LOG":
+    st.title("ACTIVITY LOG")
+    
+    current_org = st.session_state.get('org_id')
+    username = st.session_state.get('username')
+    is_admin = st.session_state.get('is_admin', False)
+    
+    st.markdown(f"**ORGANIZATION:** {current_org}")
+    if is_admin:
+        st.caption("Admin view: Showing all organization activity")
+    else:
+        st.caption("User view: Showing your activity only")
+    
+    st.divider()
+    
+    # --- FILTERS ---
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    
+    with filter_col1:
+        limit = st.selectbox("ENTRIES TO SHOW", [20, 50, 100, 200], index=0)
+    
+    with filter_col2:
+        activity_types = ["ALL", "VISUAL AUDIT", "COPY EDIT", "CONTENT GENERATION", 
+                         "STRATEGY UPDATE", "PROFILE DELETED", "ASSET INJECTION"]
+        filter_type = st.selectbox("ACTIVITY TYPE", activity_types)
+    
+    with filter_col3:
+        if is_admin:
+            # Get all users in org for filter
+            users = db.get_users_by_org(current_org)
+            user_list = ["ALL"] + [u[0] for u in users] if users else ["ALL"]
+            filter_user = st.selectbox("USER", user_list)
+        else:
+            filter_user = username
+    
+    # --- FETCH LOGS ---
+    try:
+        logs = db.get_org_logs(current_org, limit=limit)
+        
+        # Apply filters
+        if not is_admin:
+            # Non-admins only see their own
+            logs = [log for log in logs if log.get('username') == username]
+        elif filter_user != "ALL":
+            # Admin filtered by specific user
+            logs = [log for log in logs if log.get('username') == filter_user]
+        
+        if filter_type != "ALL":
+            logs = [log for log in logs if log.get('activity_type') == filter_type]
+        
+        if logs:
+            st.markdown(f"**SHOWING {len(logs)} ENTRIES**")
+            st.markdown("---")
+            
+            # Display as table
+            import pandas as pd
+            
+            # Prepare data for table
+            table_data = []
+            for log in logs:
+                table_data.append({
+                    "TIME": log.get('timestamp', ''),
+                    "USER": log.get('username', ''),
+                    "ACTIVITY": log.get('activity_type', ''),
+                    "ASSET": log.get('asset_name', '')[:30] + "..." if len(log.get('asset_name', '')) > 30 else log.get('asset_name', ''),
+                    "SCORE": log.get('score', '-'),
+                    "VERDICT": log.get('verdict', '')
+                })
+            
+            df = pd.DataFrame(table_data)
+            
+            # Interactive table with row selection
+            selection = st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
+            )
+            
+            # --- DETAIL VIEW ---
+            st.markdown("---")
+            st.markdown("### ENTRY DETAILS")
+            
+            if selection and len(selection.selection.rows) > 0:
+                row_idx = selection.selection.rows[0]
+                selected_log = logs[row_idx]
+                
+                detail_col1, detail_col2 = st.columns(2)
+                
+                with detail_col1:
+                    st.markdown("**METADATA**")
+                    st.write(f"**Org:** {selected_log.get('org_id')}")
+                    st.write(f"**User:** {selected_log.get('username')}")
+                    st.write(f"**Time:** {selected_log.get('timestamp')}")
+                    st.write(f"**Activity:** {selected_log.get('activity_type')}")
+                    st.write(f"**Asset:** {selected_log.get('asset_name')}")
+                    st.write(f"**Score:** {selected_log.get('score')}")
+                    st.write(f"**Verdict:** {selected_log.get('verdict')}")
+                
+                with detail_col2:
+                    st.markdown("**FULL PAYLOAD (JSON)**")
+                    try:
+                        metadata = json.loads(selected_log.get('metadata_json', '{}'))
+                        st.json(metadata)
+                    except:
+                        st.code(selected_log.get('metadata_json', '{}'))
+            else:
+                st.info("Select a row above to view full details")
+        
+        else:
+            st.warning("No activity logs found matching your filters")
+    
+    except Exception as e:
+        st.error(f"Error loading activity logs: {e}")
+    
+    # --- EXPORT OPTION (Future Enhancement) ---
+    st.markdown("---")
+    if st.button("EXPORT TO CSV"):
+        st.info("Export functionality: Coming in next update")
+
+# ===================================================================
+# END OF ACTIVITY LOG MODULE
+# ===================================================================
+
 # --- ADMIN DASHBOARD (GOD MODE) ---
 if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
     st.markdown("---")
@@ -4100,6 +4232,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
