@@ -1102,7 +1102,7 @@ with st.sidebar:
                 # 2. System Capabilities (Instructional)
                 st.markdown("<span style='color:#24363b; font-weight:800; font-size:0.75rem;'>SYSTEM CAPABILITIES:</span>", unsafe_allow_html=True)
                 if score < 40:
-                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **UNSAFE:** Engine relies on generic training. High risk of hallucination.</span>", unsafe_allow_html=True)
+                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **UNSAFE:** Engine relies on generic training. High risk of generic output.</span>", unsafe_allow_html=True)
                 elif score < 90:
                     st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **PARTIAL:** Safe for fortified clusters (green) only. Verify output carefully.</span>", unsafe_allow_html=True)
                 else:
@@ -4232,6 +4232,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
