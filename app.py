@@ -147,40 +147,33 @@ st.markdown("""
         border-color: var(--c-gold-muted) !important;
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
-    /* --- EXPANDER HEADER FIXES --- */
+    /* --- EXPANDER HEADER FIXES (NUCLEAR) --- */
 
-    /* 1. Target the Expander Header Container */
+    /* 1. Target the Container */
     .streamlit-expanderHeader {
-        background-color: var(--c-navy-dark) !important; /* Ensure background matches */
-        color: var(--c-gold-muted) !important; /* Force text to Gold */
-        border: 1px solid var(--c-gold-muted) !important; /* Optional: Clean border */
-        border-radius: 4px;
+        background-color: var(--c-navy-dark) !important;
+        border: 1px solid var(--c-gold-muted) !important;
+        color: var(--c-gold-muted) !important;
     }
 
-    /* 2. Target the Internal Text (p or div) inside the Header */
-    .streamlit-expanderHeader p,
-    .streamlit-expanderHeader div,
-    .streamlit-expanderHeader span {
+    /* 2. THE NUCLEAR RULE: Target EVERY child element inside the header */
+    /* This forces text, icons, spans, and divs to inherit the color */
+    .streamlit-expanderHeader * {
         color: var(--c-gold-muted) !important;
+        fill: var(--c-gold-muted) !important; /* Force Icon Fill */
+        stroke: var(--c-gold-muted) !important; /* Force Icon Lines */
         font-weight: 600 !important;
     }
 
-    /* 3. Target the SVG Arrow (The little dropdown icon) */
-    .streamlit-expanderHeader svg {
-        fill: var(--c-gold-muted) !important;
-        stroke: var(--c-gold-muted) !important;
+    /* 3. Hover State (Brighten Everything) */
+    .streamlit-expanderHeader:hover {
+        border-color: var(--c-gold-signal) !important;
     }
 
-    /* 4. Hover State for Expander */
-    .streamlit-expanderHeader:hover {
-        border-color: var(--c-gold-signal) !important; /* Brighten border on hover */
-    }
-    
-    .streamlit-expanderHeader:hover p,
-    .streamlit-expanderHeader:hover div,
-    .streamlit-expanderHeader:hover svg {
-        color: var(--c-gold-signal) !important; /* Brighten text on hover */
+    .streamlit-expanderHeader:hover * {
+        color: var(--c-gold-signal) !important;
         fill: var(--c-gold-signal) !important;
+        stroke: var(--c-gold-signal) !important;
     }
     
 /* --- DROPDOWN & POPOVER FIXES --- */
@@ -3856,6 +3849,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
