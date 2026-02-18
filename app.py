@@ -2534,7 +2534,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                 # Trigger Calibration (Persisted via key)
                 st.selectbox(
                     "NETWORK", 
-                    ["LinkedIn", "X (Twitter)", "Instagram", "Facebook"],
+                    ["LinkedIn", "X (Twitter)", "Instagram"],
                     key="sm_platform"
                 )
             with cc2:
@@ -2848,7 +2848,7 @@ elif app_mode == "BRAND ARCHITECT":
             
             c1, c2 = st.columns([1, 2])
             with c1:
-                s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)", "Facebook"], key="wiz_social_platform")
+                s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)"], key="wiz_social_platform")
             with c2:
                 s_key = f"social_up_{st.session_state['social_uploader_key']}"
                 s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
@@ -3858,6 +3858,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
