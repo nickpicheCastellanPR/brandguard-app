@@ -147,33 +147,42 @@ st.markdown("""
         border-color: var(--c-gold-muted) !important;
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
-    /* --- EXPANDER HEADER FIXES (NUCLEAR) --- */
+    /* --- EXPANDER HEADER FIXES (HTML NATIVE) --- */
 
-    /* 1. Target the Container */
-    .streamlit-expanderHeader {
-        background-color: var(--c-navy-dark) !important;
-        border: 1px solid var(--c-gold-muted) !important;
+    /* 1. Target the Expander Container via Data Attribute */
+    [data-testid="stExpander"] {
+        background-color: transparent !important;
+        border: none !important;
         color: var(--c-gold-muted) !important;
     }
 
-    /* 2. THE NUCLEAR RULE: Target EVERY child element inside the header */
-    /* This forces text, icons, spans, and divs to inherit the color */
-    .streamlit-expanderHeader * {
+    /* 2. Target the Summary (The Clickable Header Bar) */
+    [data-testid="stExpander"] details > summary {
+        background-color: var(--c-navy-dark) !important;
+        border: 1px solid var(--c-gold-muted) !important;
+        border-radius: 4px;
         color: var(--c-gold-muted) !important;
-        fill: var(--c-gold-muted) !important; /* Force Icon Fill */
-        stroke: var(--c-gold-muted) !important; /* Force Icon Lines */
+        transition: all 0.2s ease;
+    }
+
+    /* 3. Target the Content INSIDE the Summary (Text & Icon) */
+    /* We use 'currentColor' so they automatically change on hover */
+    [data-testid="stExpander"] details > summary > * {
+        color: inherit !important;
+        fill: currentColor !important;
+        stroke: currentColor !important;
         font-weight: 600 !important;
     }
 
-    /* 3. Hover State (Brighten Everything) */
-    .streamlit-expanderHeader:hover {
-        border-color: var(--c-gold-signal) !important;
+    /* 4. Target the Paragraph specifically (Double-tap for safety) */
+    [data-testid="stExpander"] details > summary p {
+        color: inherit !important;
     }
 
-    .streamlit-expanderHeader:hover * {
+    /* 5. Hover State */
+    [data-testid="stExpander"] details > summary:hover {
+        border-color: var(--c-gold-signal) !important;
         color: var(--c-gold-signal) !important;
-        fill: var(--c-gold-signal) !important;
-        stroke: var(--c-gold-signal) !important;
     }
     
 /* --- DROPDOWN & POPOVER FIXES --- */
@@ -3849,6 +3858,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
