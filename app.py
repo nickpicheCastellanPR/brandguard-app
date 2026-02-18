@@ -148,7 +148,9 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
 
-    /* Target the portal and all parent containers */
+/* --- DROPDOWN & POPOVER FIXES --- */
+
+    /* 1. Target the portal and all parent containers (Existing Logic Preserved) */
     div[data-testid="portal"],
     div[data-testid="portal"] > div,
     div[data-baseweb="popover"],
@@ -158,10 +160,8 @@ st.markdown("""
         background-color: var(--c-gold-muted) !important;
         background: var(--c-gold-muted) !important;
     }
-    
-    /* Fix Dropdown Menu Items - NUCLEAR OPTION */
-    
-    /* Target every possible dropdown container */
+
+    /* 2. Target the Menu Containers (Nuclear Option Preserved) */
     ul[data-baseweb="menu"],
     div[data-baseweb="popover"],
     div[data-baseweb="popover"] > div,
@@ -173,32 +173,49 @@ st.markdown("""
         background: var(--c-gold-muted) !important;
         border: 1px solid var(--c-gold-muted) !important;
     }
-    
-    /* Target the list items */
+
+    /* 3. Target the List Items (Container Level) */
     ul[data-baseweb="menu"] li,
     li[role="option"] {
-        color: var(--c-teal-deep) !important;
         background-color: var(--c-gold-muted) !important;
         background: var(--c-gold-muted) !important;
-        -webkit-text-fill-color: var(--c-teal-deep) !important;
+        color: var(--c-teal-deep) !important;
         padding: 10px 15px !important;
         transition: all 0.2s ease;
     }
-    
-    /* Hover state */
-    ul[data-baseweb="menu"] li:hover,
-    li[role="option"]:hover {
-        background-color: #c9a867 !important;
-        background: #c9a867 !important;
+
+    /* 4. [NEW] Target the Text Inside the List Item (The Fix) */
+    /* This overrides the default Streamlit dark mode text inheritance */
+    ul[data-baseweb="menu"] li div,
+    li[role="option"] div {
         color: var(--c-teal-deep) !important;
         -webkit-text-fill-color: var(--c-teal-deep) !important;
     }
+
+    /* 5. Hover State */
+    ul[data-baseweb="menu"] li:hover,
+    li[role="option"]:hover {
+        background-color: #c9a867 !important; /* Slightly darker gold */
+        background: #c9a867 !important;
+    }
     
-    /* Selected state */
+    /* [NEW] Force text color on hover */
+    ul[data-baseweb="menu"] li:hover div,
+    li[role="option"]:hover div {
+        color: var(--c-teal-deep) !important;
+        -webkit-text-fill-color: var(--c-teal-deep) !important;
+    }
+
+    /* 6. Selected State */
     ul[data-baseweb="menu"] li[aria-selected="true"],
     li[role="option"][aria-selected="true"] {
         background-color: var(--c-teal-deep) !important;
         background: var(--c-teal-deep) !important;
+    }
+
+    /* [NEW] Force text inversion on selection (Gold Text on Teal Background) */
+    ul[data-baseweb="menu"] li[aria-selected="true"] div,
+    li[role="option"][aria-selected="true"] div {
         color: var(--c-gold-muted) !important;
         -webkit-text-fill-color: var(--c-gold-muted) !important;
     }
@@ -3804,6 +3821,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
