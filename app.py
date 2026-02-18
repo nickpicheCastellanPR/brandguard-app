@@ -2875,10 +2875,10 @@ elif app_mode == "BRAND ARCHITECT":
                 st.session_state['extraction_error'] = str(e)
 
     # --- MAIN INTERFACE: TABS ---
-    main_tab1, main_tab2, main_tab3 = st.tabs(["CREATE BLUEPRINT", "MANAGE BLUEPRINTS", "IMPORT GUIDELINES"])
+    main_tab1, main_tab2, main_tab3 = st.tabs(["BUILD NEW BRAND", "MANAGE BRAND", "IMPORT BRAND FROM PDF"])
 
     # -----------------------------------------------------------
-    # TAB 1: CREATE NEW BLUEPRINT
+    # TAB 1: BUILD NEW BRAND (FORMERLY WIZARD)
     # -----------------------------------------------------------
     with main_tab1:
         st.markdown("### ARCHITECT NEW BRAND")
@@ -2943,12 +2943,12 @@ elif app_mode == "BRAND ARCHITECT":
             c1, c2 = st.columns([1, 2])
             with c1:
                 s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)"], key="wiz_social_platform")
-                # NEW: Creator Mode Text Option
-                wiz_soc_mode = st.radio("INPUT", ["Image Screenshot", "Raw Text"], horizontal=True, key="wiz_soc_mode")
+                # CREATOR MODE: Toggle matching Manager
+                wiz_soc_mode = st.radio("INPUT SOURCE", ["Upload Image", "Paste Text"], horizontal=True, key="wiz_soc_mode")
             with c2:
                 s_file = None
                 s_text = None
-                if wiz_soc_mode == "Image Screenshot":
+                if wiz_soc_mode == "Upload Image":
                     s_key = f"social_up_{st.session_state['social_uploader_key']}"
                     s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
                 else:
@@ -2958,18 +2958,17 @@ elif app_mode == "BRAND ARCHITECT":
             if 'temp_social_analysis' not in st.session_state: st.session_state['temp_social_analysis'] = ""
             
             if st.button("ANALYZE POST"):
-                if wiz_soc_mode == "Image Screenshot" and s_file:
+                if wiz_soc_mode == "Upload Image" and s_file:
                     with st.spinner("REVERSE ENGINEERING VISUAL STRATEGY..."):
                         img = Image.open(s_file)
                         st.session_state['temp_social_analysis'] = logic_engine.analyze_social_style(img)
-                elif wiz_soc_mode == "Raw Text" and s_text:
+                elif wiz_soc_mode == "Paste Text" and s_text:
                     with st.spinner("ANALYZING TEXT STRUCTURE..."):
-                        # For raw text, we just pass it through or run a lighter text-only analysis
                         st.session_state['temp_social_analysis'] = s_text
             
             # --- THE FEEDBACK LOOP ---
             if st.session_state['temp_social_analysis']:
-                st.markdown("#### 🧬 AI FINDINGS (REVIEW & EDIT)")
+                st.markdown("####  AI FINDINGS (REVIEW & EDIT)")
                 st.caption("Edit the analysis below to ensure it matches your brand standards.")
                 
                 edited_analysis = st.text_area(
@@ -3132,14 +3131,14 @@ elif app_mode == "BRAND ARCHITECT":
                         st.success("CALIBRATED & SAVED TO DATABASE")
                         st.rerun()
                     except Exception as e:
-                        if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
+                        if "ResourceExhausted" in str(e): st.error(" PROCESSING: Please wait 60 seconds.")
                         else: st.error(f"Error: {e}")
 
     # -----------------------------------------------------------
-    # TAB 2: MANAGE BLUEPRINTS (THE OLD MANAGER)
+    # TAB 2: MANAGE BRAND (THE OLD MANAGER)
     # -----------------------------------------------------------
     with main_tab2:
-        st.markdown("### BRAND MANAGER")
+        st.markdown("### MANAGE BRAND")
         st.caption("Edit, refine, and inject new assets into existing profiles.")
         
         if st.session_state['profiles']:
@@ -3158,7 +3157,7 @@ elif app_mode == "BRAND ARCHITECT":
             
             with view_tab2:
                 st.markdown("### CURRENT BRAND KIT")
-                st.caption("This is the exact data the AI uses to generate content.")
+                st.caption("This is the data the AI uses to generate and review content.")
                 st.text_area("READ-ONLY VIEW", value=final_text_view, height=600, disabled=True)
                 
                 html_data = convert_to_html_brand_card(target, final_text_view)
@@ -3280,31 +3279,29 @@ elif app_mode == "BRAND ARCHITECT":
                         with c1:
                             cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
                             
-                            # --- NEW FEATURE: RAW TEXT INJECTOR ---
-                            use_raw_text = st.checkbox("I only have text (No Screenshot)", key="soc_raw_check")
-                            
                         with c2:
+                            # --- TABS FOR CONSISTENCY (MATCHING VOICE TAB) ---
+                            s_tab1, s_tab2 = st.tabs(["UPLOAD SCREENSHOT", "PASTE TEXT"])
+                            
                             cal_img = None
                             raw_post_text = None
                             
-                            if not use_raw_text:
-                                cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
-                            else:
-                                raw_post_text = st.text_area("PASTE POST COPY", height=150, placeholder="Paste the full caption here...", key="soc_raw_text")
+                            with s_tab1:
+                                s_key = f"social_up_mgr_{st.session_state.get('social_uploader_key', 0)}"
+                                cal_img = st.file_uploader("UPLOAD IMAGE", type=["png", "jpg"], key=s_key)
+                                
+                            with s_tab2:
+                                raw_post_text = st.text_area("PASTE POST COPY", height=100, key="soc_raw_text_mgr")
                         
                         if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
                         
                         # LOGIC BRANCH: IMAGE vs TEXT
-                        if not use_raw_text:
-                            # IMAGE FLOW
-                            if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
-                                with st.spinner("REVERSE ENGINEERING..."):
-                                    img = Image.open(cal_img)
-                                    st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
-                        else:
-                            # TEXT FLOW (Just pass it through for formatting)
-                            if raw_post_text and st.button(f"INGEST TEXT POST", type="primary", key="btn_cal_soc_text"):
-                                st.session_state['man_social_analysis'] = raw_post_text
+                        if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST (IMAGE)", type="primary", key="btn_cal_social_img"):
+                            with st.spinner("REVERSE ENGINEERING..."):
+                                img = Image.open(cal_img)
+                                st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                        elif raw_post_text and st.button(f"INGEST {cal_platform.upper()} POST (TEXT)", type="primary", key="btn_cal_social_txt"):
+                             st.session_state['man_social_analysis'] = raw_post_text
                         
                         if st.session_state['man_social_analysis']:
                             st.markdown("#### REVIEW FINDINGS")
@@ -3428,17 +3425,18 @@ elif app_mode == "BRAND ARCHITECT":
                                 voice_audience = st.text_input("AUDIENCE (TARGET)", placeholder="e.g. Investors", key="cal_audience_voice")
                         
                         with c2:
-                            # --- NEW FEATURE: VOICE TEXT PASTE ---
-                            voice_mode = st.radio("INPUT SOURCE", ["Upload File", "Paste Text"], horizontal=True, key="voice_input_mode")
+                            # --- VOICE TEXT PASTE (TABS) ---
+                            v_tab1, v_tab2 = st.tabs(["UPLOAD FILE", "PASTE TEXT"])
                             
                             v_file = None
                             v_text_input = None
                             
-                            if voice_mode == "Upload File":
+                            with v_tab1:
                                 # UPDATED FILE UPLOADER TO ACCEPT PDF AND DOCX
                                 v_file = st.file_uploader("UPLOAD (PDF/DOCX/TXT)", type=["pdf", "docx", "txt"], key="cal_up_voice")
                                 st.caption("Engine requires 3+ samples per cluster.")
-                            else:
+                                
+                            with v_tab2:
                                 v_text_input = st.text_area("PASTE RAW CONTENT", height=200, placeholder="Paste article/email text here...", key="cal_paste_voice")
                         
                         if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
@@ -3449,7 +3447,7 @@ elif app_mode == "BRAND ARCHITECT":
                             raw_txt = ""
                             source_name = "Manual Paste"
                             
-                            if voice_mode == "Upload File" and v_file:
+                            if v_file:
                                 valid_input = True
                                 source_name = v_file.name
                                 try:
@@ -3465,7 +3463,7 @@ elif app_mode == "BRAND ARCHITECT":
                                     st.error(f"Read Error: {e}")
                                     valid_input = False
                                     
-                            elif voice_mode == "Paste Text" and v_text_input:
+                            elif v_text_input:
                                 valid_input = True
                                 raw_txt = v_text_input
                             
@@ -3651,15 +3649,15 @@ elif app_mode == "BRAND ARCHITECT":
                     st.divider()
 
                     # --- MANUAL EDITORS (ADVANCED) ---
-                    with st.expander("MANUAL TEXT EDITORS (ADVANCED USERS)"):
-                        st.warning("Editing these raw fields directly may break the Asset Library headers above.")
+                    with st.expander("MANUAL TEXT EDITORS (READ-ONLY)"):
+                        st.info("These fields display the raw data blocks. To edit this content, use the Asset Library tools above.")
                         edit_tab1, edit_tab2, edit_tab3 = st.tabs(["RAW SOCIAL", "RAW VOICE", "RAW VISUAL"])
                         with edit_tab1:
-                            inputs['social_dna'] = st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, max_chars=10000)
+                            st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, disabled=True)
                         with edit_tab2:
-                            inputs['voice_dna'] = st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, max_chars=10000)
+                            st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, disabled=True)
                         with edit_tab3:
-                            inputs['visual_dna'] = st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, max_chars=10000)
+                            st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, disabled=True)
 
                     if st.button("SAVE STRATEGY CHANGES", type="primary"):
                         # 1. Update Standard Inputs
@@ -3770,21 +3768,21 @@ elif app_mode == "BRAND ARCHITECT":
                     st.rerun()
     
     # -----------------------------------------------------------
-    # TAB 3: IMPORT GUIDELINES (THE PDF INGESTOR)
+    # TAB 3: IMPORT BRAND FROM PDF (THE PDF INGESTOR)
     # -----------------------------------------------------------
     with main_tab3:
         st.markdown("### AUTO-FILL FROM GUIDELINES")
-        st.caption("Upload a PDF to automatically populate the Blueprint fields.")
+        st.caption("Upload a PDF to automatically populate the Brand Identity fields.")
         
         # The uploader needs the key match the callback
         st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
         
         # The button simply triggers the callback
-        st.button("EXTRACT & MAP TO BLUEPRINT", type="primary", on_click=extract_and_map_pdf)
+        st.button("EXTRACT & MAP TO BRAND", type="primary", on_click=extract_and_map_pdf)
     
         # Display Messages based on the flags set in callback
         if st.session_state.get('extraction_success'):
-            st.success("✅ Extraction Complete! Switch to the 'CREATE BLUEPRINT' tab to review.")
+            st.success("✅ Extraction Complete! Switch to the 'BUILD NEW BRAND' tab to review.")
             # Clear flag so it doesn't stay forever
             st.session_state['extraction_success'] = False
         
@@ -4283,6 +4281,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
