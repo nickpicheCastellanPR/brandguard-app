@@ -1252,7 +1252,38 @@ if app_mode == "DASHBOARD":
     
     # --- RETURNING USER STATE (1+ PROFILES) ---
     st.title("COMMAND CENTER")
-    
+    # --- DIAGNOSTIC BLOCK (DELETE AFTER USE) ---
+    with st.expander("🛠️ SYSTEM DIAGNOSTICS (CLICK TO EXPAND)", expanded=True):
+        st.write("Testing Anthropic Model Access...")
+        import anthropic
+        
+        # Test the 3 most likely model IDs
+        candidates = [
+            "claude-3-5-sonnet-20241022", # Newest (v2)
+            "claude-3-5-sonnet-latest",   # The Alias
+            "claude-3-5-sonnet-20240620"  # The Old One
+        ]
+        
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            st.error("❌ NO API KEY FOUND")
+        else:
+            client = anthropic.Anthropic(api_key=api_key)
+            for model in candidates:
+                try:
+                    client.messages.create(
+                        model=model,
+                        max_tokens=5,
+                        messages=[{"role": "user", "content": "ping"}]
+                    )
+                    st.success(f"✅ ACCESS GRANTED: {model}")
+                    st.write(f"👉 **Update logic.py to use this ID:** `{model}`")
+                except Exception as e:
+                    if "not_found_error" in str(e):
+                        st.error(f"❌ ACCESS DENIED (404): {model}")
+                    else:
+                        st.error(f"⚠️ ERROR: {model} -> {str(e)}")
+    # -------------------------------------------
     # Profile selector (auto-select if only one profile)
     if len(profiles) == 1:
         selected_profile = list(profiles.keys())[0]
@@ -4281,6 +4312,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
