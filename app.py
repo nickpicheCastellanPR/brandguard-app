@@ -1421,9 +1421,9 @@ if app_mode == "DASHBOARD":
         
         # View full log button
         if st.button("VIEW FULL LOG", use_container_width=True):
-            # Check if full log view exists in current app
-            # If not, just show message for now
-            st.info("Full log view: Coming soon")
+            # Manually force the navigation state
+            st.session_state.app_mode = "ACTIVITY LOG" 
+            st.rerun()
 
             
 # 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
@@ -4232,6 +4232,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
