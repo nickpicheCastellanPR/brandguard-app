@@ -169,7 +169,7 @@ class SignetLogic:
         if not client:
             raise ValueError("ANTHROPIC_API_KEY environment variable not set")
         self.client = client
-        self.model = "claude-3-sonnet-20240229" # Updated to latest stable Sonnet model
+        self.model = "claude-opus-4-6" # Updated to latest stable Sonnet model
 
     def _safe_generate(self, system_msg, user_msg, max_tokens=4000):
         """
