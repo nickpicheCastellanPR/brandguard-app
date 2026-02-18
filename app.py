@@ -147,6 +147,17 @@ st.markdown("""
         border-color: var(--c-gold-muted) !important;
         box-shadow: 0 0 8px rgba(171, 143, 89, 0.2) !important;
     }
+
+    /* Target the portal and all parent containers */
+    div[data-testid="portal"],
+    div[data-testid="portal"] > div,
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    #portal,
+    #portal > div {
+        background-color: var(--c-gold-muted) !important;
+        background: var(--c-gold-muted) !important;
+    }
     
     /* Fix Dropdown Menu Items - NUCLEAR OPTION */
     
@@ -3793,6 +3804,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
