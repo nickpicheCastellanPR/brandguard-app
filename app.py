@@ -2696,11 +2696,14 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             with t3:
                 st.text_area("Utility Focus", value=st.session_state['sm_results'][2].strip(), height=400)
                 
-# 6. BRAND ARCHITECT
+# ===================================================================
+# 6. BRAND ARCHITECT (UNIFIED MODULE)
+# Merges Creation (Architect) and Editing (Manager)
+# ===================================================================
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
     
-    # --- CSS INJECTION FOR VISIBILITY ---
+    # --- CSS INJECTION ---
     st.markdown("""
         <style>
         div.stButton > button[kind="primary"] {
@@ -2716,9 +2719,99 @@ elif app_mode == "BRAND ARCHITECT":
         div.stButton > button[kind="primary"] p {
             color: #1b2a2e !important;
         }
+        .asset-box {
+            border: 1px solid #333;
+            background-color: #1E1E1E;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        .asset-header {
+            font-weight: bold;
+            color: #ab8f59;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
+    # --- HELPER FUNCTIONS ---
+    def process_image_for_storage(file_buffer):
+        """Resizes image and converts to base64 for storage."""
+        try:
+            import base64
+            from io import BytesIO
+            
+            # Reset buffer pointer
+            file_buffer.seek(0)
+            img = Image.open(file_buffer)
+            
+            # Resize for thumbnail (Max 400px width)
+            base_width = 400
+            w_percent = (base_width / float(img.size[0]))
+            h_size = int((float(img.size[1]) * float(w_percent)))
+            img = img.resize((base_width, h_size), Image.Resampling.LANCZOS)
+            
+            # Convert to Base64
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return f"data:image/png;base64,{img_str}"
+        except Exception:
+            return None
+
+    def parse_assets_from_text(text_blob):
+        """Splits the DNA text block into manageable assets based on headers."""
+        if not text_blob: return []
+        # Split by the divider line we used
+        raw_assets = text_blob.split("----------------\n")
+        parsed = []
+        for asset in raw_assets:
+            if "[ASSET:" in asset:
+                lines = asset.strip().split('\n')
+                header = lines[0] # [ASSET: TYPE - NAME]
+                
+                # Extract Visual Data if present
+                img_data = None
+                clean_lines = []
+                for line in lines[1:]:
+                    if line.startswith("[VISUAL_REF:"):
+                        img_data = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
+                    else:
+                        clean_lines.append(line)
+                
+                content = "\n".join(clean_lines)
+                parsed.append({
+                    "header": header, 
+                    "content": content, 
+                    "full_text": asset + "----------------\n",
+                    "image": img_data
+                })
+        return parsed
+
+    def update_calibration_score(profile_obj):
+        """Recalculates the profile completeness score based on inputs."""
+        inputs = profile_obj.get('inputs', {})
+        score = 0
+        
+        # 1. Basics (40%) - The Strategy Layer
+        if inputs.get('wiz_name'): score += 10
+        if inputs.get('wiz_mission'): score += 10
+        if inputs.get('wiz_values'): score += 10
+        if inputs.get('wiz_archetype'): score += 10
+        
+        # 2. DNA Layers (60%) - The Asset Layer
+        has_social = len(inputs.get('social_dna', '')) > 20 or "[ASSET:" in inputs.get('social_dna', '')
+        has_voice = len(inputs.get('voice_dna', '')) > 20 or "[ASSET:" in inputs.get('voice_dna', '')
+        has_visual = len(inputs.get('visual_dna', '')) > 20 or "[ASSET:" in inputs.get('visual_dna', '')
+
+        if has_social: score += 20
+        if has_voice: score += 20
+        if has_visual: score += 20
+        
+        profile_obj['calibration_score'] = min(score, 100)
+        return profile_obj
+        
     def extract_and_map_pdf():
         # This runs BEFORE the page redraws
         uploaded_file = st.session_state.get('arch_pdf_uploader')
@@ -2781,12 +2874,17 @@ elif app_mode == "BRAND ARCHITECT":
                 
             except Exception as e:
                 st.session_state['extraction_error'] = str(e)
-            
-    # PERSISTENCE HANDLED AUTOMATICALLY UPON GENERATION NOW
-    st.info("Profiles are automatically saved to your account upon generation.")
-    
-    tab1, tab2 = st.tabs(["WIZARD", "PDF EXTRACT"])
-    with tab1:
+
+    # --- MAIN INTERFACE: TABS ---
+    main_tab1, main_tab2, main_tab3 = st.tabs(["CREATE BLUEPRINT", "IMPORT GUIDELINES", "MANAGE BLUEPRINTS"])
+
+    # -----------------------------------------------------------
+    # TAB 1: CREATE NEW BLUEPRINT
+    # -----------------------------------------------------------
+    with main_tab1:
+        st.markdown("### BLUEPRINT CREATOR")
+        st.caption("Build a new brand profile from scratch.")
+        
         with st.expander("1. STRATEGY (CORE)", expanded=True):
             st.text_input("BRAND NAME", key="wiz_name", max_chars=100)
             c1, c2 = st.columns(2)
@@ -2846,18 +2944,29 @@ elif app_mode == "BRAND ARCHITECT":
             c1, c2 = st.columns([1, 2])
             with c1:
                 s_plat = st.selectbox("PLATFORM", ["LinkedIn", "Instagram", "X (Twitter)"], key="wiz_social_platform")
+                # NEW: Creator Mode Text Option
+                wiz_soc_mode = st.radio("INPUT", ["Image Screenshot", "Raw Text"], horizontal=True, key="wiz_soc_mode")
             with c2:
-                s_key = f"social_up_{st.session_state['social_uploader_key']}"
-                s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
+                s_file = None
+                s_text = None
+                if wiz_soc_mode == "Image Screenshot":
+                    s_key = f"social_up_{st.session_state['social_uploader_key']}"
+                    s_file = st.file_uploader("UPLOAD SCREENSHOT", type=["png", "jpg"], key=s_key)
+                else:
+                    s_text = st.text_area("PASTE POST TEXT", height=100, key="wiz_soc_text_area")
             
             # --- NEW: STATEFUL ANALYSIS PREVIEW ---
             if 'temp_social_analysis' not in st.session_state: st.session_state['temp_social_analysis'] = ""
             
-            if s_file and st.button("ANALYZE POST"):
-                with st.spinner("REVERSE ENGINEERING STRATEGY..."):
-                    img = Image.open(s_file)
-                    # Use the NEW Strict Method (Visual Vibe -> Aesthetic)
-                    st.session_state['temp_social_analysis'] = logic_engine.analyze_social_style(img)
+            if st.button("ANALYZE POST"):
+                if wiz_soc_mode == "Image Screenshot" and s_file:
+                    with st.spinner("REVERSE ENGINEERING VISUAL STRATEGY..."):
+                        img = Image.open(s_file)
+                        st.session_state['temp_social_analysis'] = logic_engine.analyze_social_style(img)
+                elif wiz_soc_mode == "Raw Text" and s_text:
+                    with st.spinner("ANALYZING TEXT STRUCTURE..."):
+                        # For raw text, we just pass it through or run a lighter text-only analysis
+                        st.session_state['temp_social_analysis'] = s_text
             
             # --- THE FEEDBACK LOOP ---
             if st.session_state['temp_social_analysis']:
@@ -3015,7 +3124,7 @@ elif app_mode == "BRAND ARCHITECT":
                             asset_name=profile_name,
                             score=100, # Baseline score for creation
                             verdict="SUCCESS",
-                            metadata={"method": "Wizard Generator"}
+                            metadata={"method": "Blueprint Generator"}
                         )
 
                         st.session_state['wiz_samples_list'] = []
@@ -3027,19 +3136,22 @@ elif app_mode == "BRAND ARCHITECT":
                         if "ResourceExhausted" in str(e): st.error("⚠️ AI QUOTA EXCEEDED: Please wait 60 seconds.")
                         else: st.error(f"Error: {e}")
 
-    with tab2:
+    # -----------------------------------------------------------
+    # TAB 2: IMPORT FROM PDF
+    # -----------------------------------------------------------
+    with main_tab2:
         st.markdown("### AUTO-FILL FROM GUIDELINES")
-        st.caption("Upload a PDF to automatically populate the Wizard fields.")
+        st.caption("Upload a PDF to automatically populate the Blueprint fields.")
         
         # The uploader needs the key match the callback
         st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
         
         # The button simply triggers the callback
-        st.button("EXTRACT & MAP TO WIZARD", type="primary", on_click=extract_and_map_pdf)
+        st.button("EXTRACT & MAP TO BLUEPRINT", type="primary", on_click=extract_and_map_pdf)
     
         # Display Messages based on the flags set in callback
         if st.session_state.get('extraction_success'):
-            st.success("✅ Extraction Complete! Switch to the 'WIZARD' tab to review.")
+            st.success("✅ Extraction Complete! Switch to the 'CREATE NEW BLUEPRINT' tab to review.")
             # Clear flag so it doesn't stay forever
             st.session_state['extraction_success'] = False
         
@@ -3047,702 +3159,614 @@ elif app_mode == "BRAND ARCHITECT":
             st.error(f"Extraction Error: {st.session_state['extraction_error']}")
             st.session_state['extraction_error'] = None
 
-# 7. BRAND MANAGER
-elif app_mode == "BRAND MANAGER":
-    st.title("BRAND MANAGER")
-    
-    # --- CSS INJECTION ---
-    st.markdown("""
-        <style>
-        div.stButton > button[kind="primary"] {
-            background-color: #ab8f59 !important;
-            color: #1b2a2e !important;
-            border: none !important;
-            font-weight: 800 !important;
-        }
-        div.stButton > button[kind="primary"]:hover {
-            background-color: #f0c05a !important;
-            color: #1b2a2e !important;
-        }
-        div.stButton > button[kind="primary"] p {
-            color: #1b2a2e !important;
-        }
-        .asset-box {
-            border: 1px solid #333;
-            background-color: #1E1E1E;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 4px;
-        }
-        .asset-header {
-            font-weight: bold;
-            color: #ab8f59;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- HELPERS ---
-    def process_image_for_storage(file_buffer):
-        """Resizes image and converts to base64 for storage."""
-        try:
-            import base64
-            from io import BytesIO
+    # -----------------------------------------------------------
+    # TAB 3: MANAGE LIBRARY (THE OLD MANAGER)
+    # -----------------------------------------------------------
+    with main_tab3:
+        st.markdown("### PROFILE LIBRARY")
+        st.caption("Edit, refine, and inject new assets into existing profiles.")
+        
+        if st.session_state['profiles']:
+            p_keys = list(st.session_state['profiles'].keys())
+            default_ix = 0
+            if st.session_state.get('active_profile_name') in p_keys:
+                default_ix = p_keys.index(st.session_state['active_profile_name'])
+            target = st.selectbox("SELECT PROFILE TO MANAGE", p_keys, index=default_ix)
+            profile_obj = st.session_state['profiles'][target]
             
-            # Reset buffer pointer
-            file_buffer.seek(0)
-            img = Image.open(file_buffer)
+            is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
+            final_text_view = profile_obj['final_text'] if is_structured else profile_obj
             
-            # Resize for thumbnail (Max 400px width)
-            base_width = 400
-            w_percent = (base_width / float(img.size[0]))
-            h_size = int((float(img.size[1]) * float(w_percent)))
-            img = img.resize((base_width, h_size), Image.Resampling.LANCZOS)
+            # --- VIEW MODES ---
+            view_tab1, view_tab2 = st.tabs(["EDITOR & INJECTOR", "LIVE PREVIEW"])
             
-            # Convert to Base64
-            buffered = BytesIO()
-            img.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            return f"data:image/png;base64,{img_str}"
-        except Exception:
-            return None
-
-    def parse_assets_from_text(text_blob):
-        """Splits the DNA text block into manageable assets based on headers."""
-        if not text_blob: return []
-        # Split by the divider line we used
-        raw_assets = text_blob.split("----------------\n")
-        parsed = []
-        for asset in raw_assets:
-            if "[ASSET:" in asset:
-                lines = asset.strip().split('\n')
-                header = lines[0] # [ASSET: TYPE - NAME]
+            with view_tab2:
+                st.markdown("### CURRENT BRAND KIT")
+                st.caption("This is the exact data the AI uses to generate content.")
+                st.text_area("READ-ONLY VIEW", value=final_text_view, height=600, disabled=True)
                 
-                # Extract Visual Data if present
-                img_data = None
-                clean_lines = []
-                for line in lines[1:]:
-                    if line.startswith("[VISUAL_REF:"):
-                        img_data = line.replace("[VISUAL_REF:", "").replace("]", "").strip()
-                    else:
-                        clean_lines.append(line)
-                
-                content = "\n".join(clean_lines)
-                parsed.append({
-                    "header": header, 
-                    "content": content, 
-                    "full_text": asset + "----------------\n",
-                    "image": img_data
-                })
-        return parsed
+                html_data = convert_to_html_brand_card(target, final_text_view)
+                st.download_button(label="DOWNLOAD HTML REPORT", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html")
 
-    def update_calibration_score(profile_obj):
-        """Recalculates the profile completeness score based on inputs."""
-        inputs = profile_obj.get('inputs', {})
-        score = 0
-        
-        # 1. Basics (40%) - The Strategy Layer
-        if inputs.get('wiz_name'): score += 10
-        if inputs.get('wiz_mission'): score += 10
-        if inputs.get('wiz_values'): score += 10
-        if inputs.get('wiz_archetype'): score += 10
-        
-        # 2. DNA Layers (60%) - The Asset Layer
-        has_social = len(inputs.get('social_dna', '')) > 20 or "[ASSET:" in inputs.get('social_dna', '')
-        has_voice = len(inputs.get('voice_dna', '')) > 20 or "[ASSET:" in inputs.get('voice_dna', '')
-        has_visual = len(inputs.get('visual_dna', '')) > 20 or "[ASSET:" in inputs.get('visual_dna', '')
-
-        if has_social: score += 20
-        if has_voice: score += 20
-        if has_visual: score += 20
-        
-        profile_obj['calibration_score'] = min(score, 100)
-        return profile_obj
-
-    if st.session_state['profiles']:
-        p_keys = list(st.session_state['profiles'].keys())
-        default_ix = 0
-        if st.session_state.get('active_profile_name') in p_keys:
-            default_ix = p_keys.index(st.session_state['active_profile_name'])
-        target = st.selectbox("PROFILE", p_keys, index=default_ix)
-        profile_obj = st.session_state['profiles'][target]
-        
-        is_structured = isinstance(profile_obj, dict) and "inputs" in profile_obj
-        final_text_view = profile_obj['final_text'] if is_structured else profile_obj
-        
-        # --- VIEW MODES ---
-        view_tab1, view_tab2 = st.tabs(["EDITOR", "LIVE PROFILE PREVIEW"])
-        
-        with view_tab2:
-            st.markdown("### CURRENT BRAND KIT")
-            st.caption("This is the exact data the AI uses to generate content.")
-            st.text_area("READ-ONLY VIEW", value=final_text_view, height=600, disabled=True)
-            
-            html_data = convert_to_html_brand_card(target, final_text_view)
-            st.download_button(label="DOWNLOAD HTML REPORT", data=html_data, file_name=f"{target.replace(' ', '_')}_BrandKit.html", mime="text/html")
-
-        with view_tab1:
-            st.divider()
-            
-            if is_structured:
-                inputs = profile_obj['inputs']
-                
-                # --- SAFETY INIT ---
-                # Ensure all required keys exist to prevent errors
-                for key in ['social_dna', 'voice_dna', 'visual_dna']:
-                    if key not in inputs: inputs[key] = ""
-                for key in ['palette_primary', 'palette_secondary', 'palette_accent']:
-                    if key not in inputs: inputs[key] = []
-                
-                # 1. STRATEGY
-                with st.expander("1. STRATEGY", expanded=True):
-                    new_name = st.text_input("BRAND NAME", inputs['wiz_name'], max_chars=100)
-                    idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
-                    def format_archetype_edit(option):
-                        if option in ARCHETYPE_INFO:
-                            return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
-                        return option
-
-                    new_arch = st.selectbox(
-                        "ARCHETYPE", 
-                        ARCHETYPES, 
-                        index=idx,
-                        format_func=format_archetype_edit
-                    )
-                    if new_arch:
-                        info = ARCHETYPE_INFO[new_arch]
-                        st.markdown(f"""
-                            <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
-                                <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
-                                <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    new_mission = st.text_area("MISSION", inputs['wiz_mission'], max_chars=2000)
-                    new_values = st.text_area("VALUES", inputs['wiz_values'], max_chars=2000)
-                
-                # 2. VOICE
-                with st.expander("2. VOICE"):
-                    new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'], max_chars=100)
-                
-                # 3. GUARDRAILS
-                with st.expander("3. GUARDRAILS"):
-                    new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'], max_chars=2000)
-
-                # 4. VISUAL IDENTITY (PALETTE) - NEW SECTION ADDED HERE
-                with st.expander("4. VISUAL IDENTITY (PALETTE)"):
-                    st.markdown("##### COLOR PALETTE")
-                    st.caption("Define the hex codes for the automated Visual Audit.")
-
-                    # PRIMARY COLORS
-                    st.markdown("**PRIMARY COLORS**")
-                    if not inputs['palette_primary']: inputs['palette_primary'] = []
-                    for i, color in enumerate(inputs['palette_primary']):
-                        c1, c2 = st.columns([4,1])
-                        with c1:
-                            new_color = st.color_picker(f"Primary {i+1}", color, key=f"mgr_p_{i}")
-                            inputs['palette_primary'][i] = new_color
-                        with c2:
-                            if st.button("REMOVE", key=f"mgr_del_p_{i}", type="secondary"):
-                                inputs['palette_primary'].pop(i)
-                                st.rerun()
-                    if st.button("ADD PRIMARY COLOR", key="mgr_add_p"):
-                        inputs['palette_primary'].append("#000000")
-                        st.rerun()
-
-                    st.markdown("---")
-                    
-                    # SECONDARY COLORS
-                    st.markdown("**SECONDARY COLORS**")
-                    if not inputs['palette_secondary']: inputs['palette_secondary'] = []
-                    for i, color in enumerate(inputs['palette_secondary']):
-                        c1, c2 = st.columns([4,1])
-                        with c1:
-                            new_color = st.color_picker(f"Secondary {i+1}", color, key=f"mgr_s_{i}")
-                            inputs['palette_secondary'][i] = new_color
-                        with c2:
-                            if st.button("REMOVE", key=f"mgr_del_s_{i}", type="secondary"):
-                                inputs['palette_secondary'].pop(i)
-                                st.rerun()
-                    if st.button("ADD SECONDARY COLOR", key="mgr_add_s"):
-                        inputs['palette_secondary'].append("#000000")
-                        st.rerun()
-
-                    st.markdown("---")
-
-                    # ACCENT COLORS
-                    st.markdown("**ACCENT COLORS**")
-                    if not inputs['palette_accent']: inputs['palette_accent'] = []
-                    for i, color in enumerate(inputs['palette_accent']):
-                        c1, c2 = st.columns([4,1])
-                        with c1:
-                            new_color = st.color_picker(f"Accent {i+1}", color, key=f"mgr_a_{i}")
-                            inputs['palette_accent'][i] = new_color
-                        with c2:
-                            if st.button("REMOVE", key=f"mgr_del_a_{i}", type="secondary"):
-                                inputs['palette_accent'].pop(i)
-                                st.rerun()
-                    if st.button("ADD ACCENT COLOR", key="mgr_add_a"):
-                        inputs['palette_accent'].append("#000000")
-                        st.rerun()
-                
-                # --- CALIBRATION & ASSETS ---
-                st.markdown("### CALIBRATION LAB & ASSET LIBRARY")
-                st.info("Upload assets to train the engine. View and manage uploaded assets in the lists below.")
-                
-                cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL MEDIA", "VOICE & TONE", "VISUAL ID"])
-                
-                # --- 1. SOCIAL INJECTOR ---
-                with cal_tab1:
-                    # UPLOAD SECTION
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
-                    with c2:
-                        cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
-                    
-                    if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
-                    
-                    if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
-                        with st.spinner("REVERSE ENGINEERING..."):
-                            img = Image.open(cal_img)
-                            st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
-                    
-                    if st.session_state['man_social_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150, max_chars=5000)
-                        if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            
-                            # Process Visual for Storage
-                            vis_ref = ""
-                            if cal_img:
-                                b64_img = process_image_for_storage(cal_img)
-                                if b64_img:
-                                    vis_ref = f"\n[VISUAL_REF: {b64_img}]"
-
-                            injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}{vis_ref}\n----------------\n"
-                            
-                            inputs['social_dna'] += injection
-                            
-                            # UPDATE SCORE
-                            profile_obj = update_calibration_score(profile_obj)
-                            
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_social_analysis'] = ""
-
-                            # LOG TO DB
-                            db.log_event(
-                                org_id=st.session_state.get('org_id', 'Unknown'),
-                                username=st.session_state.get('username', 'Unknown'),
-                                activity_type="ASSET INJECTION",
-                                asset_name=f"Social: {cal_platform}",
-                                score=profile_obj.get('calibration_score', 0),
-                                verdict="ADDED SOCIAL",
-                                metadata={"type": "social_dna", "content": edit_social[:50]+"..."}
-                            )
-
-                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
-                            st.rerun()
-                    
-                    # LIBRARY VIEW
-                    st.divider()
-                    st.markdown("#### ACTIVE ASSETS")
-                    social_assets = parse_assets_from_text(inputs['social_dna'])
-                    if social_assets:
-                        for i, asset in enumerate(social_assets):
-                            with st.container():
-                                st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_img, c_txt, c_del = st.columns([1, 3, 1])
-                                with c_img:
-                                    if asset['image']:
-                                        st.image(asset['image'], caption="Asset Thumbnail")
-                                    else:
-                                        st.caption("No Image")
-                                with c_txt:
-                                    with st.expander("View Analysis"):
-                                        st.text(asset['content'])
-                                with c_del:
-                                    if st.button("DELETE", key=f"del_soc_{i}", type="secondary"):
-                                        inputs['social_dna'] = inputs['social_dna'].replace(asset['full_text'], "")
-                                        profile_obj = update_calibration_score(profile_obj)
-                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-                                        
-                                        # LOG DELETION
-                                        db.log_event(
-                                            org_id=st.session_state.get('org_id', 'Unknown'),
-                                            username=st.session_state.get('username', 'Unknown'),
-                                            activity_type="ASSET DELETED",
-                                            asset_name=asset['header'],
-                                            score=profile_obj.get('calibration_score', 0),
-                                            verdict="REMOVED",
-                                            metadata={"type": "social_dna"}
-                                        )
-                                        st.rerun()
-                    else:
-                        st.caption("No social assets calibrated.")
-
-                # --- 2. VOICE INJECTOR (FORTIFICATION PROTOCOL) ---
-                with cal_tab2:
-                    c1, c2 = st.columns([1, 1])
-                    with c1:
-                        # THE 5 CLUSTERS
-                        VOICE_CLUSTERS = {
-                            "Corporate Affairs": {
-                                "role": "STANDARDIZATION & RECORD",
-                                "desc": "Upload Press Releases and Fact Sheets. Maintains objective accuracy and establishes the baseline narrative."
-                            },
-                            "Crisis & Response": {
-                                "role": "DEFENSE & MITIGATION",
-                                "desc": "Upload Holding Statements and Apologies. Fortifies reputation during volatility. Prioritizes empathy and rapid stabilization."
-                            },
-                            "Internal Leadership": {
-                                "role": "ALIGNMENT & MORALE",
-                                "desc": "Upload Memos and All-Hands updates. Strengthens cultural cohesion and transmits directives from the top down."
-                            },
-                            "Thought Leadership": {
-                                "role": "INFLUENCE & AUTHORITY",
-                                "desc": "Upload Op-Eds and Speeches. Penetrates new markets via argumentation and distinct perspective."
-                            },
-                            "Brand Marketing": {
-                                "role": "GROWTH & CONVERSION",
-                                "desc": "Upload Newsletters and Copy. Drives action through persuasion and benefit-driven framing."
-                            }
-                        }
-                        
-                        voice_type = st.selectbox("COMMUNICATION CLUSTER", list(VOICE_CLUSTERS.keys()), key="cal_type_voice")
-                        
-                        # THE EXPLAINER BLOCK (Dynamic)
-                        info = VOICE_CLUSTERS[voice_type]
-                        st.markdown(f"""
-                            <div style="background-color: #1b2a2e; border-left: 3px solid #ab8f59; padding: 15px; margin-top: 5px; margin-bottom: 20px;">
-                                <strong style="color: #ab8f59; font-size: 0.75rem; letter-spacing: 1px; display: block; margin-bottom: 5px;">{info['role']}</strong>
-                                <span style="color: #d0d0d0; font-size: 0.85rem; line-height: 1.4;">{info['desc']}</span>
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                        # TUNERS (Metadata only, not separate buckets)
-                        cc1, cc2 = st.columns(2)
-                        with cc1:
-                            voice_sender = st.text_input("SENDER (CONTEXT)", placeholder="e.g. CEO", key="cal_sender_voice")
-                        with cc2:
-                            voice_audience = st.text_input("AUDIENCE (TARGET)", placeholder="e.g. Investors", key="cal_audience_voice")
-                    
-                    with c2:
-                        v_file = st.file_uploader("UPLOAD SOURCE MATERIAL (PDF/DOCX/TXT)", type=["pdf", "docx", "txt"], key="cal_up_voice")
-                        st.caption("Engine requires 3+ samples per cluster for high fidelity.")
-                    
-                    if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
-                    
-                    if v_file and st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice"):
-                        with st.spinner("DECONSTRUCTING RHETORICAL PATTERNS..."):
-                            try:
-                                raw_txt = ""
-                                if v_file.type == "application/pdf":
-                                    raw_txt = logic_engine.extract_text_from_pdf(v_file)
-                                elif v_file.name.endswith(".docx"):
-                                    # PYTHON-DOCX HANDLER
-                                    import docx
-                                    doc = docx.Document(v_file)
-                                    raw_txt = "\n".join([para.text for para in doc.paragraphs])
-                                else:
-                                    raw_txt = str(v_file.read(), "utf-8")
-                                
-                                prompt = f"""
-                                TASK: Extract the 'Voice DNA' from this text.
-                                ROLE: Expert Linguist.
-                                CONTEXT: This belongs to the '{voice_type}' cluster.
-                                CONSTRAINTS: No chat. No emojis. Bullet points only.
-                                INPUT TEXT: {raw_txt[:10000]}
-                                OUTPUT FORMAT:
-                                - SYNTAX ARCHITECTURE: (e.g. Complex, Fragmented)
-                                - LEXICON TIER: (e.g. Academic, Slang, Corporate)
-                                - RHETORICAL MECHANICS: (e.g. Metaphors, Questions)
-                                - TONAL FREQUENCY: (e.g. Urgent, Calm, Witty)
-                                """
-                                st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
-                            except Exception as e:
-                                st.error(f"Analysis Failed: {e}")
-
-                    if st.session_state['man_voice_analysis']:
-                        st.markdown("#### ANALYSIS REVIEW")
-                        edit_voice = st.text_area("EXTRACTED PATTERNS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
-                        
-                        if st.button("CONFIRM & FORTIFY ENGINE", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            
-                            # UPDATED HEADER WITH NEW TAXONOMY
-                            header_meta = f"CLUSTER: {voice_type.upper()} | SENDER: {voice_sender.upper()} | AUDIENCE: {voice_audience.upper()}"
-                            injection = f"\n\n[ASSET: {header_meta} | SOURCE: {v_file.name} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
-                            
-                            inputs['voice_dna'] += injection
-                            
-                            # Update Score & DB
-                            profile_obj = update_calibration_score(profile_obj)
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_voice_analysis'] = ""
-
-                            # Log
-                            db.log_event(
-                                org_id=st.session_state.get('org_id', 'Unknown'),
-                                username=st.session_state.get('username', 'Unknown'),
-                                activity_type="ASSET INJECTION",
-                                asset_name=f"Voice: {voice_type}",
-                                score=profile_obj.get('calibration_score', 0),
-                                verdict="FORTIFIED",
-                                metadata={"cluster": voice_type}
-                            )
-
-                            st.success(f"Cluster Fortified. Calibration Score: {profile_obj.get('calibration_score', 0)}%.")
-                            st.rerun()
-
-                    # LIBRARY VIEW
-                    st.divider()
-                    st.markdown("#### ACTIVE ASSETS")
-                    voice_assets = parse_assets_from_text(inputs['voice_dna'])
-                    if voice_assets:
-                        for i, asset in enumerate(voice_assets):
-                            with st.container():
-                                st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_txt, c_del = st.columns([4,1])
-                                with c_txt:
-                                    with st.expander("View Analysis Content"):
-                                        st.text(asset['content'])
-                                with c_del:
-                                    if st.button("DELETE", key=f"del_voc_{i}", type="secondary"):
-                                        inputs['voice_dna'] = inputs['voice_dna'].replace(asset['full_text'], "")
-                                        profile_obj = update_calibration_score(profile_obj)
-                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-                                        
-                                        # LOG DELETION
-                                        db.log_event(
-                                            org_id=st.session_state.get('org_id', 'Unknown'),
-                                            username=st.session_state.get('username', 'Unknown'),
-                                            activity_type="ASSET DELETED",
-                                            asset_name=asset['header'],
-                                            score=profile_obj.get('calibration_score', 0),
-                                            verdict="REMOVED",
-                                            metadata={"type": "voice_dna"}
-                                        )
-                                        st.rerun()
-                    else:
-                        st.caption("No voice assets calibrated.")
-
-                # --- 3. VISUAL INJECTOR ---
-                with cal_tab3:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
-                    with c2:
-                        vis_file = st.file_uploader("UPLOAD VISUAL ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
-                    
-                    if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
-                    
-                    if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
-                        with st.spinner("ANALYZING DESIGN..."):
-                            img = Image.open(vis_file)
-                            st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
-                    
-                    if st.session_state['man_vis_analysis']:
-                        st.markdown("#### REVIEW FINDINGS")
-                        edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150, max_chars=5000)
-                        if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y-%m-%d")
-                            
-                            # Process Visual for Storage
-                            vis_ref = ""
-                            if vis_file:
-                                b64_img = process_image_for_storage(vis_file)
-                                if b64_img:
-                                    vis_ref = f"\n[VISUAL_REF: {b64_img}]"
-
-                            injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}{vis_ref}\n----------------\n"
-                            
-                            inputs['visual_dna'] += injection
-                            
-                            # UPDATE SCORE
-                            profile_obj = update_calibration_score(profile_obj)
-                            
-                            db.save_profile(st.session_state['user_id'], target, profile_obj)
-                            st.session_state['man_vis_analysis'] = ""
-
-                            # LOG TO DB
-                            db.log_event(
-                                org_id=st.session_state.get('org_id', 'Unknown'),
-                                username=st.session_state.get('username', 'Unknown'),
-                                activity_type="ASSET INJECTION",
-                                asset_name=f"Visual: {vis_type}",
-                                score=profile_obj.get('calibration_score', 0),
-                                verdict="ADDED VISUAL",
-                                metadata={"type": "visual_dna", "content": edit_vis[:50]+"..."}
-                            )
-
-                            st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
-                            st.rerun()
-
-                    # LIBRARY VIEW
-                    st.divider()
-                    st.markdown("#### ACTIVE ASSETS")
-                    vis_assets = parse_assets_from_text(inputs['visual_dna'])
-                    if vis_assets:
-                        for i, asset in enumerate(vis_assets):
-                            with st.container():
-                                st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
-                                c_img, c_txt, c_del = st.columns([1, 3, 1])
-                                with c_img:
-                                    if asset['image']:
-                                        st.image(asset['image'], caption="Asset Thumbnail")
-                                    else:
-                                        st.caption("No Image")
-                                with c_txt:
-                                    with st.expander("View Analysis"):
-                                        st.text(asset['content'])
-                                with c_del:
-                                    if st.button("DELETE", key=f"del_vis_{i}", type="secondary"):
-                                        inputs['visual_dna'] = inputs['visual_dna'].replace(asset['full_text'], "")
-                                        profile_obj = update_calibration_score(profile_obj)
-                                        db.save_profile(st.session_state['user_id'], target, profile_obj)
-
-                                        # LOG DELETION
-                                        db.log_event(
-                                            org_id=st.session_state.get('org_id', 'Unknown'),
-                                            username=st.session_state.get('username', 'Unknown'),
-                                            activity_type="ASSET DELETED",
-                                            asset_name=asset['header'],
-                                            score=profile_obj.get('calibration_score', 0),
-                                            verdict="REMOVED",
-                                            metadata={"type": "visual_dna"}
-                                        )
-                                        st.rerun()
-                    else:
-                        st.caption("No visual assets calibrated.")
-
+            with view_tab1:
                 st.divider()
+                
+                if is_structured:
+                    inputs = profile_obj['inputs']
+                    
+                    # --- SAFETY INIT ---
+                    for key in ['social_dna', 'voice_dna', 'visual_dna']:
+                        if key not in inputs: inputs[key] = ""
+                    for key in ['palette_primary', 'palette_secondary', 'palette_accent']:
+                        if key not in inputs: inputs[key] = []
+                    
+                    # 1. STRATEGY
+                    with st.expander("1. STRATEGY", expanded=True):
+                        new_name = st.text_input("BRAND NAME", inputs['wiz_name'], max_chars=100)
+                        idx = ARCHETYPES.index(inputs['wiz_archetype']) if inputs['wiz_archetype'] in ARCHETYPES else 0
+                        def format_archetype_edit(option):
+                            if option in ARCHETYPE_INFO:
+                                return f"{option} | {ARCHETYPE_INFO[option]['tagline']}"
+                            return option
 
-                # --- MANUAL EDITORS (ADVANCED) ---
-                with st.expander("MANUAL TEXT EDITORS (ADVANCED USERS)"):
-                    st.warning("Editing these raw fields directly may break the Asset Library headers above.")
-                    edit_tab1, edit_tab2, edit_tab3 = st.tabs(["RAW SOCIAL", "RAW VOICE", "RAW VISUAL"])
-                    with edit_tab1:
-                        inputs['social_dna'] = st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, max_chars=10000)
-                    with edit_tab2:
-                        inputs['voice_dna'] = st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, max_chars=10000)
-                    with edit_tab3:
-                        inputs['visual_dna'] = st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, max_chars=10000)
+                        new_arch = st.selectbox(
+                            "ARCHETYPE", 
+                            ARCHETYPES, 
+                            index=idx,
+                            format_func=format_archetype_edit
+                        )
+                        if new_arch:
+                            info = ARCHETYPE_INFO[new_arch]
+                            st.markdown(f"""
+                                <div style="background-color: rgba(36, 54, 59, 0.05); border-left: 3px solid #ab8f59; padding: 10px; margin-top: 5px; margin-bottom: 15px;">
+                                    <strong style="color: #24363b; display: block; margin-bottom: 4px;">THE AESTHETIC:</strong>
+                                    <span style="color: #5c6b61; font-size: 0.85rem;">{info['desc']}</span>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        new_mission = st.text_area("MISSION", inputs['wiz_mission'], max_chars=2000)
+                        new_values = st.text_area("VALUES", inputs['wiz_values'], max_chars=2000)
+                    
+                    # 2. VOICE
+                    with st.expander("2. VOICE"):
+                        new_tone = st.text_input("TONE KEYWORDS", inputs['wiz_tone'], max_chars=100)
+                    
+                    # 3. GUARDRAILS
+                    with st.expander("3. GUARDRAILS"):
+                        new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'], max_chars=2000)
 
-                if st.button("SAVE STRATEGY CHANGES", type="primary"):
-                    # 1. Update Standard Inputs
-                    profile_obj['inputs']['wiz_name'] = new_name
-                    profile_obj['inputs']['wiz_archetype'] = new_arch
-                    profile_obj['inputs']['wiz_mission'] = new_mission
-                    profile_obj['inputs']['wiz_values'] = new_values
-                    profile_obj['inputs']['wiz_tone'] = new_tone
-                    profile_obj['inputs']['wiz_guardrails'] = new_guard
-                    
-                    p_p = ", ".join(inputs['palette_primary'])
-                    p_s = ", ".join(inputs['palette_secondary'])
-                    p_a = ", ".join(inputs['palette_accent'])
-                    
-                    # 2. Update Score
-                    profile_obj = update_calibration_score(profile_obj)
-                    
-                    # 3. Rebuild Final Text (The Full Brand Kit)
-                    
-                    def clean_dna_for_llm(text):
-                        """Removes base64 images from text before sending to LLM context."""
-                        if not text: return ""
-                        lines = text.split('\n')
-                        clean = [l for l in lines if not l.startswith("[VISUAL_REF:")]
-                        return "\n".join(clean)
+                    # 4. VISUAL IDENTITY (PALETTE)
+                    with st.expander("4. VISUAL IDENTITY (PALETTE)"):
+                        st.markdown("##### COLOR PALETTE")
+                        st.caption("Define the hex codes for the automated Visual Audit.")
 
-                    new_text = f"""
-                    1. STRATEGY
-                    - Brand: {new_name}
-                    - Archetype: {new_arch}
-                    - Mission: {new_mission}
-                    - Values: {new_values}
-                    
-                    2. VOICE
-                    - Tone Keywords: {new_tone}
-                    
-                    [VOICE DNA & ASSETS]
-                    {clean_dna_for_llm(inputs['voice_dna'])}
-                    
-                    3. VISUALS
-                    - Primary: {p_p}
-                    - Secondary: {p_s}
-                    - Accents: {p_a}
-                    
-                    [VISUAL DNA & ASSETS]
-                    {clean_dna_for_llm(inputs['visual_dna'])}
-                    
-                    4. GUARDRAILS
-                    - {new_guard}
-                    
-                    5. SOCIAL DNA (CALIBRATION DATA)
-                    {clean_dna_for_llm(inputs['social_dna'])}
-                    """
-                    
-                    profile_obj['final_text'] = new_text
-                    st.session_state['profiles'][target] = profile_obj
-                    
-                    # 4. DB Commit
-                    db.save_profile(st.session_state['user_id'], target, profile_obj)
+                        # PRIMARY COLORS
+                        st.markdown("**PRIMARY COLORS**")
+                        if not inputs['palette_primary']: inputs['palette_primary'] = []
+                        for i, color in enumerate(inputs['palette_primary']):
+                            c1, c2 = st.columns([4,1])
+                            with c1:
+                                new_color = st.color_picker(f"Primary {i+1}", color, key=f"mgr_p_{i}")
+                                inputs['palette_primary'][i] = new_color
+                            with c2:
+                                if st.button("REMOVE", key=f"mgr_del_p_{i}", type="secondary"):
+                                    inputs['palette_primary'].pop(i)
+                                    st.rerun()
+                        if st.button("ADD PRIMARY COLOR", key="mgr_add_p"):
+                            inputs['palette_primary'].append("#000000")
+                            st.rerun()
 
-                    # LOG STRATEGY UPDATE
-                    db.log_event(
-                        org_id=st.session_state.get('org_id', 'Unknown'),
-                        username=st.session_state.get('username', 'Unknown'),
-                        activity_type="STRATEGY UPDATE",
-                        asset_name=target,
-                        score=profile_obj.get('calibration_score', 0),
-                        verdict="REFINED",
-                        metadata={"name": new_name, "arch": new_arch}
-                    )
+                        st.markdown("---")
+                        
+                        # SECONDARY COLORS
+                        st.markdown("**SECONDARY COLORS**")
+                        if not inputs['palette_secondary']: inputs['palette_secondary'] = []
+                        for i, color in enumerate(inputs['palette_secondary']):
+                            c1, c2 = st.columns([4,1])
+                            with c1:
+                                new_color = st.color_picker(f"Secondary {i+1}", color, key=f"mgr_s_{i}")
+                                inputs['palette_secondary'][i] = new_color
+                            with c2:
+                                if st.button("REMOVE", key=f"mgr_del_s_{i}", type="secondary"):
+                                    inputs['palette_secondary'].pop(i)
+                                    st.rerun()
+                        if st.button("ADD SECONDARY COLOR", key="mgr_add_s"):
+                            inputs['palette_secondary'].append("#000000")
+                            st.rerun()
+
+                        st.markdown("---")
+
+                        # ACCENT COLORS
+                        st.markdown("**ACCENT COLORS**")
+                        if not inputs['palette_accent']: inputs['palette_accent'] = []
+                        for i, color in enumerate(inputs['palette_accent']):
+                            c1, c2 = st.columns([4,1])
+                            with c1:
+                                new_color = st.color_picker(f"Accent {i+1}", color, key=f"mgr_a_{i}")
+                                inputs['palette_accent'][i] = new_color
+                            with c2:
+                                if st.button("REMOVE", key=f"mgr_del_a_{i}", type="secondary"):
+                                    inputs['palette_accent'].pop(i)
+                                    st.rerun()
+                        if st.button("ADD ACCENT COLOR", key="mgr_add_a"):
+                            inputs['palette_accent'].append("#000000")
+                            st.rerun()
                     
-                    st.success(f"Strategy Saved. Calibration Score: {profile_obj.get('calibration_score', 0)}%")
-                    st.rerun()
+                    # --- CALIBRATION & ASSETS ---
+                    st.markdown("### CALIBRATION LAB & ASSET LIBRARY")
+                    st.info("Upload assets to train the engine. View and manage uploaded assets in the lists below.")
+                    
+                    cal_tab1, cal_tab2, cal_tab3 = st.tabs(["SOCIAL MEDIA", "VOICE & TONE", "VISUAL ID"])
+                    
+                    # --- 1. SOCIAL INJECTOR ---
+                    with cal_tab1:
+                        # UPLOAD SECTION
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            cal_platform = st.selectbox("PLATFORM", ["LinkedIn", "X (Twitter)", "Instagram"], key="cal_plat")
+                            
+                            # --- NEW FEATURE: RAW TEXT INJECTOR ---
+                            use_raw_text = st.checkbox("I only have text (No Screenshot)", key="soc_raw_check")
+                            
+                        with c2:
+                            cal_img = None
+                            raw_post_text = None
+                            
+                            if not use_raw_text:
+                                cal_img = st.file_uploader("UPLOAD POST SCREENSHOT", type=["png", "jpg"], key="cal_up_social")
+                            else:
+                                raw_post_text = st.text_area("PASTE POST COPY", height=150, placeholder="Paste the full caption here...", key="soc_raw_text")
+                        
+                        if 'man_social_analysis' not in st.session_state: st.session_state['man_social_analysis'] = ""
+                        
+                        # LOGIC BRANCH: IMAGE vs TEXT
+                        if not use_raw_text:
+                            # IMAGE FLOW
+                            if cal_img and st.button(f"ANALYZE {cal_platform.upper()} POST", type="primary", key="btn_cal_social"):
+                                with st.spinner("REVERSE ENGINEERING..."):
+                                    img = Image.open(cal_img)
+                                    st.session_state['man_social_analysis'] = logic_engine.analyze_social_style(img)
+                        else:
+                            # TEXT FLOW (Just pass it through for formatting)
+                            if raw_post_text and st.button(f"INGEST TEXT POST", type="primary", key="btn_cal_soc_text"):
+                                st.session_state['man_social_analysis'] = raw_post_text
+                        
+                        if st.session_state['man_social_analysis']:
+                            st.markdown("#### REVIEW FINDINGS")
+                            edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150, max_chars=5000)
+                            if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                
+                                # Process Visual for Storage
+                                vis_ref = ""
+                                if cal_img:
+                                    b64_img = process_image_for_storage(cal_img)
+                                    if b64_img:
+                                        vis_ref = f"\n[VISUAL_REF: {b64_img}]"
 
-            else:
-                st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
-                new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500, max_chars=20000)
-                if st.button("SAVE RAW CHANGES"):
-                    st.session_state['profiles'][target] = new_raw
-                    db.save_profile(st.session_state['user_id'], target, new_raw)
+                                injection = f"\n\n[ASSET: {cal_platform.upper()} POST | DATE: {timestamp}]\n{edit_social}{vis_ref}\n----------------\n"
+                                
+                                inputs['social_dna'] += injection
+                                
+                                # UPDATE SCORE
+                                profile_obj = update_calibration_score(profile_obj)
+                                
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_social_analysis'] = ""
 
-                    # LOG RAW EDIT
-                    db.log_event(
-                        org_id=st.session_state.get('org_id', 'Unknown'),
-                        username=st.session_state.get('username', 'Unknown'),
-                        activity_type="STRATEGY UPDATE",
-                        asset_name=target,
-                        score=0,
-                        verdict="RAW EDIT",
-                        metadata={"type": "raw_text_override"}
-                    )
-                    st.success("SAVED")
+                                # LOG TO DB
+                                db.log_event(
+                                    org_id=st.session_state.get('org_id', 'Unknown'),
+                                    username=st.session_state.get('username', 'Unknown'),
+                                    activity_type="ASSET INJECTION",
+                                    asset_name=f"Social: {cal_platform}",
+                                    score=profile_obj.get('calibration_score', 0),
+                                    verdict="ADDED SOCIAL",
+                                    metadata={"type": "social_dna", "content": edit_social[:50]+"..."}
+                                )
 
-            if st.button("DELETE PROFILE"): 
-                del st.session_state['profiles'][target]
-                db.delete_profile(st.session_state['user_id'], target)
+                                st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
+                                st.rerun()
+                        
+                        # LIBRARY VIEW
+                        st.divider()
+                        st.markdown("#### ACTIVE ASSETS")
+                        social_assets = parse_assets_from_text(inputs['social_dna'])
+                        if social_assets:
+                            for i, asset in enumerate(social_assets):
+                                with st.container():
+                                    st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
+                                    c_img, c_txt, c_del = st.columns([1, 3, 1])
+                                    with c_img:
+                                        if asset['image']:
+                                            st.image(asset['image'], caption="Asset Thumbnail")
+                                        else:
+                                            st.caption("No Image")
+                                    with c_txt:
+                                        with st.expander("View Analysis"):
+                                            st.text(asset['content'])
+                                    with c_del:
+                                        if st.button("DELETE", key=f"del_soc_{i}", type="secondary"):
+                                            inputs['social_dna'] = inputs['social_dna'].replace(asset['full_text'], "")
+                                            profile_obj = update_calibration_score(profile_obj)
+                                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                            
+                                            # LOG DELETION
+                                            db.log_event(
+                                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                                username=st.session_state.get('username', 'Unknown'),
+                                                activity_type="ASSET DELETED",
+                                                asset_name=asset['header'],
+                                                score=profile_obj.get('calibration_score', 0),
+                                                verdict="REMOVED",
+                                                metadata={"type": "social_dna"}
+                                            )
+                                            st.rerun()
+                        else:
+                            st.caption("No social assets calibrated.")
 
-                # LOG DELETION
-                db.log_event(
-                    org_id=st.session_state.get('org_id', 'Unknown'),
-                    username=st.session_state.get('username', 'Unknown'),
-                    activity_type="PROFILE DELETED",
-                    asset_name=target,
-                    score=0,
-                    verdict="DESTROYED",
-                    metadata={}
-                )
-                st.rerun()
+                    # --- 2. VOICE INJECTOR (FORTIFICATION PROTOCOL) ---
+                    with cal_tab2:
+                        c1, c2 = st.columns([1, 1])
+                        with c1:
+                            # THE 5 CLUSTERS
+                            VOICE_CLUSTERS = {
+                                "Corporate Affairs": {
+                                    "role": "STANDARDIZATION & RECORD",
+                                    "desc": "Upload Press Releases and Fact Sheets. Maintains objective accuracy and establishes the baseline narrative."
+                                },
+                                "Crisis & Response": {
+                                    "role": "DEFENSE & MITIGATION",
+                                    "desc": "Upload Holding Statements and Apologies. Fortifies reputation during volatility. Prioritizes empathy and rapid stabilization."
+                                },
+                                "Internal Leadership": {
+                                    "role": "ALIGNMENT & MORALE",
+                                    "desc": "Upload Memos and All-Hands updates. Strengthens cultural cohesion and transmits directives from the top down."
+                                },
+                                "Thought Leadership": {
+                                    "role": "INFLUENCE & AUTHORITY",
+                                    "desc": "Upload Op-Eds and Speeches. Penetrates new markets via argumentation and distinct perspective."
+                                },
+                                "Brand Marketing": {
+                                    "role": "GROWTH & CONVERSION",
+                                    "desc": "Upload Newsletters and Copy. Drives action through persuasion and benefit-driven framing."
+                                }
+                            }
+                            
+                            voice_type = st.selectbox("COMMUNICATION CLUSTER", list(VOICE_CLUSTERS.keys()), key="cal_type_voice")
+                            
+                            # THE EXPLAINER BLOCK (Dynamic)
+                            info = VOICE_CLUSTERS[voice_type]
+                            st.markdown(f"""
+                                <div style="background-color: #1b2a2e; border-left: 3px solid #ab8f59; padding: 15px; margin-top: 5px; margin-bottom: 20px;">
+                                    <strong style="color: #ab8f59; font-size: 0.75rem; letter-spacing: 1px; display: block; margin-bottom: 5px;">{info['role']}</strong>
+                                    <span style="color: #d0d0d0; font-size: 0.85rem; line-height: 1.4;">{info['desc']}</span>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                            # TUNERS (Metadata only, not separate buckets)
+                            cc1, cc2 = st.columns(2)
+                            with cc1:
+                                voice_sender = st.text_input("SENDER (CONTEXT)", placeholder="e.g. CEO", key="cal_sender_voice")
+                            with cc2:
+                                voice_audience = st.text_input("AUDIENCE (TARGET)", placeholder="e.g. Investors", key="cal_audience_voice")
+                        
+                        with c2:
+                            # --- NEW FEATURE: VOICE TEXT PASTE ---
+                            voice_mode = st.radio("INPUT SOURCE", ["Upload File", "Paste Text"], horizontal=True, key="voice_input_mode")
+                            
+                            v_file = None
+                            v_text_input = None
+                            
+                            if voice_mode == "Upload File":
+                                # UPDATED FILE UPLOADER TO ACCEPT PDF AND DOCX
+                                v_file = st.file_uploader("UPLOAD (PDF/DOCX/TXT)", type=["pdf", "docx", "txt"], key="cal_up_voice")
+                                st.caption("Engine requires 3+ samples per cluster.")
+                            else:
+                                v_text_input = st.text_area("PASTE RAW CONTENT", height=200, placeholder="Paste article/email text here...", key="cal_paste_voice")
+                        
+                        if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
+                        
+                        if st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice"):
+                            # VALIDATION
+                            valid_input = False
+                            raw_txt = ""
+                            source_name = "Manual Paste"
+                            
+                            if voice_mode == "Upload File" and v_file:
+                                valid_input = True
+                                source_name = v_file.name
+                                try:
+                                    if v_file.type == "application/pdf":
+                                        raw_txt = logic_engine.extract_text_from_pdf(v_file)
+                                    elif v_file.name.endswith(".docx"):
+                                        import docx
+                                        doc = docx.Document(v_file)
+                                        raw_txt = "\n".join([para.text for para in doc.paragraphs])
+                                    else:
+                                        raw_txt = str(v_file.read(), "utf-8")
+                                except Exception as e:
+                                    st.error(f"Read Error: {e}")
+                                    valid_input = False
+                                    
+                            elif voice_mode == "Paste Text" and v_text_input:
+                                valid_input = True
+                                raw_txt = v_text_input
+                            
+                            if valid_input:
+                                with st.spinner("DECONSTRUCTING RHETORICAL PATTERNS..."):
+                                    try:
+                                        prompt = f"""
+                                        TASK: Extract the 'Voice DNA' from this text.
+                                        ROLE: Expert Linguist.
+                                        CONTEXT: This belongs to the '{voice_type}' cluster.
+                                        CONSTRAINTS: No chat. No emojis. Bullet points only.
+                                        INPUT TEXT: {raw_txt[:10000]}
+                                        OUTPUT FORMAT:
+                                        - SYNTAX ARCHITECTURE: (e.g. Complex, Fragmented)
+                                        - LEXICON TIER: (e.g. Academic, Slang, Corporate)
+                                        - RHETORICAL MECHANICS: (e.g. Metaphors, Questions)
+                                        - TONAL FREQUENCY: (e.g. Urgent, Calm, Witty)
+                                        """
+                                        # logic_engine handles the sanitization of 'prompt'
+                                        st.session_state['man_voice_analysis'] = logic_engine.generate_brand_rules(prompt)
+                                        st.session_state['temp_voice_source_name'] = source_name # Track source
+                                    except Exception as e:
+                                        st.error(f"Analysis Failed: {e}")
+                            else:
+                                st.warning("Please upload a file or paste text.")
+
+                        if st.session_state['man_voice_analysis']:
+                            st.markdown("#### ANALYSIS REVIEW")
+                            edit_voice = st.text_area("EXTRACTED PATTERNS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
+                            
+                            if st.button("CONFIRM & FORTIFY ENGINE", type="primary"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                source_ref = st.session_state.get('temp_voice_source_name', 'Unknown')
+                                
+                                # UPDATED HEADER WITH NEW TAXONOMY
+                                header_meta = f"CLUSTER: {voice_type.upper()} | SENDER: {voice_sender.upper()} | AUDIENCE: {voice_audience.upper()}"
+                                injection = f"\n\n[ASSET: {header_meta} | SOURCE: {source_ref} | DATE: {timestamp}]\n{edit_voice}\n----------------\n"
+                                
+                                inputs['voice_dna'] += injection
+                                
+                                # Update Score & DB
+                                profile_obj = update_calibration_score(profile_obj)
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_voice_analysis'] = ""
+
+                                # Log
+                                db.log_event(
+                                    org_id=st.session_state.get('org_id', 'Unknown'),
+                                    username=st.session_state.get('username', 'Unknown'),
+                                    activity_type="ASSET INJECTION",
+                                    asset_name=f"Voice: {voice_type}",
+                                    score=profile_obj.get('calibration_score', 0),
+                                    verdict="FORTIFIED",
+                                    metadata={"cluster": voice_type}
+                                )
+
+                                st.success(f"Cluster Fortified. Calibration Score: {profile_obj.get('calibration_score', 0)}%.")
+                                st.rerun()
+
+                        # LIBRARY VIEW
+                        st.divider()
+                        st.markdown("#### ACTIVE ASSETS")
+                        voice_assets = parse_assets_from_text(inputs['voice_dna'])
+                        if voice_assets:
+                            for i, asset in enumerate(voice_assets):
+                                with st.container():
+                                    st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
+                                    c_txt, c_del = st.columns([4,1])
+                                    with c_txt:
+                                        with st.expander("View Analysis Content"):
+                                            st.text(asset['content'])
+                                    with c_del:
+                                        if st.button("DELETE", key=f"del_voc_{i}", type="secondary"):
+                                            inputs['voice_dna'] = inputs['voice_dna'].replace(asset['full_text'], "")
+                                            profile_obj = update_calibration_score(profile_obj)
+                                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                            
+                                            # LOG DELETION
+                                            db.log_event(
+                                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                                username=st.session_state.get('username', 'Unknown'),
+                                                activity_type="ASSET DELETED",
+                                                asset_name=asset['header'],
+                                                score=profile_obj.get('calibration_score', 0),
+                                                verdict="REMOVED",
+                                                metadata={"type": "voice_dna"}
+                                            )
+                                            st.rerun()
+                        else:
+                            st.caption("No voice assets calibrated.")
+
+                    # --- 3. VISUAL INJECTOR ---
+                    with cal_tab3:
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            vis_type = st.selectbox("ASSET TYPE", ["Logo", "Iconography", "Website Screenshot", "Marketing Flyer", "Typography Spec"], key="cal_type_vis")
+                        with c2:
+                            vis_file = st.file_uploader("UPLOAD VISUAL ASSET (IMG)", type=["png", "jpg"], key="cal_up_vis")
+                        
+                        if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
+                        
+                        if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
+                            with st.spinner("ANALYZING DESIGN..."):
+                                img = Image.open(vis_file)
+                                st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
+                        
+                        if st.session_state['man_vis_analysis']:
+                            st.markdown("#### REVIEW FINDINGS")
+                            edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150, max_chars=5000)
+                            if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y-%m-%d")
+                                
+                                # Process Visual for Storage
+                                vis_ref = ""
+                                if vis_file:
+                                    b64_img = process_image_for_storage(vis_file)
+                                    if b64_img:
+                                        vis_ref = f"\n[VISUAL_REF: {b64_img}]"
+
+                                injection = f"\n\n[ASSET: {vis_type.upper()} | SOURCE: {vis_file.name} | DATE: {timestamp}]\n{edit_vis}{vis_ref}\n----------------\n"
+                                
+                                inputs['visual_dna'] += injection
+                                
+                                # UPDATE SCORE
+                                profile_obj = update_calibration_score(profile_obj)
+                                
+                                db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                st.session_state['man_vis_analysis'] = ""
+
+                                # LOG TO DB
+                                db.log_event(
+                                    org_id=st.session_state.get('org_id', 'Unknown'),
+                                    username=st.session_state.get('username', 'Unknown'),
+                                    activity_type="ASSET INJECTION",
+                                    asset_name=f"Visual: {vis_type}",
+                                    score=profile_obj.get('calibration_score', 0),
+                                    verdict="ADDED VISUAL",
+                                    metadata={"type": "visual_dna", "content": edit_vis[:50]+"..."}
+                                )
+
+                                st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
+                                st.rerun()
+
+                        # LIBRARY VIEW
+                        st.divider()
+                        st.markdown("#### ACTIVE ASSETS")
+                        vis_assets = parse_assets_from_text(inputs['visual_dna'])
+                        if vis_assets:
+                            for i, asset in enumerate(vis_assets):
+                                with st.container():
+                                    st.markdown(f"<div class='asset-box'><div class='asset-header'>{asset['header']}</div></div>", unsafe_allow_html=True)
+                                    c_img, c_txt, c_del = st.columns([1, 3, 1])
+                                    with c_img:
+                                        if asset['image']:
+                                            st.image(asset['image'], caption="Asset Thumbnail")
+                                        else:
+                                            st.caption("No Image")
+                                    with c_txt:
+                                        with st.expander("View Analysis"):
+                                            st.text(asset['content'])
+                                    with c_del:
+                                        if st.button("DELETE", key=f"del_vis_{i}", type="secondary"):
+                                            inputs['visual_dna'] = inputs['visual_dna'].replace(asset['full_text'], "")
+                                            profile_obj = update_calibration_score(profile_obj)
+                                            db.save_profile(st.session_state['user_id'], target, profile_obj)
+                                            
+                                            # LOG DELETION
+                                            db.log_event(
+                                                org_id=st.session_state.get('org_id', 'Unknown'),
+                                                username=st.session_state.get('username', 'Unknown'),
+                                                activity_type="ASSET DELETED",
+                                                asset_name=asset['header'],
+                                                score=profile_obj.get('calibration_score', 0),
+                                                verdict="REMOVED",
+                                                metadata={"type": "visual_dna"}
+                                            )
+                                            st.rerun()
+                        else:
+                            st.caption("No visual assets calibrated.")
+
+                    st.divider()
+
+                    # --- MANUAL EDITORS (ADVANCED) ---
+                    with st.expander("MANUAL TEXT EDITORS (ADVANCED USERS)"):
+                        st.warning("Editing these raw fields directly may break the Asset Library headers above.")
+                        edit_tab1, edit_tab2, edit_tab3 = st.tabs(["RAW SOCIAL", "RAW VOICE", "RAW VISUAL"])
+                        with edit_tab1:
+                            inputs['social_dna'] = st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, max_chars=10000)
+                        with edit_tab2:
+                            inputs['voice_dna'] = st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, max_chars=10000)
+                        with edit_tab3:
+                            inputs['visual_dna'] = st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, max_chars=10000)
+
+                    if st.button("SAVE STRATEGY CHANGES", type="primary"):
+                        # 1. Update Standard Inputs
+                        profile_obj['inputs']['wiz_name'] = new_name
+                        profile_obj['inputs']['wiz_archetype'] = new_arch
+                        profile_obj['inputs']['wiz_mission'] = new_mission
+                        profile_obj['inputs']['wiz_values'] = new_values
+                        profile_obj['inputs']['wiz_tone'] = new_tone
+                        profile_obj['inputs']['wiz_guardrails'] = new_guard
+                        
+                        p_p = ", ".join(inputs['palette_primary'])
+                        p_s = ", ".join(inputs['palette_secondary'])
+                        p_a = ", ".join(inputs['palette_accent'])
+                        
+                        # 2. Update Score
+                        profile_obj = update_calibration_score(profile_obj)
+                        
+                        # 3. Rebuild Final Text (The Full Brand Kit)
+                        
+                        def clean_dna_for_llm(text):
+                            """Removes base64 images from text before sending to LLM context."""
+                            if not text: return ""
+                            lines = text.split('\n')
+                            clean = [l for l in lines if not l.startswith("[VISUAL_REF:")]
+                            return "\n".join(clean)
+
+                        new_text = f"""
+                        1. STRATEGY
+                        - Brand: {new_name}
+                        - Archetype: {new_arch}
+                        - Mission: {new_mission}
+                        - Values: {new_values}
+                        
+                        2. VOICE
+                        - Tone Keywords: {new_tone}
+                        
+                        [VOICE DNA & ASSETS]
+                        {clean_dna_for_llm(inputs['voice_dna'])}
+                        
+                        3. VISUALS
+                        - Primary: {p_p}
+                        - Secondary: {p_s}
+                        - Accents: {p_a}
+                        
+                        [VISUAL DNA & ASSETS]
+                        {clean_dna_for_llm(inputs['visual_dna'])}
+                        
+                        4. GUARDRAILS
+                        - {new_guard}
+                        
+                        5. SOCIAL DNA (CALIBRATION DATA)
+                        {clean_dna_for_llm(inputs['social_dna'])}
+                        """
+                        
+                        profile_obj['final_text'] = new_text
+                        st.session_state['profiles'][target] = profile_obj
+                        
+                        # 4. DB Commit
+                        db.save_profile(st.session_state['user_id'], target, profile_obj)
+
+                        # LOG STRATEGY UPDATE
+                        db.log_event(
+                            org_id=st.session_state.get('org_id', 'Unknown'),
+                            username=st.session_state.get('username', 'Unknown'),
+                            activity_type="STRATEGY UPDATE",
+                            asset_name=target,
+                            score=profile_obj.get('calibration_score', 0),
+                            verdict="REFINED",
+                            metadata={"name": new_name, "arch": new_arch}
+                        )
+                        
+                        st.success(f"Strategy Saved. Calibration Score: {profile_obj.get('calibration_score', 0)}%")
+                        st.rerun()
+
+                else:
+                    st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
+                    new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500, max_chars=20000)
+                    if st.button("SAVE RAW CHANGES"):
+                        st.session_state['profiles'][target] = new_raw
+                        db.save_profile(st.session_state['
                 
 # ===================================================================
-# TEAM MANAGEMENT MODULE - COMPLETE REPLACEMENT
+# TEAM MANAGEMENT MODULE 
 # ===================================================================
 
 if app_mode == "TEAM MANAGEMENT":
@@ -4232,6 +4256,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
