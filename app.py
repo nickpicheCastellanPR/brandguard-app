@@ -1107,224 +1107,224 @@ def show_paywall():
 
 # 1. DASHBOARD
 if app_mode == "DASHBOARD":
-    st.title("BRAND COMMAND CENTER")
     
-    # --- TRIAL STATUS BANNER ---
-    if st.session_state.get('status') != 'active':
-        st.markdown("""
-            <div style='background-color: #1b2a2e; padding: 15px; border-radius: 4px; margin-bottom: 25px; border: 1px solid #3d3d3d; border-left: 5px solid #ab8f59;'>
-                <strong style='color: #ab8f59; letter-spacing: 1px;'>⚠️ TRIAL MODE ACTIVE</strong><br>
-                <span style='color: #a0a0a0; font-size: 0.9rem;'>
-                    You are operating on a restricted license. High-fidelity generation modules (Copy Editor, Visual Audit) are locked.<br>
-                    <a href="https://castellanpr.lemonsqueezy.com" target="_blank" style="color: #f5f5f0; text-decoration: underline; font-weight: bold;">Initialize Agency Subscription to unlock.</a>
-                </span>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # 1. Determine if the user is "New" (Has no profiles yet)
-    has_profiles = bool(st.session_state.get('profiles'))
+    # --- DATA RETRIEVAL ---
+    profiles = st.session_state.get('profiles', {})
+    active_profile_name = st.session_state.get('active_profile_name')
+    username = st.session_state.get('username')
+    org_id = st.session_state.get('org_id')
+    is_admin = st.session_state.get('is_admin', False)
     
-    # 2. Render the Expander (Clean Title, No Emoji)
-    with st.expander("QUICK START GUIDE: OPERATIONAL WORKFLOW", expanded=not has_profiles):
+    # --- EMPTY STATE: NEW USER (0 PROFILES) ---
+    if len(profiles) == 0:
         st.markdown("""
-        <div style='font-family: sans-serif; color: #f5f5f0; font-size: 0.95rem; line-height: 1.6;'>
-            <p><strong>Signet</strong> acts as your brand's digital gatekeeper. Here is the workflow:</p>
-            <ol style='margin-left: 20px;'>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>INITIALIZE:</strong> Create a Brand Profile using the 
-                    <em>Wizard</em> (for new brands) or <em>Upload Guide</em> (for existing PDFs).
-                </li>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>CALIBRATE:</strong> The engine scores your profile confidence. 
-                    <em>Note:</em> You can generate content immediately, but adding more samples increases the precision of the engine's audits and copy generation.
-                </li>
-                <li style='margin-bottom: 10px;'>
-                    <strong style='color: #ab8f59;'>EXECUTE:</strong> Once a profile is active, use the sidebar modules:
-                    <ul>
-                        <li><strong>Copy Editor:</strong> Paste a draft to rewrite it in your executive voice.</li>
-                        <li><strong>Visual Compliance:</strong> Upload an image to check hex codes against your palette.</li>
-                        <li><strong>Content Generator:</strong> Create new content from scratch.</li>
-                        <li><strong>Social Media Assistant:</strong> Generate platform-specific captions and hashtags.</li>
-                    </ul>
-                </li>
-            </ol>
+        <div style='text-align: center; padding: 60px 20px 40px 20px;'>
+            <h2 style='color: #ab8f59; margin-bottom: 20px; font-size: 2rem; letter-spacing: 0.1em;'>
+                BRAND GOVERNANCE BEGINS HERE
+            </h2>
+            <p style='font-size: 1.1rem; line-height: 1.6; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;'>
+                Signet measures signal degradation across your brand's publishing perimeter. 
+                To begin, build a Brand Profile containing your authoritative signal.
+            </p>
         </div>
-        """, unsafe_allow_html=True)     
-
-    # --- EXACT CSS RESTORATION ---
-    st.markdown("""<style>
-        div[data-testid*="Column"] .stButton button {
-            background: linear-gradient(135deg, #1b2a2e 0%, #111 100%) !important; border: 1px solid #3a4b50 !important; height: 250px !important; width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; color: #f5f5f0 !important; border-radius: 0px !important; box-shadow: none !important; padding-top: 50px !important; position: relative !important; white-space: pre-wrap !important;
-        }
-        div[data-testid*="Column"] .stButton button:hover { transform: translateY(-5px) !important; border-color: #ab8f59 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important; color: #ab8f59 !important; }
-        div[data-testid*="Column"] .stButton button p { font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0.1em; }
-        div[data-testid*="Column"]:nth-of-type(1) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; box-shadow: 5px 5px 0px #5c6b61; }
-        div[data-testid*="Column"]:nth-of-type(2) .stButton button::before { content: ''; position: absolute; top: 40px; width: 30px; height: 40px; border: 2px solid #ab8f59; background: linear-gradient(to bottom, transparent 20%, #ab8f59 20%, #ab8f59 25%, transparent 25%, transparent 40%, #ab8f59 40%, #ab8f59 45%, transparent 45%); }
-        div[data-testid*="Column"]:nth-of-type(3) .stButton button::before { content: ''; position: absolute; top: 40px; width: 40px; height: 40px; border: 2px solid #ab8f59; border-radius: 50%; background: radial-gradient(circle, #5c6b61 20%, transparent 21%); }
-    </style>""", unsafe_allow_html=True)
-
-    # --- ACTION BUTTONS ---
-    c1, c2, c3 = st.columns(3)
-    
-    with c1: 
-        # Using set_page to match our sidebar logic
-        st.button("\nCREATE PROFILE\nArchitect a new brand identity", on_click=set_page, args=("BRAND ARCHITECT",))
-    
-    with c2: 
-        if st.button("\nUPLOAD GUIDE\nIngest existing PDF rules"):
-            st.session_state['dashboard_upload_open'] = True
-            st.rerun()
-            
-    with c3:
-        # --- REPLACED: "ASTRA DYNAMICS" SYNTHETIC DEMO ---
-        if st.button("\nLOAD DEMO\nUse 'Astra Dynamics' Sample"):
-             demo_data = {
-                 "final_text": """
-                 1. STRATEGY
-                 Brand: ASTRA DYNAMICS
-                 Archetype: The Ruler (Control, Precision, Future)
-                 Mission: To architect the infrastructure of tomorrow through uncompromising aerospace engineering.
-                 Values: Absolute Precision, Zero Tolerance for Failure, Infinite Reach.
-                 
-                 2. VOICE
-                 Tone: Authoritative, Clinical, Minimalist.
-                 Keywords: Kinetic, Orbital, Systems-Level.
-                 Guardrails: Never use exclamation points. Never use slang. Always use active voice.
-                 
-                 3. VISUALS
-                 Primary Palette: #000000, #FFFFFF
-                 Secondary Palette: #FF4500 (Ignition Orange)
-                 Accent: #808080
-                 """,
-                 "inputs": {
-                     "wiz_name": "Astra Dynamics", 
-                     "wiz_archetype": "The Ruler", 
-                     "wiz_tone": "Clinical, Authoritative", 
-                     "wiz_mission": "Architecting the infrastructure of tomorrow.", 
-                     "wiz_values": "Precision, Zero Tolerance.",
-                     "wiz_guardrails": "No exclamation points. No slang.", 
-                     "palette_primary": ["#000000", "#FFFFFF"], 
-                     "palette_secondary": ["#FF4500"], 
-                     "palette_accent": ["#808080"],
-                     "social_dna": "[ASSET: LINKEDIN POST]\nAnalysis: High contrast imagery. Short, punchy sentences. Focus on engineering specs rather than marketing fluff.",
-                     "visual_dna": "Minimalist aerospace aesthetic. High contrast black and white."
-                 },
-                 "calibration_score": 100
-             }
-             
-             st.session_state['profiles']["Astra Dynamics (Demo)"] = demo_data
-             db.save_profile(st.session_state['user_id'], "Astra Dynamics (Demo)", demo_data)
-             st.session_state['active_profile_name'] = "Astra Dynamics (Demo)"
-             st.success("DEMO LOADED: ASTRA DYNAMICS")
-             st.rerun()
-
-    # --- UPLOAD DRAWER (Conditional) ---
-    if st.session_state.get('dashboard_upload_open'):
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.container():
-            st.markdown("""<div class="dashboard-card" style="border-left: 4px solid #f5f5f0; margin-bottom: 20px;"><h3 style="color: #f5f5f0; margin:0;">UPLOAD BRAND GUIDE (PDF)</h3><p style="color: #a0a0a0; margin:0;">The engine will extract Strategy, Voice, and Visual rules automatically.</p></div>""", unsafe_allow_html=True)
-            
-            dash_pdf = st.file_uploader("SELECT PDF", type=["pdf"], key="dash_pdf_uploader")
-            
-            if dash_pdf:
-                if st.button("PROCESS & INGEST", type="primary"):
-                    with st.spinner("ANALYZING PDF STRUCTURE..."):
-                        try:
-                            # FIX: Changed 'logic' to 'logic_engine' to match your global class instance
-                            raw_text = logic_engine.extract_text_from_pdf(dash_pdf)
-                            extracted_data = logic_engine.generate_brand_rules_from_pdf(raw_text)
-                            
-                            new_profile = {
-                                "inputs": {
-                                    "wiz_name": extracted_data.get("wiz_name", "New Brand"),
-                                    "wiz_archetype": extracted_data.get("wiz_archetype", "The Sage"),
-                                    "wiz_tone": extracted_data.get("wiz_tone", "Professional"),
-                                    "wiz_mission": extracted_data.get("wiz_mission", ""),
-                                    "wiz_values": extracted_data.get("wiz_values", ""),
-                                    "wiz_guardrails": extracted_data.get("wiz_guardrails", ""),
-                                    "palette_primary": extracted_data.get("palette_primary", ["#24363b"]),
-                                    "palette_secondary": extracted_data.get("palette_secondary", ["#ab8f59"]),
-                                    "palette_accent": ["#f5f5f0"]
-                                },
-                                "final_text": f"1. STRATEGY\nMission: {extracted_data.get('wiz_mission')}\nValues: {extracted_data.get('wiz_values')}\n\n2. VOICE\nTone: {extracted_data.get('wiz_tone')}\nSample: {extracted_data.get('writing_sample')}"
-                            }
-                            
-                            profile_name = f"{extracted_data.get('wiz_name')} (PDF)"
-                            db.save_profile(st.session_state['user_id'], profile_name, new_profile)
-                            st.session_state['profiles'][profile_name] = new_profile
-                            st.session_state['active_profile_name'] = profile_name
-                            
-                            st.success(f"SUCCESS: {profile_name} ingested.")
-                            st.session_state['dashboard_upload_open'] = False
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-            
-            if st.button("CANCEL UPLOAD"):
-                st.session_state['dashboard_upload_open'] = False
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("BUILD BRAND PROFILE", use_container_width=True, type="primary"):
+                st.session_state['app_mode'] = "BRAND ARCHITECT"
                 st.rerun()
-        st.divider()
-
-    # --- ACTIVITY FEED (REAL-TIME DB STUDIO MODE) ---
-    st.divider()
-    c_head, c_org = st.columns([3, 1])
-    with c_head: st.markdown("### OPERATIONAL LOG")
-    with c_org: 
-        current_org = st.session_state.get('org_id', 'Unknown')
-        st.caption(f"ORG: {current_org.upper()}")
+        
+        st.markdown("""
+        <div style='max-width: 600px; margin: 40px auto 0 auto; padding: 20px; border-left: 3px solid #5c6b61;'>
+            <p style='margin-bottom: 10px; font-weight: 600; color: #ab8f59;'>A Brand Profile contains:</p>
+            <ul style='line-height: 1.8;'>
+                <li>Voice DNA (3-5 gold-standard text assets)</li>
+                <li>Visual Standards (color palette, logo specifications)</li>
+                <li>Strategic Foundation (mission, values, guardrails)</li>
+            </ul>
+            <p style='margin-top: 20px; color: #5c6b61;'>
+                Once calibrated, governance modules become operational.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.stop()  # Don't show the rest of dashboard
     
-    # FETCH REAL DATA FROM DB
-    logs = db.get_org_logs(current_org)
+    # --- RETURNING USER STATE (1+ PROFILES) ---
+    st.title("COMMAND CENTER")
     
-    if not logs:
-        st.info("No agency activity recorded yet.")
+    # Profile selector (auto-select if only one profile)
+    if len(profiles) == 1:
+        selected_profile = list(profiles.keys())[0]
+        st.info(f"Using profile: **{selected_profile}**")
+        st.session_state['active_profile_name'] = selected_profile
     else:
-        for entry in logs:
-            # Render Row
-            score = entry['score']
-            color = "#ff4b4b"
-            if score > 60: color = "#ffa421"
-            if score > 85: color = "#09ab3b"
+        selected_profile = st.selectbox(
+            "SELECT BRAND PROFILE",
+            list(profiles.keys()),
+            index=list(profiles.keys()).index(active_profile_name) if active_profile_name in profiles else 0
+        )
+        st.session_state['active_profile_name'] = selected_profile
+    
+    current_profile = profiles[selected_profile]
+    
+    # Calculate calibration data
+    cal_data = calculate_calibration_score(current_profile)
+    
+    # --- THREE-COLUMN LAYOUT ---
+    col_left, col_center, col_right = st.columns([1.2, 1.5, 1.3])
+    
+    # ========================================
+    # LEFT COLUMN: PROFILE STATUS
+    # ========================================
+    with col_left:
+        st.markdown("### PROFILE STATUS")
+        
+        # Calibration Score Display
+        score = cal_data.get('score', 0)
+        status_label = cal_data.get('status_label', 'UNKNOWN')
+        
+        # Color coding (using approved colors)
+        if score < 40:
+            color = "#bd0000"  # Red
+        elif score < 80:
+            color = "#eeba2b"  # Orange
+        else:
+            color = "#5c6b61"  # Green
+        
+        st.markdown(f"""
+        <div style='background: rgba(27, 42, 46, 0.6); padding: 20px; border-left: 4px solid {color}; margin-bottom: 20px;'>
+            <div style='font-size: 0.9rem; color: #ab8f59; margin-bottom: 5px;'>CALIBRATION</div>
+            <div style='font-size: 2rem; font-weight: 800; color: {color};'>{score}%</div>
+            <div style='font-size: 0.85rem; color: #5c6b61; margin-top: 5px;'>{status_label}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Cluster Status
+        cluster_health = cal_data.get('clusters', {})
+        
+        if cluster_health:
+            st.markdown("**VOICE CLUSTER STATUS:**")
             
-            # User Badge Color Logic
-            user_badge_color = "#3d3d3d"
-            if "Sarah" in entry['username']: user_badge_color = "#ab8f59" # Gold for Admin (example)
+            cluster_display_names = {
+                "Corporate": "Corporate Affairs",
+                "Crisis": "Crisis & Response",
+                "Internal": "Internal Leadership",
+                "Thought": "Thought Leadership",
+                "Marketing": "Brand Marketing"
+            }
             
-            st.markdown(f"""
-                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; margin-bottom: 5px;">
-                    <div style="flex: 1; color: #5c6b61; font-size: 0.8rem;">{entry['timestamp']}</div>
-                    <div style="flex: 2; font-weight: bold; color: #f5f5f0;">
-                         <span style="background:{user_badge_color}; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">{entry['username']}</span>
-                    </div>
-                    <div style="flex: 2; font-weight: bold; color: #a0a0a0; font-size: 0.8rem;">{entry['activity_type']}</div>
-                    <div style="flex: 3; color: #f5f5f0;">{entry['asset_name']}</div>
-                    <div style="flex: 2; color: {color}; font-weight: 800;">{entry['verdict']} ({score})</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Action Button (Snapshot)
-            if st.button("LOAD SNAPSHOT", key=f"restore_{entry['id']}"):
-                if entry['activity_type'] == "VISUAL AUDIT":
-                    import ast
-                    raw_data = entry['metadata_json']
+            for key, full_name in cluster_display_names.items():
+                if key in cluster_health:
+                    data = cluster_health[key]
+                    count = data.get('count', 0)
+                    icon = data.get('icon', '❌')
                     
-                    if isinstance(raw_data, str):
-                        try:
-                            # ast.literal_eval is safer than eval() for parsing python dict strings
-                            restored_data = ast.literal_eval(raw_data)
-                        except Exception as e:
-                            st.error(f"Corrupted Snapshot Data: {e}")
-                            restored_data = {}
+                    st.markdown(f"{icon} {full_name} ({count} assets)")
+        
+        # Engine Readiness Summary
+        st.markdown("---")
+        st.markdown("**ENGINE READINESS:**")
+        
+        fortified_clusters = [
+            cluster_display_names.get(key, key) 
+            for key, data in cluster_health.items() 
+            if data.get('count', 0) >= 3
+        ]
+        
+        if fortified_clusters:
+            st.markdown("Calibrated for content generation and copy review in:")
+            for cluster in fortified_clusters:
+                st.markdown(f"• {cluster}")
+        else:
+            st.warning("Engine requires 3+ assets per cluster for reliable output.")
+        
+        # Show next fortification target
+        unstable_clusters = [
+            (key, data) 
+            for key, data in cluster_health.items() 
+            if data.get('count', 0) > 0 and data.get('count', 0) < 3
+        ]
+        
+        if unstable_clusters:
+            key, data = unstable_clusters[0]
+            needed = 3 - data.get('count', 0)
+            cluster_name = cluster_display_names.get(key, key)
+            st.info(f"⚠️ Add {needed} more {cluster_name} asset{'s' if needed > 1 else ''} to fortify this cluster.")
+    
+    # ========================================
+    # CENTER COLUMN: GOVERNANCE MODULES
+    # ========================================
+    with col_center:
+        st.markdown("### GOVERNANCE MODULES")
+        
+        module_descriptions = {
+            "VISUAL COMPLIANCE": "Audit images against palette standards",
+            "COPY EDITOR": "Enforce voice across written content",
+            "CONTENT GENERATOR": "Generate brand-calibrated copy",
+            "SOCIAL MEDIA ASSISTANT": "Cross-channel consistency analysis"
+        }
+        
+        for module_name, description in module_descriptions.items():
+            if st.button(module_name, use_container_width=True):
+                st.session_state['app_mode'] = module_name
+                st.rerun()
+            st.caption(description)
+            st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+    
+    # ========================================
+    # RIGHT COLUMN: RECENT OPERATIONS
+    # ========================================
+    with col_right:
+        st.markdown("### RECENT OPERATIONS")
+        
+        # Fetch activity logs
+        try:
+            logs = db.get_org_logs(org_id, limit=10)
+            
+            # Filter for non-admins (show only their activity)
+            if not is_admin:
+                logs = [log for log in logs if log.get('username') == username]
+            
+            if logs:
+                for log in logs:
+                    timestamp = log.get('timestamp', '')
+                    activity = log.get('activity_type', 'UNKNOWN')
+                    verdict = log.get('verdict', '')
+                    score = log.get('score', 0)
+                    asset = log.get('asset_name', '')
+                    
+                    # Format display based on activity type
+                    if 'VISUAL' in activity:
+                        detail = f"PASS ({score}%)" if score > 60 else f"FAIL ({score}%)"
+                    elif 'EDIT' in activity or 'COPY' in activity:
+                        detail = verdict
+                    elif 'GENERATION' in activity or 'CONTENT' in activity:
+                        metadata = json.loads(log.get('metadata_json', '{}'))
+                        word_count = metadata.get('word_count', 'N/A')
+                        detail = f"{word_count} words" if isinstance(word_count, int) else verdict
                     else:
-                        restored_data = raw_data
+                        detail = verdict
                     
-                    st.session_state['active_audit_result'] = restored_data
-                    # Note: We can't restore the image itself from a text log unless we stored base64.
-                    # For Beta, we just restore the data.
-                    
-                    # Redirect
-                    st.session_state['app_mode'] = "VISUAL COMPLIANCE"
-                    st.rerun()
+                    st.markdown(f"""
+                    <div style='background: rgba(27, 42, 46, 0.4); padding: 10px; margin-bottom: 8px; border-left: 2px solid #5c6b61;'>
+                        <div style='font-size: 0.75rem; color: #ab8f59;'>{timestamp} │ {activity}</div>
+                        <div style='font-size: 0.85rem; margin-top: 4px;'>└─ {detail}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No recent activity logged.")
+        
+        except Exception as e:
+            st.error(f"Error loading activity log: {e}")
+        
+        # View full log button
+        if st.button("VIEW FULL LOG", use_container_width=True):
+            # Check if full log view exists in current app
+            # If not, just show message for now
+            st.info("Full log view: Coming soon")
+
             
 # 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
 elif app_mode == "VISUAL COMPLIANCE":
@@ -3755,6 +3755,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
