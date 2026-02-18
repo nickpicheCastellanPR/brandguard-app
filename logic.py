@@ -169,7 +169,7 @@ class SignetLogic:
         if not client:
             raise ValueError("ANTHROPIC_API_KEY environment variable not set")
         self.client = client
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-3-5-sonnet-20240620" # Updated to latest stable Sonnet model
 
     def _safe_generate(self, system_msg, user_msg, max_tokens=4000):
         """
@@ -201,12 +201,21 @@ class SignetLogic:
                     time.sleep(wait_time)
                     continue
                 else:
-                    return "⚠️ System Busy: The AI is currently overloaded. Please wait 30 seconds and try again."
+                    return "⚠️ System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
+            except anthropic.APIStatusError as e:
+                # Handle credit balance/billing specifically
+                error_str = str(e).lower()
+                if "credit balance is too low" in error_str:
+                     return "⚠️ System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
+                if attempt < max_retries - 1:
+                     time.sleep(1) # Short wait for 500 errors
+                     continue
+                return f"System Error: {str(e)}"
             except Exception as e:
                 print(f"Claude API Error: {e}")
                 return f"Error: {str(e)}"
         
-        return "Error: Max retries exceeded"
+        return "Error: Request timed out after multiple retries."
 
     def _safe_generate_with_vision(self, system_msg, text_prompt, images, max_tokens=4000):
         """
@@ -263,12 +272,21 @@ class SignetLogic:
                     time.sleep(wait_time)
                     continue
                 else:
-                    return "⚠️ System Busy: The AI is currently overloaded. Please wait 30 seconds and try again."
+                    return "⚠️ System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
+            except anthropic.APIStatusError as e:
+                # Handle credit balance/billing specifically
+                error_str = str(e).lower()
+                if "credit balance is too low" in error_str:
+                     return "⚠️ System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
+                if attempt < max_retries - 1:
+                     time.sleep(1) # Short wait for 500 errors
+                     continue
+                return f"System Error: {str(e)}"
             except Exception as e:
                 print(f"Claude Vision API Error: {e}")
                 return f"Error: {str(e)}"
         
-        return "Error: Max retries exceeded"
+        return "Error: Request timed out after multiple retries."
 
     def analyze_social_style(self, image):
         """
@@ -409,6 +427,17 @@ OUTPUT FORMAT: Return a PURE JSON object (no markdown) with these exact keys:
             # Call vision API
             response_text = self._safe_generate_with_vision(system_msg, text_prompt, images_to_analyze)
             
+            # Catch API errors returned as text
+            if "System Alert" in response_text or "System Busy" in response_text:
+                 return {
+                    "score": 0, 
+                    "verdict": "SYSTEM BUSY", 
+                    "breakdown": {}, 
+                    "critical_fixes": [response_text], 
+                    "minor_fixes": [], 
+                    "brand_wins": []
+                }
+
             txt = response_text.replace("```json", "").replace("```", "").strip()
             ai_result = json.loads(txt)
             
@@ -509,6 +538,18 @@ wiz_name, wiz_archetype, wiz_mission, wiz_values, wiz_tone, wiz_guardrails, pale
         
         try:
             response = self._safe_generate(system_msg, user_msg)
+            
+            # Catch API errors
+            if "System Alert" in response or "System Busy" in response:
+                 return {
+                     "wiz_name": "System Alert", 
+                     "wiz_mission": response, 
+                     "wiz_archetype": "System Alert",
+                     "palette_primary": [],
+                     "palette_secondary": [],
+                     "writing_sample": "" 
+                 }
+
             cleaned = response.replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned)
         except Exception as e:
