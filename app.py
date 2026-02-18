@@ -1137,9 +1137,225 @@ with st.sidebar:
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("BRAND MANAGER", width="stretch", on_click=set_page, args=("BRAND MANAGER",))
     
-    # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
-    if st.session_state.get('is_admin', False) or raw_user == "NICK_ADMIN":
-         st.button("TEAM MANAGEMENT", width="stretch", on_click=set_page, args=("TEAM MANAGEMENT",))
+# ===================================================================
+# TEAM MANAGEMENT MODULE - COMPLETE REPLACEMENT
+# ===================================================================
+
+if app_mode == "TEAM MANAGEMENT":
+    st.title("TEAM MANAGEMENT")
+    
+    # Check permissions
+    if not st.session_state.get('is_admin', False) and raw_user != "NICK_ADMIN":
+        st.error("ACCESS DENIED. This area is restricted to Organization Admins.")
+        st.stop()
+        
+    current_org = st.session_state.get('org_id', 'Unknown')
+    current_username = st.session_state.get('username')
+    
+    # Get subscription status for seat limits
+    user_status = db.get_user_status(current_username)
+    seat_limits = {
+        "trial": 1,
+        "solo": 1,
+        "agency": 5,
+        "enterprise": 20
+    }
+    max_seats = seat_limits.get(user_status, 1)
+    
+    st.markdown(f"**ORGANIZATION:** {current_org}")
+    st.markdown(f"**SUBSCRIPTION TIER:** {user_status.upper()}")
+    st.divider()
+    
+    # Get current team members
+    users = db.get_users_by_org(current_org)
+    current_seats = len(users) if users else 0
+    
+    # --- SEAT USAGE INDICATOR ---
+    st.markdown(f"### SEAT USAGE: {current_seats} / {max_seats}")
+    
+    # Visual progress bar
+    usage_pct = (current_seats / max_seats) * 100 if max_seats > 0 else 0
+    if usage_pct < 70:
+        bar_color = "#5c6b61"  # Green
+    elif usage_pct < 90:
+        bar_color = "#eeba2b"  # Orange
+    else:
+        bar_color = "#bd0000"  # Red
+    
+    st.markdown(f"""
+    <div style='background: rgba(27, 42, 46, 0.6); height: 30px; border: 1px solid #5c6b61; position: relative;'>
+        <div style='background: {bar_color}; height: 100%; width: {usage_pct}%;'></div>
+        <div style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    color: #f5f5f0; font-weight: 700; font-size: 0.85rem;'>
+            {current_seats} / {max_seats} SEATS
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
+    
+    # --- TWO COLUMN LAYOUT ---
+    col_team, col_actions = st.columns([2.5, 1.5])
+    
+    # ========================================
+    # LEFT: TEAM ROSTER
+    # ========================================
+    with col_team:
+        st.markdown("### TEAM ROSTER")
+        
+        if users:
+            import pandas as pd
+            df = pd.DataFrame(users, columns=["USERNAME", "EMAIL", "IS_ADMIN", "CREATED_AT"])
+            
+            # Format role column
+            df['ROLE'] = df['IS_ADMIN'].apply(lambda x: "ADMIN" if x else "MEMBER")
+            df = df[["USERNAME", "EMAIL", "ROLE", "CREATED_AT"]]
+            
+            st.dataframe(df, hide_index=True, use_container_width=True)
+            
+            # --- ACTION BUTTONS FOR EACH USER ---
+            st.markdown("### MANAGE MEMBERS")
+            
+            for idx, user in enumerate(users):
+                username = user[0]
+                email = user[1]
+                is_user_admin = bool(user[2])
+                
+                # Skip current user (can't manage yourself)
+                if username == current_username:
+                    st.info(f"**{username}** (You) - Cannot manage your own account")
+                    continue
+                
+                with st.expander(f"**{username}** ({email})"):
+                    action_col1, action_col2, action_col3 = st.columns(3)
+                    
+                    # Promote/Demote
+                    with action_col1:
+                        if is_user_admin:
+                            # Check if this is the last admin
+                            admin_count = sum(1 for u in users if u[2])
+                            if admin_count <= 1:
+                                st.warning("Cannot demote last admin")
+                            else:
+                                if st.button(f"Demote to Member", key=f"demote_{idx}"):
+                                    conn = sqlite3.connect(db.DB_NAME)
+                                    conn.execute("UPDATE users SET is_admin = 0 WHERE username = ?", (username,))
+                                    conn.commit()
+                                    conn.close()
+                                    st.success(f"{username} demoted to Member")
+                                    st.rerun()
+                        else:
+                            if st.button(f"Promote to Admin", key=f"promote_{idx}"):
+                                conn = sqlite3.connect(db.DB_NAME)
+                                conn.execute("UPDATE users SET is_admin = 1 WHERE username = ?", (username,))
+                                conn.commit()
+                                conn.close()
+                                st.success(f"{username} promoted to Admin")
+                                st.rerun()
+                    
+                    # Reset Password
+                    with action_col2:
+                        if st.button(f"Reset Password", key=f"reset_{idx}"):
+                            st.session_state[f'reset_password_for_{username}'] = True
+                        
+                        if st.session_state.get(f'reset_password_for_{username}', False):
+                            new_pass = st.text_input(f"New temp password for {username}", type="password", key=f"newpw_{idx}")
+                            if st.button(f"Confirm Reset", key=f"confirm_reset_{idx}"):
+                                if new_pass:
+                                    from argon2 import PasswordHasher
+                                    ph = PasswordHasher()
+                                    hashed = ph.hash(new_pass)
+                                    conn = sqlite3.connect(db.DB_NAME)
+                                    conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hashed, username))
+                                    conn.commit()
+                                    conn.close()
+                                    st.success(f"Password reset for {username}")
+                                    st.session_state[f'reset_password_for_{username}'] = False
+                                    st.rerun()
+                                else:
+                                    st.warning("Enter new password")
+                    
+                    # Remove User
+                    with action_col3:
+                        if st.button(f"Remove User", key=f"remove_{idx}", type="secondary"):
+                            st.session_state[f'confirm_remove_{username}'] = True
+                        
+                        if st.session_state.get(f'confirm_remove_{username}', False):
+                            st.warning(f"⚠️ Confirm removal of {username}?")
+                            conf_col1, conf_col2 = st.columns(2)
+                            with conf_col1:
+                                if st.button("Yes, Remove", key=f"yes_remove_{idx}"):
+                                    # Delete user
+                                    conn = sqlite3.connect(db.DB_NAME)
+                                    conn.execute("DELETE FROM users WHERE username = ?", (username,))
+                                    conn.commit()
+                                    conn.close()
+                                    st.success(f"{username} removed from organization")
+                                    st.session_state[f'confirm_remove_{username}'] = False
+                                    st.rerun()
+                            with conf_col2:
+                                if st.button("Cancel", key=f"cancel_remove_{idx}"):
+                                    st.session_state[f'confirm_remove_{username}'] = False
+                                    st.rerun()
+        else:
+            st.info("No team members found. Start by adding a user.")
+    
+    # ========================================
+    # RIGHT: ADD NEW MEMBER
+    # ========================================
+    with col_actions:
+        st.markdown("### ADD TEAM MEMBER")
+        
+        # Check if seats available
+        if current_seats >= max_seats:
+            st.error(f"⚠️ SEAT LIMIT REACHED")
+            st.markdown(f"Your {user_status.upper()} tier allows {max_seats} seat(s).")
+            st.markdown("Upgrade your subscription to add more team members.")
+        else:
+            seats_remaining = max_seats - current_seats
+            st.info(f"{seats_remaining} seat(s) available")
+            
+            with st.form("add_team_member"):
+                new_user = st.text_input("USERNAME", max_chars=64)
+                new_email = st.text_input("EMAIL", max_chars=120)
+                new_pass = st.text_input("TEMP PASSWORD", type="password", max_chars=64)
+                make_admin = st.checkbox("Grant Admin Access")
+                submitted = st.form_submit_button("CREATE SEAT", use_container_width=True)
+                
+                if submitted:
+                    if new_user and new_pass and new_email:
+                        # Validate email format (basic)
+                        if "@" not in new_email or "." not in new_email:
+                            st.error("Invalid email format")
+                        else:
+                            # CREATE USER LINKED TO CURRENT ORG
+                            if db.create_user(new_user, new_email, new_pass, org_id=current_org, is_admin=make_admin):
+                                role = "Admin" if make_admin else "Member"
+                                st.success(f"✓ {new_user} added as {role}")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("Failed: Username exists OR seat limit reached")
+                    else:
+                        st.warning("All fields required")
+        
+        st.markdown("---")
+        st.markdown("### SUBSCRIPTION INFO")
+        tier_info = {
+            "trial": "1 seat, limited features",
+            "solo": "1 seat, full platform",
+            "agency": "5 seats, team features",
+            "enterprise": "20 seats, premium support"
+        }
+        st.caption(f"**{user_status.upper()}:** {tier_info.get(user_status, 'Contact support')}")
+        
+        if st.button("Upgrade Subscription", use_container_width=True):
+            st.info("Contact sales@castellanpr.com to upgrade")
+
+# ===================================================================
+# END OF TEAM MANAGEMENT MODULE
+# ===================================================================
+
 
     # Footer Spacer
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
@@ -3858,6 +4074,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
