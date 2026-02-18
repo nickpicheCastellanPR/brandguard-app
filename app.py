@@ -852,20 +852,59 @@ if not st.session_state['authenticated']:
             box-shadow: 0 10px 40px rgba(0,0,0,0.08);
             border-top: 5px solid #24363b;
         }
-        
-        /* Base Geometric Bullet Style */
-        .geo-bullet {
-            display: inline-block;
-            width: 12px; height: 12px;
-            background-color: #ab8f59; /* Brand Gold */
-            margin-right: 14px;
-            vertical-align: middle;
-            box-shadow: 0 0 0 2px #24363b; /* Subtle Teal Border */
-            position: relative; top: -2px; 
+
+        /* --- NEW TYPOGRAPHY & LAYOUT --- */
+        .login-content-left h1 {
+            font-family: 'Helvetica Neue', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #24363b;
+            margin-bottom: 24px;
+            line-height: 1.2;
         }
-        .geo-circle  { border-radius: 50%; }
-        .geo-diamond { transform: rotate(45deg); border-radius: 1px; }
-        .geo-square  { border-radius: 2px; }
+
+        .subheadline {
+            font-size: 1.1rem;
+            line-height: 1.7;
+            color: #3d3d3d;
+            margin-bottom: 32px;
+            max-width: 600px;
+            font-family: sans-serif;
+        }
+
+        /* --- FEATURE LIST & ICONS --- */
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .feature-list li {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px; /* Spacing between items */
+        }
+
+        .feature-icon {
+            color: #ab8f59; /* Brand Gold */
+            margin-right: 12px; /* Icon to text spacing */
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            color: #3d3d3d;
+            font-size: 1.05rem;
+            font-family: sans-serif;
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            .login-content-left h1 { font-size: 1.8rem; }
+            .subheadline { font-size: 1rem; }
+            .feature-icon { width: 20px; height: 20px; margin-right: 10px; }
+        }
     </style>""", unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -878,25 +917,47 @@ if not st.session_state['authenticated']:
         if os.path.exists("Signet_Logo_Color.png"):
             st.image("Signet_Logo_Color.png", width=180)
         else:
-            st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em;'>SIGNET</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 3rem; color: #24363b; font-weight: 800; letter-spacing: 0.15em; margin-bottom: 20px;'>SIGNET</div>", unsafe_allow_html=True)
             
         st.markdown("""
-            <div style='margin-top: 20px; color: #24363b;'>
-                <h1 style='border: none; padding: 0; font-size: 2.5rem; line-height: 1.2; margin-bottom: 20px;'>
-                    Protect your brand's <br><span style='color: #ab8f59;'>integrity at scale.</span>
-                </h1>
-                <p style='font-size: 1.1rem; line-height: 1.6; color: #5c6b61; font-family: sans-serif;'>
-                    Signet is the intelligent governance engine that ensures every piece of content—from emails to social posts—aligns perfectly with your brand identity.
+            <div class="login-content-left">
+                <h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
+                
+                <p class="subheadline">
+                    When content velocity exceeds founder bandwidth, signal degradation begins. 
+                    Signet prevents brand drift through algorithmic governance—measuring every 
+                    output against your authoritative baseline before it reaches stakeholders.
                 </p>
-                <ul style='list-style: none; padding: 0; margin-top: 30px; font-family: sans-serif; color: #3d3d3d; font-size: 1.05rem;'>
-                    <li style='margin-bottom: 18px;'>
-                        <span class="geo-bullet geo-circle"></span><strong>Strategic Alignment:</strong> Calibrate AI to your specific archetype.
+                
+                <ul class="feature-list">
+                    <li>
+                        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                        <span class="feature-text">
+                            <strong>Voice DNA Calibration:</strong> 3-5 gold-standard assets lock your executive voice
+                        </span>
                     </li>
-                    <li style='margin-bottom: 18px;'>
-                        <span class="geo-bullet geo-diamond"></span><strong>Visual Compliance:</strong> Audit assets against hex codes and logo rules.
+                    <li>
+                        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="22" y1="12" x2="18" y2="12"></line>
+                            <line x1="6" y1="12" x2="2" y2="12"></line>
+                            <line x1="12" y1="6" x2="12" y2="2"></line>
+                            <line x1="12" y1="22" x2="12" y2="18"></line>
+                        </svg>
+                        <span class="feature-text">
+                            <strong>Visual Compliance Engine:</strong> Audit every image against palette specifications
+                        </span>
                     </li>
-                    <li style='margin-bottom: 18px;'>
-                        <span class="geo-bullet geo-square"></span><strong>Perfect Copy:</strong> Rewrite drafts to match your executive voice.
+                    <li>
+                        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+                        </svg>
+                        <span class="feature-text">
+                            <strong>Signal Integrity Score:</strong> Quantify consistency across your publishing perimeter
+                        </span>
                     </li>
                 </ul>
             </div>
@@ -4334,6 +4395,7 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)
+
 
 
 
