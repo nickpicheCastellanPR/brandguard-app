@@ -287,6 +287,10 @@ def check_usage_limit(username: str) -> dict:
     if tier_key == "super_admin":
         return {"within_limit": True, "used": 0, "limit": -1, "percentage": 0.0}
 
+    # Beta testers: track usage but bypass limits and nudges
+    if user.get("is_beta_tester"):
+        return {"within_limit": True, "used": 0, "limit": -1, "percentage": 0.0}
+
     tier = TIER_CONFIG.get(tier_key, TIER_CONFIG["solo"])
     limit = tier["monthly_ai_actions"]
     org_id = user.get("org_id") or username
@@ -332,11 +336,11 @@ def get_usage_nudge_message(usage_info: dict) -> str | None:
 
     if pct >= 100:
         return (
-            "You've reached your monthly usage allocation. You can continue using Signet — "
-            "we just ask that you contact us if your needs have grown beyond your current plan. "
-            "We're happy to find the right fit."
+            "You've reached your monthly usage limit. You can keep working \u2014 if your needs have grown "
+            "beyond your current plan, we'd love to talk about the right fit. "
+            "Contact us at support@castellanpr.com."
         )
     elif pct >= 80:
-        return f"You've used {int(pct)}% of your monthly actions ({used}/{limit}). No rush — just a heads up."
+        return "You're approaching your monthly usage limit. No rush \u2014 just a heads up."
 
     return None

@@ -87,6 +87,11 @@ def _render_user_management():
         tier_key = u.get('subscription_tier', 'solo')
         tier_display = TIER_CONFIG.get(tier_key, {}).get('display_name', tier_key)
         org_name = u.get('org_id') or 'Solo'
+        flags = []
+        if u.get('is_beta_tester'):
+            flags.append("BETA")
+        if u.get('is_suspended'):
+            flags.append("SUSPENDED")
         rows.append({
             "Username": u['username'],
             "Email": u.get('email', ''),
@@ -94,6 +99,7 @@ def _render_user_management():
             "Org": org_name,
             "Role": u.get('org_role', 'member'),
             "Status": u.get('subscription_status', 'inactive'),
+            "Flags": " | ".join(flags) if flags else "",
             "Brands": brand_count,
             "Actions (Mo)": usage,
             "Last Login": (u.get('last_login') or 'Never')[:16],
@@ -172,6 +178,7 @@ def _render_user_management():
                                            index=org_options.index(current_org) if current_org in org_options else 0)
                     edit_role = st.selectbox("Org Role", ["member", "owner"],
                                             index=["member", "owner"].index(user_data.get('org_role', 'member')))
+                    edit_beta = st.checkbox("Beta Tester", value=bool(user_data.get('is_beta_tester', 0)))
 
                     if st.form_submit_button("Save Changes"):
                         changes = {}
@@ -192,6 +199,13 @@ def _render_user_management():
                         if edit_role != user_data.get('org_role', 'member'):
                             changes['org_role'] = edit_role
                             old_vals['org_role'] = user_data.get('org_role', 'member')
+                        if edit_beta != bool(user_data.get('is_beta_tester', 0)):
+                            changes['is_beta_tester'] = 1 if edit_beta else 0
+                            old_vals['is_beta_tester'] = user_data.get('is_beta_tester', 0)
+                            # Log beta flag change specifically
+                            action = "beta_flag_set" if edit_beta else "beta_flag_removed"
+                            db.log_admin_action(_admin_user(), action, "user", edit_user,
+                                                {"beta_tester": edit_beta})
 
                         if changes:
                             db.update_user_fields(edit_user, **changes)
@@ -224,6 +238,49 @@ def _render_user_management():
                     st.error("Username does not match. Deletion cancelled.")
         else:
             st.info("No deletable users (super_admin accounts cannot be deleted via UI).")
+
+    # --- Account Suspension ---
+    st.divider()
+    st.markdown("#### Account Suspension")
+    suspendable = [u['username'] for u in users if u.get('subscription_tier') != 'super_admin']
+    if suspendable:
+        susp_user = st.selectbox("Select user", suspendable, key="admin_susp_user_select")
+        susp_data = db.get_user_full(susp_user)
+        if susp_data and susp_data.get('is_suspended'):
+            st.markdown(
+                f'<div style="background:rgba(166,120,77,0.1); border-left:3px solid #a6784d; '
+                f'padding:10px; margin:8px 0; font-size:0.85rem;">'
+                f'<strong style="color:#a6784d;">SUSPENDED</strong> '
+                f'by {susp_data.get("suspended_by", "unknown")} '
+                f'on {(susp_data.get("suspended_at") or "")[:16]}<br>'
+                f'<em>Reason: {susp_data.get("suspended_reason", "No reason given")}</em></div>',
+                unsafe_allow_html=True
+            )
+            if st.button("Unsuspend Account", key="admin_unsuspend_btn"):
+                db.unsuspend_user(susp_user)
+                suspended_at = susp_data.get('suspended_at', '')
+                db.log_admin_action(
+                    _admin_user(), "account_unsuspended", "user", susp_user,
+                    {"unsuspended_by": _admin_user(), "was_suspended_at": suspended_at}
+                )
+                st.success(f"Account '{susp_user}' unsuspended.")
+                st.rerun()
+        else:
+            susp_reason = st.text_input("Suspension reason (required)", key="admin_susp_reason",
+                                        placeholder="e.g. 'Abuse detected — 500 actions in 1 hour'")
+            if st.button("Suspend Account", type="primary", key="admin_suspend_btn"):
+                if not susp_reason.strip():
+                    st.error("A reason is required to suspend an account.")
+                else:
+                    db.suspend_user(susp_user, susp_reason.strip(), _admin_user())
+                    db.log_admin_action(
+                        _admin_user(), "account_suspended", "user", susp_user,
+                        {"reason": susp_reason.strip(), "suspended_by": _admin_user()}
+                    )
+                    st.success(f"Account '{susp_user}' suspended.")
+                    st.rerun()
+    else:
+        st.info("No suspendable users (super_admin accounts cannot be suspended).")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -680,13 +737,42 @@ def _render_usage_analytics():
     else:
         st.info("No usage data yet.")
 
+    # --- Daily Usage (Current Month) ---
+    st.divider()
+    st.markdown("#### Daily Usage (Current Month)")
+    daily_data = db.get_daily_usage_platform(billing_month)
+    if daily_data and any(d['actions'] > 0 for d in daily_data):
+        daily_df = pd.DataFrame(daily_data)
+        daily_df = daily_df.rename(columns={"day": "Day", "actions": "AI Actions"})
+        daily_df = daily_df.set_index("Day")
+        st.bar_chart(daily_df)
+
+        # Spike detection
+        avg_daily = sum(d['actions'] for d in daily_data) / len(daily_data) if daily_data else 0
+        spikes = [d for d in daily_data if d['actions'] > avg_daily * 2 and avg_daily > 0]
+        if spikes:
+            st.markdown(
+                f'<div style="border-left:3px solid #a6784d; padding:8px 12px; font-size:0.85rem; color:#3d3d3d;">'
+                f'<strong style="color:#a6784d;">Spike detected:</strong> '
+                + ", ".join(f"{s['day']} ({s['actions']} actions)" for s in spikes)
+                + f' — daily average is {avg_daily:.0f}</div>',
+                unsafe_allow_html=True
+            )
+
+        # Daily cost estimate
+        daily_cost_str = " | ".join(f"{d['day']}: ${d['actions'] * 0.025:,.2f}" for d in daily_data[-7:])
+        st.caption(f"Est. daily cost (last 7 days): {daily_cost_str}")
+    else:
+        st.info("No daily usage data for this month yet.")
+
     # --- Overage Report ---
     st.divider()
     st.markdown("#### Overage Report")
+    beta_usernames = {u['username'] for u in users if u.get('is_beta_tester')}
     overages = []
     for a in (analytics or []):
         tk = a.get('subscription_tier', 'solo')
-        if tk in ('super_admin',):
+        if tk in ('super_admin',) or a['username'] in beta_usernames:
             continue
         tier = TIER_CONFIG.get(tk, TIER_CONFIG['solo'])
         limit = tier['monthly_ai_actions']

@@ -107,6 +107,11 @@ def run_migrations():
         ("comp_expires_at", "TIMESTAMP DEFAULT NULL"),
         ("comp_reason", "TEXT DEFAULT NULL"),
         ("subscription_override_until", "TIMESTAMP DEFAULT NULL"),
+        ("is_beta_tester", "BOOLEAN DEFAULT 0"),
+        ("is_suspended", "BOOLEAN DEFAULT 0"),
+        ("suspended_at", "TIMESTAMP DEFAULT NULL"),
+        ("suspended_reason", "TEXT DEFAULT NULL"),
+        ("suspended_by", "TEXT DEFAULT NULL"),
     ]
     for col_name, col_def in new_user_cols:
         if col_name not in user_columns:
@@ -663,6 +668,58 @@ def update_user_fields(username, **fields):
     conn.commit()
     conn.close()
     return True
+
+
+def suspend_user(username, reason, admin_username):
+    """Suspend a user account. Returns True on success."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute(
+        "UPDATE users SET is_suspended = 1, suspended_at = ?, suspended_reason = ?, suspended_by = ? WHERE username = ?",
+        (datetime.now().isoformat(), reason, admin_username, username)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def unsuspend_user(username):
+    """Unsuspend a user account. Returns True on success."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute(
+        "UPDATE users SET is_suspended = 0, suspended_at = NULL, suspended_reason = NULL, suspended_by = NULL WHERE username = ?",
+        (username,)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def is_user_suspended(username):
+    """Check if a user is suspended. Returns (is_suspended, reason) tuple."""
+    conn = sqlite3.connect(DB_NAME)
+    result = conn.execute(
+        "SELECT is_suspended, suspended_reason FROM users WHERE username = ?",
+        (username,)
+    ).fetchone()
+    conn.close()
+    if result:
+        return bool(result[0]), result[1]
+    return False, None
+
+
+def get_daily_usage_platform(billing_month):
+    """Returns daily usage across all users for platform-level analytics."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute('''
+        SELECT DATE(timestamp) as day, SUM(action_weight) as actions
+        FROM usage_tracking
+        WHERE billing_month = ?
+        GROUP BY DATE(timestamp)
+        ORDER BY DATE(timestamp)
+    ''', (billing_month,)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 def update_organization_fields(org_id, **fields):

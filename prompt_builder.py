@@ -218,7 +218,7 @@ def build_mh_context(inputs: dict) -> str:
         return ""
 
     return (
-        "\n=== MESSAGE HOUSE (GOVERNING DOCUMENT) ===\n\n"
+        "\n=== MESSAGE HOUSE (AUTHORITATIVE DOCUMENT) ===\n\n"
         + "\n\n".join(mh_parts)
         + "\n\n=== END MESSAGE HOUSE ===\n"
     )

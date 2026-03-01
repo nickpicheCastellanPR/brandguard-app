@@ -526,7 +526,7 @@ Those are different design philosophies, and they produce fundamentally differen
 # Brand rules text (final_text) — the AI-generated strategy output
 # This is a condensed version of what the AI would produce from the inputs.
 # ---------------------------------------------------------------------------
-_FINAL_TEXT = """BRAND GOVERNANCE RULES — MERIDIAN LABS
+_FINAL_TEXT = """BRAND FIDELITY RULES — MERIDIAN LABS
 
 ARCHETYPE: The Creator (Builder variant)
 TONE: Precise, Technical, Confident, Accessible, Opinionated

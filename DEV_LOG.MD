@@ -934,3 +934,678 @@ app.py                  — Module prompt construction updated to use shared bui
 - Do NOT change the module names or UI layout
 - Do NOT ignore the cluster selection logic — style bleed between clusters is a core problem Signet exists to prevent
 - Do NOT create separate prompt builders per module — one shared function, called by all
+
+3/1/2026 2:17AM PST
+# PROMPT 6: Platform Brand Fidelity Audit — Copy, Login Page, Module Help & Terminology
+
+## Before You Start
+
+**Read the existing codebase first.** This prompt touches every user-facing string in the platform. You need to read:
+- `app.py` — every piece of text visible to users: login page, sidebar, headers, module descriptions, error messages, confirmation dialogs, nudge messages, paywall copy, brand architect helper text, calibration notices, everything
+- Any template files or separate UI files that contain display text
+- `prompt_builder.py` (from Prompt 5) — the system prompts contain platform self-descriptions
+- `sample_brand_data.py` (from Prompt 3) — verify Meridian Labs data doesn't use wrong terminology
+- `tier_config.py` — display_name fields
+
+**This is the most important prompt in the entire sequence.** Signet is a product built by a brand fidelity firm. If the platform's own copy contradicts Castellan's approved messaging, we are the cobbler whose children have no shoes. Every word a user reads in this platform must be on brand.
+
+---
+
+## Context
+
+Signet's UI copy was written early in development before Castellan PR's brand positioning was fully refined. The language has drifted. Specifically:
+
+1. **"Brand Governance Engine"** appears throughout the platform and documentation. This is wrong. Signet is a **Brand Fidelity Engine** (or simply **Brand Fidelity Platform**). Castellan does brand fidelity, not brand governance. Governance sounds bureaucratic and compliance-heavy. Fidelity sounds like quality and discipline.
+
+2. The login/welcome page has day-one copy that doesn't reflect Castellan's current positioning, message house, or voice.
+
+3. Module descriptions, helper text, error messages, and calibration notices use inconsistent and sometimes off-brand language.
+
+4. The severity/warning hierarchy in audit outputs needs to use the correct terminology.
+
+**This prompt has four parts:**
+- Part A: Terminology enforcement (global find-and-replace + contextual rewrites)
+- Part B: Login page rewrite
+- Part C: Module help buttons
+- Part D: Full UI copy review
+
+---
+
+## APPROVED TERMINOLOGY — THE AUTHORITATIVE REFERENCE
+
+This terminology hierarchy is law. Every user-facing string in the platform must comply.
+
+### Core Terms
+
+| USE THIS | NOT THIS | CONTEXT |
+|---|---|---|
+| brand fidelity | brand governance | The goal. The discipline. What Signet protects. What Castellan delivers. |
+| brand degradation | brand erosion, brand damage | The serious problem. The failure state. What happens without fidelity at scale. |
+| brand drift | (new term — use for warnings) | The moderate warning. Things aren't critically wrong but they're heading the wrong direction. Use for WARNING-level findings. |
+| Brand Fidelity Engine | Brand Governance Engine | Signet's category descriptor. |
+| Brand Fidelity Platform | Brand Governance Platform | Acceptable alternative to "Engine." |
+| generic output | hallucination, AI hallucination | The failure mode when the engine lacks sufficient calibration data. |
+| calibration | training, learning | What the engine does with brand data. Signet is calibrated, not trained. |
+| Engine Confidence | AI Confidence, accuracy score | The calibration score metric. |
+| Empty / Unstable / Fortified | uncalibrated / partial / full | Calibration tier names. |
+
+### Severity Terminology for Audit Outputs
+
+**CRITICAL: Do NOT use emoji indicators (✅ ⚠️ ❌ ℹ️) anywhere in the platform.** No checkmarks, no warning triangles, no red circles. These are generic and make the platform look like a school project.
+
+Instead, build a custom severity indicator system using **shield iconography** — directly referencing Signet's visual identity (the shield/crest in the logo). Each severity level gets a distinct shield state rendered as a small inline SVG or styled HTML element.
+
+**The four severity states:**
+
+| SEVERITY | LABEL | SHIELD STATE | VISUAL TREATMENT |
+|---|---|---|---|
+| Pass | **ALIGNED** | Intact shield | Solid gold (#ab8f59) shield outline, filled. The brand is holding. |
+| Warning | **DRIFT** | Shield with hairline crack | Gold (#ab8f59) outline, interior shows a diagonal fracture line in charcoal (#3d3d3d). Visually "still standing but compromised." |
+| Fail | **DEGRADATION** | Fractured shield | Deep teal (#24363b) fill with visible break lines in copper (#a6784d). The shield is damaged. Should feel wrong when you look at it — not alarming like a red X, but unmistakably broken. |
+| Info | **NOTE** | No shield | Sage (#5c6b61) text only, small, understated. No icon. Just a subtle typographic treatment — italic or lighter weight. Notes don't get the shield treatment because they're not compliance findings. |
+
+**Implementation — inline SVGs:**
+
+Create these as small inline SVGs (20x24px) that can be rendered in `st.markdown()` with `unsafe_allow_html=True`. Each one is a simple shield silhouette (pointed bottom, flat top — matching the Signet logo shape) with the appropriate treatment.
+
+```html
+<!-- ALIGNED — intact gold shield -->
+<svg width="20" height="24" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#ab8f59"/>
+</svg>
+
+<!-- DRIFT — cracked shield, gold outline with fracture -->
+<svg width="20" height="24" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="none" stroke="#ab8f59" stroke-width="1.5"/>
+  <line x1="7" y1="5" x2="12" y2="13" stroke="#3d3d3d" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="12" y1="13" x2="9" y2="19" stroke="#3d3d3d" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
+
+<!-- DEGRADATION — fractured shield, dark fill with break lines -->
+<svg width="20" height="24" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#24363b"/>
+  <line x1="6" y1="4" x2="13" y2="12" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>
+  <line x1="13" y1="12" x2="8" y2="20" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>
+  <line x1="14" y1="6" x2="10" y2="15" stroke="#a6784d" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
+```
+
+**Usage in audit output lines:**
+
+Instead of:
+```
+✅ PASS — Tone: Hero headline matches brand tone keywords.
+⚠️ WARNING — Generic Language: "Unlock the power" violates brand guardrails.
+❌ FAIL — Unapproved Claim: "99.99% uptime" not in approved proof points.
+```
+
+Render as:
+```
+[gold shield SVG] ALIGNED — Tone: Hero headline matches brand tone keywords.
+[cracked shield SVG] DRIFT — Generic language: "Unlock the power" conflicts with brand guardrails. 
+[fractured shield SVG] DEGRADATION — Unapproved claim: "99.99% uptime" not in approved proof points.
+```
+
+The label text ("ALIGNED", "DRIFT", "DEGRADATION") should be rendered in small caps, bold, in the corresponding color:
+- ALIGNED: gold (#ab8f59)
+- DRIFT: charcoal (#3d3d3d) 
+- DEGRADATION: copper (#a6784d)
+
+**These indicators must be used consistently across ALL audit outputs:** Copy Editor findings, Visual Audit report, and any future proofing module. One visual language, everywhere.
+
+Store the SVG strings and CSS in a shared constants file or at the top of the UI code — do not duplicate them across modules.
+
+### Phrases That Must Never Appear in User-Facing Copy
+
+- "brand governance" (in any context — replace with "brand fidelity")
+- "governance engine" or "governance platform"
+- "hallucination" or "AI hallucination" (replace with "generic output")
+- "fortification philosophy" (replaced by "brand fidelity philosophy")
+- "unlock" / "empower" / "leverage" / "synergy" (enterprise jargon — violates Castellan's guardrails)
+- "cutting-edge" / "revolutionary" / "industry-leading" / "best-in-class" (unverifiable superlatives)
+- "we believe in a world where..." (vision statement framing — not our voice)
+
+---
+
+## PART A: GLOBAL TERMINOLOGY ENFORCEMENT
+
+### Step 1: Search and Catalog
+
+Search the entire codebase for every instance of the following strings in user-facing text (UI strings, comments visible to users, docstrings that appear in UI, help text, error messages):
+
+```
+"Brand Governance Engine"
+"Brand Governance"
+"brand governance"
+"governance engine"
+"governance platform"
+"hallucination"
+"AI hallucination"
+"fortification"
+"unlock"
+"empower"
+"leverage" (in marketing sense, not technical)
+"synergy"
+```
+
+Create a list of every occurrence with file name and line number.
+
+### Step 2: Replace
+
+For each occurrence:
+- "Brand Governance Engine" → "Brand Fidelity Engine"
+- "Brand Governance Platform" → "Brand Fidelity Platform"
+- "brand governance" → "brand fidelity"
+- "governance" (when referring to what Signet does) → "fidelity"
+- "hallucination" / "AI hallucination" → "generic output"
+- Any enterprise jargon → rewrite the sentence to be specific and concrete
+
+### Step 3: Contextual Review
+
+Some replacements aren't simple find-and-replace. Read each sentence in context. For example:
+
+- "Signet provides brand governance for scaling teams" → "Signet protects brand fidelity for scaling teams"
+- "The governance engine ensures consistency" → "The fidelity engine ensures consistency"
+- "Without governance, brands degrade" → "Without brand fidelity discipline, positioning degrades"
+
+The replacement must read naturally, not like a robot did a string swap.
+
+### Step 4: Internal References
+
+Also check and update:
+- `SIGNET_Platform_Reference.md` section headers and descriptions (this is an internal doc but Claude Code reads it — if it says "governance," Claude Code will use "governance" in its work)
+- Code comments that describe what Signet is
+- Any README or documentation files in the repo
+
+---
+
+## PART B: LOGIN PAGE REWRITE
+
+The login page is the first thing every user sees. It must immediately communicate what Signet is, who it's for, and what it does — in Castellan's voice.
+
+### Approved Copy for Login Page
+
+**Primary headline (above the login form):**
+```
+Signet — Brand Fidelity Engine
+```
+
+**Subheadline / descriptor (below the headline, above login fields):**
+```
+Calibrate your brand. Generate on-message content. Catch drift before it becomes degradation.
+```
+
+**Brief description (below the login form or in a sidebar panel — whichever the current layout supports):**
+```
+Signet is the brand fidelity platform built by Castellan PR. Upload your brand's strategy, message house, and voice samples — the engine calibrates to your positioning and ensures every output stays aligned. The more you calibrate, the more precise the output.
+```
+
+**Footer line (bottom of login page):**
+```
+Built by Castellan PR · castellanpr.com
+```
+
+### Copy Principles for Login Page:
+- No jargon. A first-time user who has never heard of Castellan should understand what this does in 5 seconds.
+- "Brand fidelity" is front and center — this is our term, our territory.
+- The three-part subheadline maps to the user journey: calibrate → generate → audit.
+- "Catch drift before it becomes degradation" introduces both terms in the correct hierarchy.
+- No superlatives. No "revolutionary." No "cutting-edge AI." Just a clear statement of what the platform does.
+
+### Styling Notes:
+- Headline: use the platform's existing heading style — large, clean, likely the brand's primary color (#24363b)
+- Subheadline: smaller, secondary text — the accent color (#ab8f59) could work here if the current design uses color accents
+- Description: body text size, neutral color
+- "Castellan PR" in the footer should be a link to castellanpr.com
+- If there's currently a logo on the login page, keep it. If not, the Signet logo should appear above the headline.
+- Do NOT add a background image, animation, or decorative elements. Clean and structural, like the brand.
+
+### Global Streamlit Theme Override
+
+While you're touching the UI, ensure the Streamlit theme uses Castellan brand colors — not the default blue. Add or update `.streamlit/config.toml`:
+
+```toml
+[theme]
+primaryColor = "#ab8f59"          # Gold accent — buttons, links, interactive elements
+backgroundColor = "#f5f5f0"       # Cream — main background
+secondaryBackgroundColor = "#24363b"  # Deep teal — sidebar, cards
+textColor = "#3d3d3d"             # Charcoal — body text
+font = "sans serif"
+```
+
+This ensures every Streamlit default element (buttons, toggles, sliders, progress bars, links) renders in Castellan colors instead of Streamlit blue. If the codebase already has a theme config, update it to match these values. If any elements still render blue after the theme change, override them with custom CSS via `st.markdown()` with `unsafe_allow_html=True`.
+
+---
+
+## PART C: MODULE HELP BUTTONS
+
+Each of the 4 AI modules needs a contextual help button that explains what the module does, what it expects as input, and what it returns. This is the "Clear Module Expectations" UX requirement from the Platform Reference.
+
+### Implementation
+
+Add a styled help button next to each module's header/title. On click, it expands or pops up the explanation. Use `st.expander()` or `st.popover()` — whichever is available and consistent with the current UI.
+
+**Help Button Styling — MUST use Castellan brand colors, not Streamlit defaults:**
+
+The help button should be a small circular or pill-shaped element using the gold accent (#ab8f59) as its color. It needs to be visible and inviting but not competing with the module itself. Use `st.markdown()` with inline HTML/CSS to override Streamlit's default blue:
+
+```css
+/* Help button — gold accent on dark background */
+.signet-help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #ab8f59;
+    color: #f5f5f0;
+    font-weight: 700;
+    font-size: 14px;
+    font-family: 'Montserrat', Helvetica Neue, Arial, sans-serif;
+    cursor: pointer;
+    border: none;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+.signet-help-btn:hover {
+    background-color: #a6784d;
+}
+```
+
+The button contains a `?` character — not an emoji, not an SVG. A typographic question mark in Montserrat Bold on gold. Clean, architectural, on brand.
+
+When clicked/expanded, the help panel should have a subtle left border in gold (#ab8f59) to visually connect it to the button, with body text in charcoal (#3d3d3d) on the existing background. No blue anywhere.
+
+### Help Text for Each Module
+
+**Content Generator:**
+```
+WHAT IT DOES:
+Generates brand-aligned content calibrated to your brand profile — strategy, message house, and voice samples.
+
+WHAT TO PROVIDE:
+Describe what you need: "Write a press release about our Series B" or "Draft homepage hero copy." Include the content type so the engine selects the right voice cluster.
+
+WHAT YOU GET BACK:
+Content written in your brand's voice, drawing from your approved message pillars and proof points. Includes a rationale section showing which brand elements informed the output.
+
+CALIBRATION NOTE:
+The more complete your brand profile, the more precise the output. An incomplete profile produces more generic results — not wrong, but less distinctly yours.
+```
+
+**Social Assistant:**
+```
+WHAT IT DOES:
+Creates social media content calibrated to your brand's voice and social presence. Optimized for platform-specific formats.
+
+WHAT TO PROVIDE:
+A topic or prompt, and which platform (LinkedIn, Twitter/X, or other). For founder-voice posts, specify "founder voice" to blend thought leadership patterns.
+
+WHAT YOU GET BACK:
+Platform-appropriate social content aligned with your brand's tone, message pillars, and social media reference samples. Includes a rationale section.
+
+CALIBRATION NOTE:
+Upload at least 3 social media samples in the Brand Architect. Without them, the engine calibrates from your general brand voice — usable, but less tuned to your social presence.
+```
+
+**Copy Editor:**
+```
+WHAT IT DOES:
+Audits your draft content against your brand profile. Flags brand drift and brand degradation — misaligned tone, unapproved claims, guardrail violations, and generic language.
+
+WHAT TO PROVIDE:
+Paste your draft text. The engine works best when you specify the content type (press release, blog post, email, etc.) so it checks against the right voice cluster.
+
+WHAT YOU GET BACK:
+A line-by-line review with specific findings. Each issue cites which brand guideline it relates to, rates it as aligned / drift / degradation, and suggests a brand-aligned alternative.
+
+CALIBRATION NOTE:
+The more complete your message house, the deeper the audit. Without message pillars and proof points, the engine can check tone but cannot verify positioning or claim accuracy.
+```
+
+**Visual Audit:**
+```
+WHAT IT DOES:
+Analyzes uploaded images (screenshots, mockups, ad creatives) for brand compliance across three layers: color palette accuracy, visual identity consistency, and copy alignment.
+
+WHAT TO PROVIDE:
+Upload a screenshot or image file (PNG, JPG, WEBP). Optionally describe what the asset is — "landing page hero" or "email header" — for more targeted analysis.
+
+WHAT YOU GET BACK:
+A unified compliance report with an overall score (0-100). Color compliance is checked deterministically (instant, no AI cost). Visual identity and copy alignment use AI analysis. Each finding references a specific brand guideline.
+
+COST NOTE:
+Each Visual Audit uses 3 AI actions from your monthly allocation due to the multi-layer analysis.
+```
+
+---
+
+## PART D: FULL UI COPY REVIEW
+
+Go through every user-facing screen and review the copy for brand alignment. This is a comprehensive audit — the same discipline we sell to clients, applied to our own platform.
+
+### Screens to Audit (in order):
+
+**1. Login / Welcome Page**
+→ Rewritten in Part B above
+
+**2. Dashboard / Home (post-login)**
+- What does the user see first after logging in?
+- Is the platform description on brand?
+- Does it say "Brand Governance" anywhere? Fix it.
+- Is the calibration score clearly labeled "Engine Confidence"?
+
+**3. Brand Architect / Brand Setup**
+- Section headers: Strategy (Core), Message House, Visual Identity, Voice Clusters
+- Helper text for each field — is it clear, on brand, and using correct terminology?
+- Calibration notices — do they use "brand fidelity" language, not "governance"?
+- The hard ceiling message when message house is empty: verify it says "cannot enforce positioning" not "cannot govern"
+
+**4. Module Pages (Content Generator, Social Assistant, Copy Editor, Visual Audit)**
+- Module headers and descriptions
+- Input field labels and placeholder text
+- Output headers and formatting
+- Rationale sections — do they use correct severity terms (aligned / drift / degradation)?
+- Error messages — on brand?
+
+**5. Usage & Billing Displays**
+- Tier names displayed correctly?
+- Usage nudge messages — review for tone (friendly, peer-level, not transactional)
+- Soft cap message at 100%: verify it reads naturally and doesn't sound like a paywall threat
+
+**6. Team / Org Management**
+- Invite flow copy
+- Seat limit messages
+- Org role descriptions
+
+**7. Admin Panel (super_admin only)**
+- Less critical since it's internal, but still audit for consistency
+- "Brand Governance" must not appear even in admin-only screens
+
+**8. Paywall / Subscribe Gate**
+- What does an unpaid user see?
+- Is it on brand? Does it explain value without being transactional?
+- Suggested copy for subscribe gate:
+
+```
+Signet requires an active subscription.
+
+Signet is the brand fidelity platform built by Castellan PR — it calibrates to your brand's positioning and ensures every piece of content stays aligned as you scale.
+
+Choose a plan at [link] to get started, or contact us at [email] if you'd like to learn more.
+```
+
+**9. Sample Brand Load / Delete Confirmations**
+- "Sample brand loaded" message — on brand?
+- Delete confirmation — clear and respectful?
+
+**10. Error States & Edge Cases**
+- What happens when the API fails? Is the error message on brand?
+- What happens when a brand has no data? Is the "insufficient data" message helpful and on brand?
+- Session timeout message?
+
+### For Each Screen, Check:
+
+1. **Terminology compliance** — no forbidden terms (governance, hallucination, superlatives, jargon)
+2. **Voice alignment** — precise, confident, peer-level, not supplicant, not salesy
+3. **Clarity** — would a first-time user understand what they're reading?
+4. **Consistency** — does the same concept use the same word everywhere? (e.g., "Engine Confidence" not sometimes "calibration score" and sometimes "confidence level")
+5. **Castellan attribution** — is it clear this is a Castellan PR product? (at minimum on login page and in footer/about section)
+
+### Specific Rewrites Required
+
+**Calibration ceiling notice (when message house is empty):**
+Current (likely): "The engine can match tone but cannot govern positioning"
+Replace with: "The engine can match tone from your voice samples, but without a message house it cannot enforce positioning, validate claims, or catch messaging drift."
+(Use a [cracked shield] DRIFT indicator next to this notice — it's the platform's own brand drift warning to the user.)
+
+**Soft cap nudge at 80%:**
+Current (from Prompt 1): "You've used 80% of your monthly actions. No rush — just a heads up."
+This is fine. Keep it.
+
+**Soft cap at 100%:**
+Current (from Prompt 1): "You've reached your monthly usage allocation. You can continue using Signet — we just ask that you contact us if your needs have grown beyond your current plan. We're happy to find the right fit."
+This is fine. Keep it.
+
+**Inactive subscription message:**
+Current (from Prompt 1): "Your subscription is inactive. Reactivate to continue using Signet."
+Replace with: "Your subscription is inactive. Your brand data is safe — reactivate anytime to pick up where you left off."
+
+**Brand deletion warning:**
+Verify it says: "Deleting [Brand Name] will permanently remove all brand data including strategy, message house, voice samples, and visual identity. This cannot be undone."
+Not: "Deleting will remove all governance data" or similar.
+
+## PART E: USAGE DISPLAY REMOVAL & BETA USER CONFIGURATION
+
+### Remove All User-Facing Usage Metrics
+
+The following elements must be removed from or hidden in all user-facing screens. Usage tracking continues to work behind the scenes — we still record every action, we still calculate percentages, we still log overages for manual review. But the user never sees the numbers.
+
+**Remove or hide:**
+- "Each Visual Audit uses 3 AI actions" (or any action-cost disclosure on any module)
+- "Current usage: X/Y this month" (anywhere it appears — sidebar, module pages, dashboard)
+- Monthly usage meter / progress bar in the sidebar
+- Any reference to "AI actions" as a user-facing concept
+- Any reference to the specific number of actions in a plan (200, 800, 1500)
+- The action weight display ("This audit uses 3 AI actions from your monthly allocation")
+
+**Why:** Exposing token economics to the user signals a metered commodity, not a premium professional tool. Castellan clients don't see their consultant's hourly breakdown. Signet users shouldn't see their action count.
+
+**What stays:**
+- The soft cap nudge messages at 80% and 100% — but rewrite them to remove action counts:
+  - **At 80%:** "You're approaching your monthly usage limit. No rush — just a heads up."
+  - **At 100%:** "You've reached your monthly usage limit. You can keep working — if your needs have grown beyond your current plan, we'd love to talk about the right fit. Contact us at [email]."
+- Usage analytics in the **admin panel only** — the super_admin still sees full usage data per user, action counts, cost estimates, overage reports. This is operator-level data, not user-level.
+- `record_ai_action()` and `check_usage_limit()` continue running on every AI call. The tracking is invisible, not disabled.
+
+**Specific screens to check:**
+- Visual Audit: remove the "3 AI actions" cost note
+- Content Generator: remove any action cost display
+- Social Assistant: same
+- Copy Editor: same
+- Sidebar: remove the usage meter
+- Dashboard/home: remove any usage summary
+- Module help buttons (Part C): the Copy Editor and Visual Audit help text should NOT mention action costs. Update accordingly:
+
+**Visual Audit help text — updated (remove the COST NOTE line entirely):**
+```
+WHAT IT DOES:
+Analyzes uploaded images (screenshots, mockups, ad creatives) for brand compliance across three layers: color palette accuracy, visual identity consistency, and copy alignment.
+
+WHAT TO PROVIDE:
+Upload a screenshot or image file (PNG, JPG, WEBP). Optionally describe what the asset is — "landing page hero" or "email header" — for more targeted analysis.
+
+WHAT YOU GET BACK:
+A unified compliance report with an overall score (0-100). Color compliance is checked deterministically. Visual identity and copy alignment use AI analysis. Each finding references a specific brand guideline.
+
+CALIBRATION NOTE:
+A complete brand profile with hex palette, message house, and voice samples produces the most thorough audit. The engine checks what it can with whatever data you've provided.
+```
+
+### Beta User Configuration
+
+Current beta testers need to use the platform without hitting nudge messages or worrying about limits. Two options — implement both:
+
+**Option 1 — Beta flag on user accounts:**
+
+Add a column to the users table:
+```sql
+ALTER TABLE users ADD COLUMN is_beta_tester BOOLEAN DEFAULT 0;
+```
+
+When `is_beta_tester = 1`:
+- `check_usage_limit()` always returns `within_limit: True` and `percentage: 0`
+- `get_usage_nudge_message()` always returns `None`
+- Usage is still recorded (we want the data) but limits are never enforced and nudges never shown
+- This is separate from super_admin — beta testers see the normal user experience, just without the ceiling
+
+The super_admin panel (from Prompt 2) should have a toggle to set/unset the beta flag on any user account.
+
+**Option 2 — Increase beta tier limits:**
+
+In `tier_config.py`, add a multiplier or override that the admin can apply:
+```python
+BETA_USAGE_MULTIPLIER = 10  # Beta users get 10x their tier's normal limit
+```
+
+When a user has `is_beta_tester = 1`, `check_usage_limit()` multiplies their tier's `monthly_ai_actions` by this multiplier before comparing. This means they technically have a limit (Solo beta: 2,000 actions, Agency beta: 8,000) but will never realistically hit it during testing.
+
+**Prefer Option 1** (flag that bypasses limits entirely) as the primary mechanism. Option 2 is a fallback if the bypass creates edge cases.
+
+### Admin Panel Updates for Beta
+
+In the User Management section of the admin panel:
+- Add "Beta Tester" as a visible toggle/checkbox on each user's edit screen
+- Add a "Beta" badge next to usernames in the user list for users with the flag
+- The usage analytics dashboard should be able to filter out beta testers from overage reports (since their usage isn't economically meaningful)
+- Audit log should record when beta flag is set/unset: `beta_flag_set` / `beta_flag_removed`
+
+## PART F: ADMIN USAGE GRANULARITY & ACCOUNT SUSPENSION
+
+### Daily Usage Breakdown
+
+The current admin analytics dashboard (from Prompt 2) shows per-user monthly totals. That's not enough to spot abuse. Add daily granularity:
+
+**Per-User Daily View:**
+In the Usage Analytics section of the admin panel, add the ability to click on any user and see their daily usage for the current month (and previous months via a date selector).
+
+Display as:
+- A simple bar chart (Streamlit's built-in `st.bar_chart()` is fine) — one bar per day, height = total weighted actions that day
+- Below the chart, a table: Date | Actions | Modules Used | Peak Hour
+
+**What to look for (add visual flags):**
+- Any single day exceeding 50% of the user's monthly allocation → highlight in copper (#a6784d)
+- Any single hour with more than 20 actions → flag as "Spike detected" in the table
+- Usage on days with no login recorded → flag as "No session — possible API abuse"
+
+These flags are visual aids for the admin, not automated enforcement. You see the pattern, you make the call.
+
+**Aggregated View:**
+Add a "Platform Usage" tab to admin analytics showing:
+- Total daily actions across all users for the current month (bar chart)
+- Estimated daily API cost (total actions × $0.025 average, with visual_audit weighted)
+- Top 5 users by usage this week (table with username, tier, action count, % of their limit)
+
+### Account Suspension (Kill Switch)
+
+Add a manual, immediate, admin-controlled hard block that is completely separate from subscription status and the soft cap system.
+
+**Database:**
+```sql
+ALTER TABLE users ADD COLUMN is_suspended BOOLEAN DEFAULT 0;
+ALTER TABLE users ADD COLUMN suspended_at TIMESTAMP DEFAULT NULL;
+ALTER TABLE users ADD COLUMN suspended_reason TEXT DEFAULT NULL;
+ALTER TABLE users ADD COLUMN suspended_by TEXT DEFAULT NULL;
+```
+
+**Behavior when `is_suspended = 1`:**
+
+- **All AI modules are disabled.** Not soft-capped — hard-blocked. The module UI shows but the execution buttons are disabled with the message:
+
+```
+Your account has been temporarily suspended. If you believe this is an error, contact support@castellanpr.com.
+```
+
+- The message is deliberately neutral — no accusation, no explanation of why. The admin communicates the reason separately if appropriate.
+- **Brand Architect remains accessible.** The user can still view and edit their brand data. We never hold data hostage.
+- **Deterministic Visual Audit (color check only)** remains available — it costs nothing.
+- **Login still works.** They can log in, see their brands, export data. They just can't run AI modules.
+- **The suspension survives subscription changes.** Reactivating a subscription, upgrading tiers, or any Lemon Squeezy event does NOT clear the suspension. Only a super_admin can unsuspend.
+
+**Implementation in app.py:**
+
+Check suspension status early in the module execution flow — after tier resolution but before any AI call:
+
+```python
+def check_suspension(username):
+    """Returns True if user is suspended. Check this before every AI module execution."""
+    user = get_user_full(username)
+    return user.get('is_suspended', False)
+```
+
+This check goes in the same place as the existing tier/usage checks but takes absolute priority. If suspended, skip all other checks and show the message.
+
+**Admin Panel — Suspension Controls:**
+
+In User Management, add:
+- A prominent "Suspend Account" button on each user's detail view (red-toned, not gold — this is a punitive action)
+- On click: require a reason (text field, mandatory) and confirmation ("Suspend [username]? This will immediately block all AI module access.")
+- "Unsuspend Account" button appears when viewing a suspended user
+- On unsuspend: require confirmation, log to audit log
+
+**In the user list table:**
+- Suspended users show a visual indicator — a small red dot or "SUSPENDED" badge next to their name
+- Filterable: admin can filter the user list to show only suspended accounts
+
+**Audit Log entries:**
+- `account_suspended` — details: username, reason, suspended_by
+- `account_unsuspended` — details: username, unsuspended_by, duration of suspension
+
+**Integration with `resolve_user_tier()`:**
+
+The suspension check should NOT be part of `resolve_user_tier()` — tier resolution is about billing and feature access. Suspension is a separate enforcement layer. Keep them decoupled:
+
+```
+Login → resolve_user_tier() → check_suspension() → check_usage_limit() → execute module
+```
+
+If suspended, the flow stops at `check_suspension()` and never reaches usage tracking. Suspended users do NOT accumulate usage records for blocked attempts.
+
+**Cannot suspend a super_admin account.** Safety check — same as the "cannot delete super_admin" rule from Prompt 2.
+
+---
+
+1. **Read every file** and catalog all user-facing strings
+2. **Global terminology replacement** (Part A) — fix every instance of forbidden terms
+3. **Login page rewrite** (Part B) — replace all login/welcome copy with approved text
+4. **Module help buttons** (Part C) — add help text to all 4 modules
+5. **Full UI copy review** (Part D) — go screen by screen, fix everything that's off brand
+6. **Remove usage displays** (Part E) — strip all action counts, usage meters, and cost disclosures from user-facing UI
+7. **Add beta tester flag** (Part E) — add DB column, update limit checks, add admin panel toggle
+8. **Add daily usage granularity to admin panel** (Part F) — per-user daily breakdown, spike detection flags, platform-wide daily view
+9. **Add account suspension system** (Part F) — DB columns, suspension check in module flow, admin panel controls, audit logging
+10. **Verify severity indicators** in Copy Editor and Visual Audit outputs use the shield-based system (ALIGNED / DRIFT / DEGRADATION) with the custom SVGs — no emoji fallbacks anywhere
+11. **Test**: load the app, click through every screen, read every word. Nothing should say "governance." Nothing should say "hallucination." No blue elements. No emoji. No action counts visible to users. Suspend a test user and verify AI modules are blocked but data access remains. Everything should sound and look like Castellan built it.
+
+---
+
+## File Organization
+
+```
+app.py              — All UI copy updates, remove usage displays, suspension check in module flow [MODIFY — heavy changes]
+brand_ui.py         — Shield SVGs, severity labels, help button CSS, brand color constants [NEW — shared across all UI]
+prompt_builder.py   — System prompt self-descriptions [MODIFY]
+subscription_manager.py — Beta flag bypass, suspension check function [MODIFY]
+db_manager.py       — Add is_beta_tester and suspension columns, daily usage queries [MODIFY]
+tier_config.py      — Add BETA_USAGE_MULTIPLIER constant [MODIFY]
+.streamlit/config.toml — Theme override [NEW or MODIFY]
+Any other UI files   — Terminology fixes [MODIFY]
+```
+
+Create `brand_ui.py` as the single source for all brand-specific UI elements: the three shield SVGs, severity label rendering functions, help button CSS, and Castellan color constants. Every module imports from here. No duplicating SVG strings or color codes across files.
+
+---
+
+## What NOT to Do
+
+- Do NOT use "brand governance" anywhere in user-facing copy — this is the single most important rule in this prompt
+- Do NOT use emoji indicators (✅ ⚠️ ❌ ℹ️ or any emoji) for severity, status, or UI elements — use the custom shield system and Castellan-branded styling instead
+- Do NOT use Streamlit's default blue (#0068C9 or similar) for any interactive element — override with Castellan brand colors (gold #ab8f59 for accents, teal #24363b for primary, sage #5c6b61 for secondary)
+- Do NOT use superlatives (revolutionary, cutting-edge, industry-leading)
+- Do NOT use enterprise jargon (unlock, empower, leverage, synergy)
+- Do NOT write login page copy that sounds like a SaaS marketing page — Castellan's voice is precise and confident, not promotional
+- Do NOT change functionality — this prompt is copy and visual indicators only (except for the help button additions)
+- Do NOT skip the admin panel — even internal screens should be consistent
+- Do NOT leave inconsistent terminology (e.g., "confidence score" in one place and "Engine Confidence" in another)
+- Do NOT make the help text longer than what's specified — these should be scannable, not walls of text
+- Do NOT remove any functional elements while updating copy
+- Do NOT forget the "Built by Castellan PR" attribution on the login page
+- Do NOT use generic colored dots, traffic lights, or other common indicator patterns — the shield system is the only severity indicator in this platform
+- Do NOT expose action counts, usage meters, action weights, or token economics to users — this data is admin-only
+- Do NOT disable usage tracking when hiding the display — tracking continues silently, only the user-facing display is removed
+- Do NOT show beta testers the soft cap nudge messages — the beta flag bypasses all nudges and limits
+- Do NOT let subscription changes (reactivation, upgrade, LS webhook events) clear a suspension — only a super_admin can unsuspend
+- Do NOT block data access for suspended users — they can view brands, export data, and use deterministic tools. Only AI modules are blocked.
+- Do NOT allow suspension of super_admin accounts
+- Do NOT automate suspension — it is always a manual admin decision based on reviewing the usage data

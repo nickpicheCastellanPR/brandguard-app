@@ -57,7 +57,7 @@ def sanitize_user_input(text, context=""):
     text_upper = text.upper()
     for pattern in injection_patterns:
         if pattern in text_upper:
-            print(f"⚠️ INJECTION ATTEMPT DETECTED in {context}: Pattern '{pattern}' found")
+            print(f"[WARN] INJECTION ATTEMPT DETECTED in {context}: Pattern '{pattern}' found")
             # Log but don't block - continue processing
             
     return text
@@ -254,12 +254,12 @@ class SignetLogic:
                     time.sleep(wait_time)
                     continue
                 else:
-                    return "⚠️ System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
+                    return "System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
             except anthropic.APIStatusError as e:
                 # Handle credit balance/billing specifically
                 error_str = str(e).lower()
                 if "credit balance is too low" in error_str:
-                     return "⚠️ System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
+                     return "System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
                 if attempt < max_retries - 1:
                      time.sleep(1) # Short wait for 500 errors
                      continue
@@ -325,12 +325,12 @@ class SignetLogic:
                     time.sleep(wait_time)
                     continue
                 else:
-                    return "⚠️ System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
+                    return "System Busy: The computational engine is currently at capacity. Please try again in 30 seconds."
             except anthropic.APIStatusError as e:
                 # Handle credit balance/billing specifically
                 error_str = str(e).lower()
                 if "credit balance is too low" in error_str:
-                     return "⚠️ System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
+                     return "System Alert: Usage Limit Reached. Please contact your administrator to upgrade plan credits."
                 if attempt < max_retries - 1:
                      time.sleep(1) # Short wait for 500 errors
                      continue
