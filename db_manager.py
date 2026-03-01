@@ -341,6 +341,88 @@ def delete_profile(username, profile_name):
     conn.commit()
     conn.close()
 
+
+def _resolve_org_id(conn, username):
+    """Internal helper — resolve org_id from username (fallback to username)."""
+    org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (username,)).fetchone()
+    return org_res[0] if org_res and org_res[0] else username
+
+
+def load_sample_brand(username):
+    """Load the Meridian Labs sample brand for a user/org. Returns True on success."""
+    from sample_brand_data import SAMPLE_BRAND
+    conn = sqlite3.connect(DB_NAME)
+    org_id = _resolve_org_id(conn, username)
+    profile_name = SAMPLE_BRAND["profile_name"]
+
+    # Check if already loaded
+    existing = conn.execute(
+        "SELECT id FROM profiles WHERE org_id = ? AND name = ?",
+        (org_id, profile_name)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return False  # Already loaded
+
+    data_json = json.dumps(SAMPLE_BRAND["profile_data"])
+    conn.execute('''
+        INSERT INTO profiles (org_id, name, data, created_at, updated_by, is_sample_brand)
+        VALUES (?, ?, ?, ?, ?, 1)
+    ''', (org_id, profile_name, data_json, datetime.now(), username))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def has_sample_brand(username):
+    """Check if the user's org already has the sample brand loaded."""
+    conn = sqlite3.connect(DB_NAME)
+    org_id = _resolve_org_id(conn, username)
+    result = conn.execute(
+        "SELECT id FROM profiles WHERE org_id = ? AND is_sample_brand = 1",
+        (org_id,)
+    ).fetchone()
+    conn.close()
+    return result is not None
+
+
+def delete_sample_brand(username):
+    """Remove the sample brand from a user's org."""
+    conn = sqlite3.connect(DB_NAME)
+    org_id = _resolve_org_id(conn, username)
+    conn.execute(
+        "DELETE FROM profiles WHERE org_id = ? AND is_sample_brand = 1",
+        (org_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_brand_owner_info(username):
+    """Returns (org_id, org_role, subscription_tier) for permission checks on brand deletion."""
+    conn = sqlite3.connect(DB_NAME)
+    row = conn.execute(
+        "SELECT org_id, org_role, subscription_tier FROM users WHERE username = ?",
+        (username,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None, 'member', 'solo'
+    return row[0] or username, row[1] or 'member', row[2] or 'solo'
+
+
+def is_profile_sample(username, profile_name):
+    """Check whether a specific profile is a sample brand."""
+    conn = sqlite3.connect(DB_NAME)
+    org_id = _resolve_org_id(conn, username)
+    result = conn.execute(
+        "SELECT is_sample_brand FROM profiles WHERE org_id = ? AND name = ?",
+        (org_id, profile_name)
+    ).fetchone()
+    conn.close()
+    return bool(result and result[0])
+
+
 # --- 4. THE GOD VIEW (Rich Logging) ---
 def log_event(org_id, username, activity_type, asset_name, score, verdict, metadata):
     """Logs an event to the persistent Studio timeline."""

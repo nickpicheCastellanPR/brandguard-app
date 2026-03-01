@@ -9,6 +9,7 @@ from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
 import admin_panel
+import visual_audit
 import html
 
 # --- PAGE CONFIG ---
@@ -1582,7 +1583,20 @@ elif app_mode == "DASHBOARD":
             if st.button("BUILD BRAND PROFILE", use_container_width=True, type="primary"):
                 st.session_state['app_mode'] = "BRAND ARCHITECT"
                 st.rerun()
-        
+
+            # Sample brand button (empty state)
+            _has_sample = db.has_sample_brand(st.session_state.get('user_id', ''))
+            if _has_sample:
+                st.button("Sample Brand Already Loaded", use_container_width=True, disabled=True, key="empty_sample_loaded")
+            else:
+                if st.button("Try a Sample Brand", use_container_width=True, key="empty_load_sample"):
+                    _uid = st.session_state.get('user_id', '')
+                    db.load_sample_brand(_uid)
+                    st.session_state['profiles'] = db.get_profiles(_uid)
+                    st.success("Sample brand loaded! Meridian Labs is now available in your brand list. Explore the Brand Architect to see how a complete brand profile is structured, then try generating content or running an audit.")
+                    import time as _t; _t.sleep(2)
+                    st.rerun()
+
         st.markdown("""
         <div style='max-width: 600px; margin: 40px auto 0 auto; padding: 20px; border-left: 3px solid #5c6b61;'>
             <p style='margin-bottom: 10px; font-weight: 600; color: #ab8f59;'>A Brand Profile contains:</p>
@@ -1596,7 +1610,7 @@ elif app_mode == "DASHBOARD":
             </p>
         </div>
         """, unsafe_allow_html=True)
-        
+
         st.stop()  # Don't show the rest of dashboard
     
     # --- RETURNING USER STATE (1+ PROFILES) ---
@@ -1809,10 +1823,102 @@ elif app_mode == "DASHBOARD":
         # View full log button
         if st.button("VIEW FULL LOG", use_container_width=True):
             # Manually force the navigation state
-            st.session_state.app_mode = "ACTIVITY LOG" 
+            st.session_state.app_mode = "ACTIVITY LOG"
             st.rerun()
 
-            
+    # ========================================
+    # BRAND MANAGEMENT (below 3-col layout)
+    # ========================================
+    st.markdown("---")
+    st.markdown("### BRAND MANAGEMENT")
+
+    _bm_uid = st.session_state.get('user_id', '')
+    _bm_org_id, _bm_org_role, _bm_tier_key = db.get_brand_owner_info(_bm_uid)
+    _bm_is_owner = _bm_org_role in ('owner', 'admin') or _bm_tier_key == 'super_admin' or _bm_org_id == _bm_uid
+    _bm_is_sa = _get_tier_key() == 'super_admin' or (st.session_state.get('username') or '').upper() == 'NICK_ADMIN'
+
+    bm_col1, bm_col2 = st.columns(2)
+
+    with bm_col1:
+        # Sample brand load/remove
+        _bm_has_sample = db.has_sample_brand(_bm_uid)
+        if _bm_has_sample:
+            st.markdown("**Meridian Labs (Sample Brand)** is loaded.")
+            if st.button("Remove Sample Brand", key="dash_remove_sample"):
+                st.session_state['_confirm_remove_sample'] = True
+            if st.session_state.get('_confirm_remove_sample'):
+                st.warning("Remove the sample brand? You can reload it anytime.")
+                _rc1, _rc2 = st.columns(2)
+                with _rc1:
+                    if st.button("Yes, Remove", key="dash_confirm_remove_sample", type="primary"):
+                        db.delete_sample_brand(_bm_uid)
+                        st.session_state['profiles'] = db.get_profiles(_bm_uid)
+                        # Clear active profile if it was the sample brand
+                        if st.session_state.get('active_profile_name', '').startswith("Meridian Labs"):
+                            remaining = list(st.session_state['profiles'].keys())
+                            st.session_state['active_profile_name'] = remaining[0] if remaining else None
+                        st.session_state.pop('_confirm_remove_sample', None)
+                        st.rerun()
+                with _rc2:
+                    if st.button("Cancel", key="dash_cancel_remove_sample"):
+                        st.session_state.pop('_confirm_remove_sample', None)
+                        st.rerun()
+        else:
+            if st.button("Load Sample Brand", key="dash_load_sample"):
+                db.load_sample_brand(_bm_uid)
+                st.session_state['profiles'] = db.get_profiles(_bm_uid)
+                st.success("Sample brand loaded! Meridian Labs is now available in your brand list.")
+                import time as _t; _t.sleep(1.5)
+                st.rerun()
+
+    with bm_col2:
+        # Brand deletion
+        brand_check = sub_manager.check_brand_limit(_bm_uid)
+        st.caption(f"Brands: {brand_check['current']} / {'Unlimited' if brand_check['max'] == -1 else brand_check['max']}")
+
+        _del_candidates = [
+            name for name in profiles.keys()
+            if not db.is_profile_sample(_bm_uid, name)
+        ]
+        if _del_candidates:
+            del_brand = st.selectbox("Select brand to delete", [""] + _del_candidates, key="dash_del_brand")
+            if del_brand:
+                if not (_bm_is_owner or _bm_is_sa):
+                    st.info("Contact your account admin to delete this brand.")
+                else:
+                    if st.button("Delete Brand", type="secondary", key="dash_del_btn"):
+                        st.session_state['_confirm_delete_brand'] = del_brand
+
+                    if st.session_state.get('_confirm_delete_brand') == del_brand:
+                        st.warning(
+                            f"Deleting **{del_brand}** will permanently remove all brand data "
+                            "including strategy, message house, voice samples, visual identity, "
+                            "and usage history. This cannot be undone."
+                        )
+                        confirm_name = st.text_input(
+                            "Type the brand name to confirm deletion",
+                            key="dash_del_confirm_input"
+                        )
+                        if st.button("Confirm Delete", type="primary", key="dash_del_confirm_btn"):
+                            if confirm_name.strip() == del_brand:
+                                # Handle if deleting the active profile
+                                if st.session_state.get('active_profile_name') == del_brand:
+                                    remaining = [n for n in profiles.keys() if n != del_brand]
+                                    st.session_state['active_profile_name'] = remaining[0] if remaining else None
+
+                                db.delete_profile(_bm_uid, del_brand)
+                                st.session_state['profiles'] = db.get_profiles(_bm_uid)
+                                st.session_state.pop('_confirm_delete_brand', None)
+
+                                new_count = db.count_user_brands(_bm_org_id)
+                                max_b = brand_check['max']
+                                slots_msg = f"{new_count} / {'Unlimited' if max_b == -1 else max_b}"
+                                st.success(f"Brand deleted. You now have {slots_msg} brand slots used.")
+                                import time as _t; _t.sleep(1.5)
+                                st.rerun()
+                            else:
+                                st.error("Brand name does not match. Deletion cancelled.")
+
 # 2. VISUAL COMPLIANCE (The 5-Pillar Scorecard)
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
@@ -1952,7 +2058,7 @@ elif app_mode == "VISUAL COMPLIANCE":
             
             with c1:
                 st.markdown("### 1. UPLOAD CANDIDATE")
-                uploaded_file = st.file_uploader("Upload the draft to check", type=['png', 'jpg', 'jpeg'])
+                uploaded_file = st.file_uploader("Upload the draft to check", type=['png', 'jpg', 'jpeg', 'webp'])
                 if uploaded_file:
                     image = Image.open(uploaded_file)
                     st.image(image, caption="Candidate", use_container_width=True)
@@ -2014,120 +2120,232 @@ elif app_mode == "VISUAL COMPLIANCE":
 
             st.divider()
 
+            # --- USAGE NUDGE & COST DISCLOSURE ---
             _usage = st.session_state.get('usage', {})
             _nudge = sub_manager.get_usage_nudge_message(_usage)
             if _nudge:
                 if _usage.get('percentage', 0) >= 100: st.warning(_nudge)
                 else: st.info(_nudge)
 
+            from tier_config import get_tier_config
+            _va_weight = get_tier_config(
+                st.session_state.get('tier', {}).get('_tier_key', 'solo')
+            ).get('visual_audit_action_weight', 3)
+            _va_used = _usage.get('used', 0)
+            _va_limit = _usage.get('limit', 0)
+            _va_limit_str = str(_va_limit) if _va_limit > 0 else "Unlimited"
+            st.caption(f"Each Visual Audit uses {_va_weight} AI actions. Current usage: {_va_used}/{_va_limit_str} this month.")
+
+            # --- OPTIONAL CONTEXT ---
+            asset_description = st.text_input(
+                "Asset context (optional — helps the AI select the right voice cluster for comparison)",
+                placeholder="e.g. 'New landing page hero section' or 'Email newsletter header'",
+                key="va_asset_description",
+            )
+
             if st.button("RUN COMPLIANCE CHECK", type="primary", use_container_width=True,
                          disabled=not (_is_super_admin() or _subscription_active())):
                 if uploaded_file:
-                    with st.spinner("ANALYZING PIXELS & CALCULATING COMPLIANCE..."):
-                        
-                        inputs = profile_data.get('inputs', {})
-                        
-                        # 1. PREPARE VISUAL REFERENCE (COLLAGE)
+                    inputs = profile_data.get('inputs', {})
+
+                    # Check if brand has enough data for any meaningful audit
+                    _has_palette = bool(inputs.get('palette_primary'))
+                    _has_any_brand = _has_palette or bool(inputs.get('wiz_tone')) or bool(inputs.get('wiz_guardrails'))
+                    if not _has_any_brand:
+                        st.error("This brand doesn't have enough data for a meaningful audit. Add at least a hex palette or brand strategy in the Brand Architect first.")
+                    else:
+                        # 1. PREPARE REFERENCE IMAGE
                         reference_image_obj = None
                         if selected_asset_names:
                             imgs = [all_assets[n] for n in selected_asset_names]
                             reference_image_obj = create_reference_collage(imgs)
-                        
-                        # 2. BUILD TEXT DNA (THE FALLBACK KING)
-                        def clean_dna(text):
-                            if not text: return ""
-                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
 
-                        visual_dna_clean = clean_dna(inputs.get('visual_dna', ''))
-                        mh_block = build_mh_context(inputs)
+                        _asset_ctx = asset_description.strip() if asset_description else asset_type
 
-                        visual_context = f"""
-                        CORE IDENTITY (THE LAW):
-                        - Primary Palette (Hex): {', '.join(inputs.get('palette_primary', []))}
-                        - Typography/Style Rules: {visual_dna_clean}
-                        - Brand Voice: {inputs.get('wiz_tone', 'N/A')}
-                        - Core Values: {inputs.get('wiz_values', 'N/A')}
-                        {mh_block}
-                        CONTEXT:
-                        - Asset Type: {asset_type}
+                        # --- LAYER 1: COLOR COMPLIANCE (deterministic, fast) ---
+                        with st.spinner("Layer 1/3: Analyzing color compliance..."):
+                            color_result = visual_audit.run_color_compliance(image, inputs)
 
-                        GUARDRAILS (DO NOT VIOLATE):
-                        {inputs.get('wiz_guardrails', '')}
-                        """
-                        
-                        try:
-                            # Pass the Collage as the single reference image
-                            result = logic_engine.run_visual_audit(image, visual_context, reference_image=reference_image_obj)
-                            
-                            # Save State
-                            st.session_state['active_audit_result'] = result
-                            st.session_state['active_audit_image'] = image
-                            
-                            # LOG TO DB (GOD MODE)
-                            db.log_event(
-                                org_id=st.session_state.get('org_id', 'Unknown'),
-                                username=st.session_state.get('username', 'Unknown'),
-                                activity_type="VISUAL AUDIT",
-                                asset_name=uploaded_file.name,
-                                score=result.get('score', 0),
-                                verdict=result.get('verdict', 'N/A'),
-                                metadata=result
+                        # Show color results immediately
+                        _cs = color_result.get('score')
+                        if color_result.get('skipped'):
+                            st.info("Color compliance skipped — no hex palette defined.")
+                        elif _cs is not None:
+                            _cc = "#09ab3b" if _cs >= 80 else "#ffa421" if _cs >= 50 else "#ff4b4b"
+                            st.markdown(f"<div style='padding:8px; border-left:3px solid {_cc};'><strong>Color Compliance:</strong> {_cs}/100</div>", unsafe_allow_html=True)
+
+                        # --- LAYER 2: VISUAL IDENTITY (AI) ---
+                        with st.spinner("Layer 2/3: Analyzing visual identity..."):
+                            visual_result = visual_audit.run_visual_identity_check(
+                                image, inputs,
+                                color_result.get('detected_hexes', []),
+                                reference_image=reference_image_obj,
                             )
+
+                        # --- LAYER 3: COPY & MESSAGING (AI) ---
+                        with st.spinner("Layer 3/3: Extracting and analyzing copy..."):
+                            copy_result = visual_audit.run_copy_compliance(image, inputs)
+
+                        # --- ASSEMBLE UNIFIED REPORT ---
+                        ai_was_used = (
+                            (visual_result.get('score') is not None and 'error' not in visual_result)
+                            or (copy_result.get('score') is not None and not copy_result.get('skipped') and 'error' not in copy_result)
+                        )
+
+                        # Scoring
+                        weights = {}
+                        if color_result.get('score') is not None:
+                            weights['color'] = (color_result['score'], 0.30)
+                        if visual_result.get('score') is not None:
+                            weights['visual'] = (visual_result['score'], 0.30)
+                        if copy_result.get('score') is not None and not copy_result.get('skipped'):
+                            weights['copy'] = (copy_result['score'], 0.40)
+
+                        if weights:
+                            _tw = sum(w for _, w in weights.values())
+                            overall_score = int(sum(s * (w / _tw) for s, w in weights.values()))
+                        else:
+                            overall_score = 0
+                        overall_score = max(0, min(100, overall_score))
+
+                        if overall_score >= 90: verdict = "STRONG COMPLIANCE"
+                        elif overall_score >= 70: verdict = "NEEDS ATTENTION"
+                        else: verdict = "SIGNIFICANT ISSUES"
+
+                        # Collect findings
+                        all_findings = []
+                        for f in color_result.get('findings', []):
+                            f['section'] = 'Color Compliance'
+                            all_findings.append(f)
+                        for f in visual_result.get('findings', []):
+                            f['section'] = 'Visual Identity'
+                            all_findings.append(f)
+                        for f in copy_result.get('findings', []):
+                            f['section'] = 'Copy & Messaging'
+                            all_findings.append(f)
+
+                        # Build summary
+                        _n_crit = sum(1 for f in all_findings if f.get('severity') == 'CRITICAL')
+                        _n_warn = sum(1 for f in all_findings if f.get('severity') == 'WARNING')
+                        _n_pass = sum(1 for f in all_findings if f.get('type') == 'pass')
+                        _sum_parts = []
+                        if _n_crit: _sum_parts.append(f"{_n_crit} critical issue{'s' if _n_crit != 1 else ''}")
+                        if _n_warn: _sum_parts.append(f"{_n_warn} warning{'s' if _n_warn != 1 else ''}")
+                        if _n_pass: _sum_parts.append(f"{_n_pass} check{'s' if _n_pass != 1 else ''} passed")
+                        exec_summary = ". ".join(_sum_parts) + "." if _sum_parts else "Audit completed."
+
+                        result = {
+                            'overall_score': overall_score,
+                            'verdict': verdict,
+                            'summary': exec_summary,
+                            'brand_name': inputs.get('wiz_name', 'Unknown'),
+                            'asset_context': _asset_ctx,
+                            'timestamp': __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'),
+                            'color_result': color_result,
+                            'visual_result': visual_result,
+                            'copy_result': copy_result,
+                            'all_findings': all_findings,
+                            'scores': {
+                                'color': color_result.get('score'),
+                                'visual': visual_result.get('score'),
+                                'copy': copy_result.get('score'),
+                            },
+                            'ai_was_used': ai_was_used,
+                        }
+
+                        # Save state
+                        st.session_state['active_audit_result'] = result
+                        st.session_state['active_audit_image'] = image
+
+                        # Log to DB
+                        db.log_event(
+                            org_id=st.session_state.get('org_id', 'Unknown'),
+                            username=st.session_state.get('username', 'Unknown'),
+                            activity_type="VISUAL AUDIT",
+                            asset_name=uploaded_file.name,
+                            score=overall_score,
+                            verdict=verdict,
+                            metadata={'scores': result['scores'], 'summary': exec_summary}
+                        )
+
+                        # Record AI action ONLY if AI was actually used
+                        if ai_was_used:
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'visual_audit')
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
-                            st.rerun()
 
-                        except Exception as e:
-                            st.error(f"System Error: {e}")
+                        st.rerun()
                 else:
                     st.warning("Please upload an image.")
 
-        # --- RESULTS DISPLAY (If State Exists) ---
+        # ═══════════════════════════════════════════════════════
+        # UNIFIED AUDIT REPORT DISPLAY
+        # ═══════════════════════════════════════════════════════
         if st.session_state.get('active_audit_result'):
             result = st.session_state['active_audit_result']
-            
-            # Score Header
-            score = result.get('score', 0)
-            bd = result.get('breakdown', {})
-            score_color = "#ff4b4b" 
-            if score > 60: score_color = "#ffa421"
-            if score > 85: score_color = "#09ab3b"
-            
-            c1, c2 = st.columns([1, 2])
-            with c1:
+            _scores = result.get('scores', {})
+            _findings = result.get('all_findings', [])
+
+            # --- REPORT HEADER ---
+            overall_score = result.get('overall_score', 0)
+            score_color = "#ff4b4b"
+            if overall_score >= 70: score_color = "#ffa421"
+            if overall_score >= 90: score_color = "#09ab3b"
+
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #1b2a2e 0%, #24363b 100%); border: 1px solid {score_color}; padding: 20px 30px; border-radius: 4px; margin-bottom: 20px;">
+                <div style="font-size: 0.75rem; color: #ab8f59; letter-spacing: 2px; font-weight: 700; margin-bottom: 4px;">BRAND COMPLIANCE AUDIT — {html.escape(result.get('brand_name', ''))}</div>
+                <div style="font-size: 0.7rem; color: #5c6b61;">Audited: {result.get('timestamp', '')} | Asset: {html.escape(result.get('asset_context', 'Screenshot'))}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- SCORE + LAYER BARS ---
+            sc_left, sc_right = st.columns([1, 2])
+            with sc_left:
                 st.markdown(f"""
-                    <div style="background-color: #1b2a2e; border: 1px solid {score_color}; padding: 30px; border-radius: 4px; text-align: center; height: 100%;">
-                        <h2 style="color: {score_color}; margin: 0; font-size: 3.5rem; font-weight: 800; letter-spacing: -2px;">{score}</h2>
-                        <p style="color: #5c6b61; margin: 0; letter-spacing: 2px; font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">{result.get('verdict', 'ANALYZED')}</p>
-                    </div>
+                <div style="background-color: #1b2a2e; border: 1px solid {score_color}; padding: 30px; border-radius: 4px; text-align: center;">
+                    <h2 style="color: {score_color}; margin: 0; font-size: 3.5rem; font-weight: 800; letter-spacing: -2px;">{overall_score}</h2>
+                    <p style="color: #5c6b61; margin: 0; letter-spacing: 2px; font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">{result.get('verdict', 'ANALYZED')}</p>
+                </div>
                 """, unsafe_allow_html=True)
-            
-            with c2:
-                def render_bar(label, val, weight_txt):
-                    try: val = int(val) 
-                    except: val = 0
-                    color = "#09ab3b" if val > 80 else "#ffa421" if val > 50 else "#ff4b4b"
-                    st.markdown(f"""
+                st.caption(result.get('summary', ''))
+
+            with sc_right:
+                def render_bar(label, val, weight_txt, skipped=False):
+                    if skipped or val is None:
+                        st.markdown(f"""
                         <div style="margin-bottom: 8px;">
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:700; color:#a0a0a0;">
                                 <span>{label} <span style="font-weight:400; font-style:italic;">{weight_txt}</span></span>
-                                <span style="color:{color};">{val}/100</span>
+                                <span style="color:#5c6b61;">Skipped</span>
                             </div>
-                            <div style="width:100%; height:6px; background:#3d3d3d; border-radius:3px; overflow:hidden;">
-                                <div style="width:{val}%; height:100%; background:{color};"></div>
-                            </div>
+                            <div style="width:100%; height:6px; background:#3d3d3d; border-radius:3px;"></div>
                         </div>
+                        """, unsafe_allow_html=True)
+                        return
+                    try: val = int(val)
+                    except: val = 0
+                    color = "#09ab3b" if val > 80 else "#ffa421" if val > 50 else "#ff4b4b"
+                    st.markdown(f"""
+                    <div style="margin-bottom: 8px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:700; color:#a0a0a0;">
+                            <span>{label} <span style="font-weight:400; font-style:italic;">{weight_txt}</span></span>
+                            <span style="color:{color};">{val}/100</span>
+                        </div>
+                        <div style="width:100%; height:6px; background:#3d3d3d; border-radius:3px; overflow:hidden;">
+                            <div style="width:{val}%; height:100%; background:{color};"></div>
+                        </div>
+                    </div>
                     """, unsafe_allow_html=True)
-                
-                render_bar("COLOR FIDELITY", bd.get('color', {}).get('score', 0), "(25%)")
-                render_bar("IDENTITY INTEGRITY", bd.get('identity', {}).get('score', 0), "(25%)")
-                render_bar("TONE & COPY", bd.get('tone', {}).get('score', 0), "(20%)")
-                render_bar("TYPOGRAPHY", bd.get('typography', {}).get('score', 0), "(15%)")
-                render_bar("VISUAL AESTHETIC", bd.get('vibe', {}).get('score', 0), "(15%)") # RENAMED
+
+                _color_skip = result.get('color_result', {}).get('skipped', False)
+                _copy_skip = result.get('copy_result', {}).get('skipped', False)
+                render_bar("COLOR COMPLIANCE", _scores.get('color'), "(30%)", skipped=_color_skip)
+                render_bar("VISUAL IDENTITY", _scores.get('visual'), "(30%)")
+                render_bar("COPY & MESSAGING", _scores.get('copy'), "(40%)", skipped=_copy_skip)
 
             st.divider()
-            
-            col_crit, col_warn, col_win = st.columns(3)
+
+            # --- CSS FOR FINDINGS ---
             st.markdown("""
             <style>
                 .geo-bullet-red { display: inline-block; width: 8px; height: 8px; background-color: #ff4b4b; margin-right: 8px; transform: rotate(45deg); }
@@ -2136,52 +2354,108 @@ elif app_mode == "VISUAL COMPLIANCE":
                 .audit-item { font-size: 0.85rem; color: #f5f5f0; margin-bottom: 12px; border-left: 2px solid #3d3d3d; padding-left: 12px; line-height: 1.4; }
             </style>
             """, unsafe_allow_html=True)
-            
-            with col_crit:
-                st.markdown("<h5 style='color:#ff4b4b; letter-spacing:1px;'>VIOLATIONS</h5>", unsafe_allow_html=True)
-                if result.get('critical_fixes'):
-                    for fix in result['critical_fixes']:
-                        st.markdown(f"<div class='audit-item' style='border-left-color: #ff4b4b;'><div class='geo-bullet-red'></div>{fix}</div>", unsafe_allow_html=True)
-                else:
-                    st.caption("No critical errors.")
 
-            with col_warn:
-                st.markdown("<h5 style='color:#ffa421; letter-spacing:1px;'>REFINEMENTS</h5>", unsafe_allow_html=True)
-                if result.get('minor_fixes'):
-                    for fix in result['minor_fixes']:
-                        st.markdown(f"<div class='audit-item' style='border-left-color: #ffa421;'><div class='geo-bullet-orange'></div>{fix}</div>", unsafe_allow_html=True)
+            # --- SECTION 1: COLOR COMPLIANCE ---
+            with st.expander("1. COLOR COMPLIANCE", expanded=True):
+                cr = result.get('color_result', {})
+                if cr.get('skipped'):
+                    st.info(cr.get('reasoning', 'Skipped.'))
                 else:
-                    st.caption("No refinements needed.")
+                    st.markdown(f"**Score:** {cr.get('score', 0)}/100")
+                    if cr.get('detected_hexes'):
+                        det_swatches = " ".join(
+                            f"<span style='display:inline-block;width:20px;height:20px;background:{h};border:1px solid #555;margin-right:4px;vertical-align:middle;'></span><code>{h}</code>"
+                            for h in cr['detected_hexes']
+                        )
+                        st.markdown(f"**Detected Colors:** {det_swatches}", unsafe_allow_html=True)
+                    if cr.get('brand_hexes'):
+                        brand_swatches = " ".join(
+                            f"<span style='display:inline-block;width:20px;height:20px;background:{h};border:1px solid #555;margin-right:4px;vertical-align:middle;'></span><code>{h}</code>"
+                            for h in cr['brand_hexes']
+                        )
+                        st.markdown(f"**Brand Palette:** {brand_swatches}", unsafe_allow_html=True)
+                    st.caption(cr.get('reasoning', ''))
+                    for f in cr.get('findings', []):
+                        _icon = {"pass": "&#10004;", "warning": "&#9888;", "fail": "&#10008;"}.get(f.get('type'), '')
+                        _col = {"PASS": "#09ab3b", "WARNING": "#ffa421", "CRITICAL": "#ff4b4b"}.get(f.get('severity'), '#a0a0a0')
+                        st.markdown(f"<div class='audit-item' style='border-left-color:{_col};'>{_icon} {html.escape(f.get('text', ''))}</div>", unsafe_allow_html=True)
 
-            with col_win:
-                st.markdown("<h5 style='color:#09ab3b; letter-spacing:1px;'>SUCCESS</h5>", unsafe_allow_html=True)
-                if result.get('brand_wins'):
-                    for win in result['brand_wins']:
-                        st.markdown(f"<div class='audit-item' style='border-left-color: #09ab3b;'><div class='geo-bullet-green'></div>{win}</div>", unsafe_allow_html=True)
+            # --- SECTION 2: VISUAL IDENTITY COMPLIANCE ---
+            with st.expander("2. VISUAL IDENTITY COMPLIANCE", expanded=True):
+                vr = result.get('visual_result', {})
+                if vr.get('error'):
+                    st.warning(f"Visual identity check could not be completed: {vr.get('error', '')}")
+                elif vr.get('score') is not None:
+                    st.markdown(f"**Score:** {vr.get('score', 0)}/100")
+                    if vr.get('summary'):
+                        st.caption(vr['summary'])
+                    for f in vr.get('findings', []):
+                        _type = f.get('type', 'pass')
+                        if _type == 'pass':
+                            _prefix, _bul, _col = "BRAND FIDELITY", "geo-bullet-green", "#09ab3b"
+                        elif _type == 'warning':
+                            _prefix, _bul, _col = "BRAND DRIFT", "geo-bullet-orange", "#ffa421"
+                        else:
+                            _prefix, _bul, _col = "BRAND DEGRADATION", "geo-bullet-red", "#ff4b4b"
+                        _guideline = f.get('guideline', '')
+                        _sev = f" (Severity: {f.get('severity')})" if f.get('severity') in ('CRITICAL', 'WARNING') else ""
+                        st.markdown(
+                            f"<div class='audit-item' style='border-left-color:{_col};'>"
+                            f"<div class='{_bul}'></div><strong>{_prefix}</strong> — {_guideline}: {html.escape(f.get('text', ''))}{_sev}</div>",
+                            unsafe_allow_html=True
+                        )
                 else:
-                    st.caption("No specific wins.")
-            
-            with st.expander("VIEW SCORING LOGIC (TRANSPARENCY REPORT)"):
-                r_color = bd.get('color', {}).get('reason', 'No data.')
-                r_id = bd.get('identity', {}).get('reason', 'No data.')
-                r_tone = bd.get('tone', {}).get('reason', 'No data.')
-                r_typo = bd.get('typography', {}).get('reason', 'No data.')
-                r_vibe = bd.get('vibe', {}).get('reason', 'No data.')
-                
-                st.markdown(f"""
-                **1. COLOR ANALYSIS:** {r_color}
-                **2. IDENTITY:** {r_id}
-                **3. TONE & COPY:** {r_tone}
-                **4. TYPOGRAPHY:** {r_typo}
-                **5. VISUAL AESTHETIC:** {r_vibe}
-                """)
+                    st.info("Visual identity check was not performed.")
 
-                # Message House alignment status
-                _vc_inputs = st.session_state['profiles'].get(active_profile, {}).get('inputs', {}) if active_profile else {}
-                if build_mh_context(_vc_inputs):
-                    st.markdown("**6. MESSAGE HOUSE ALIGNMENT:** Evaluated by AI against brand promise, pillar claims, and off-limits language. Review VIOLATIONS above for any flagged messaging deviations.")
+            # --- SECTION 3: COPY & MESSAGING COMPLIANCE ---
+            with st.expander("3. COPY & MESSAGING COMPLIANCE", expanded=True):
+                cpr = result.get('copy_result', {})
+                if cpr.get('skipped'):
+                    st.info(cpr.get('summary', 'Copy compliance skipped.'))
+                elif cpr.get('error'):
+                    st.warning(f"Copy analysis could not be completed: {cpr.get('error', '')}")
+                elif cpr.get('score') is not None:
+                    st.markdown(f"**Score:** {cpr.get('score', 0)}/100")
+                    if cpr.get('text_summary'):
+                        st.markdown(f"**Extracted Text Summary:** {cpr['text_summary']}")
+                    if cpr.get('summary'):
+                        st.caption(cpr['summary'])
+                    for f in cpr.get('findings', []):
+                        _type = f.get('type', 'pass')
+                        if _type == 'pass':
+                            _prefix, _bul, _col = "BRAND FIDELITY", "geo-bullet-green", "#09ab3b"
+                        elif _type == 'warning':
+                            _prefix, _bul, _col = "BRAND DRIFT", "geo-bullet-orange", "#ffa421"
+                        else:
+                            _prefix, _bul, _col = "BRAND DEGRADATION", "geo-bullet-red", "#ff4b4b"
+                        _guideline = f.get('guideline', '')
+                        _sev = f" (Severity: {f.get('severity')})" if f.get('severity') in ('CRITICAL', 'WARNING') else ""
+                        st.markdown(
+                            f"<div class='audit-item' style='border-left-color:{_col};'>"
+                            f"<div class='{_bul}'></div><strong>{_prefix}</strong> — {_guideline}: {html.escape(f.get('text', ''))}{_sev}</div>",
+                            unsafe_allow_html=True
+                        )
+                    # Show extracted text in expander
+                    if cpr.get('extracted_text'):
+                        with st.expander("View Extracted Text"):
+                            st.text(cpr['extracted_text'])
                 else:
-                    st.markdown("**6. MESSAGE HOUSE ALIGNMENT:** Message house not configured. Proofing limited to tone and voice pattern matching. Configure in Brand Architect for claim-level compliance.")
+                    st.info("Copy & messaging check was not performed.")
+
+            # --- RECOMMENDATIONS ---
+            recs = [f for f in _findings if f.get('type') in ('fail', 'warning')]
+            if recs:
+                with st.expander("RECOMMENDATIONS (Prioritized)"):
+                    _sorted = sorted(recs, key=lambda x: {"CRITICAL": 0, "WARNING": 1, "NOTE": 2}.get(x.get('severity', 'NOTE'), 2))
+                    for i, f in enumerate(_sorted, 1):
+                        _sev = f.get('severity', 'NOTE')
+                        _col = {"CRITICAL": "#ff4b4b", "WARNING": "#ffa421"}.get(_sev, "#a0a0a0")
+                        _section = f.get('section', '')
+                        st.markdown(
+                            f"<div style='margin-bottom:10px; padding:8px 12px; border-left:3px solid {_col}; font-size:0.85rem;'>"
+                            f"<strong style='color:{_col};'>{_sev}</strong> [{_section}] {html.escape(f.get('text', ''))}</div>",
+                            unsafe_allow_html=True
+                        )
     
     # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
     if app_mode == "TEAM MANAGEMENT":

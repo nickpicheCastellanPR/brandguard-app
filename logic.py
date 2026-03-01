@@ -136,12 +136,20 @@ class ColorScorer:
                 # B. TINT/SHADE MATH (The Vector Upgrade)
                 d_h, d_l, d_s = colorsys.rgb_to_hls(*[x/255.0 for x in d_rgb])
                 b_h, b_l, b_s = colorsys.rgb_to_hls(*[x/255.0 for x in b_rgb])
-                
+
+                # Guard: both colors must have meaningful saturation
+                # Achromatic colors (white/gray/black) have near-zero saturation,
+                # making their hue arbitrary — skip tint/shade for these
+                if d_s < 0.10 or b_s < 0.10:
+                    continue
+
                 hue_diff = abs(d_h - b_h)
-                if hue_diff > 0.5: hue_diff = 1.0 - hue_diff 
-                
+                if hue_diff > 0.5: hue_diff = 1.0 - hue_diff
+
                 if hue_diff < 0.05: # 5% Tolerance on Hue Family
-                    tint_score = 90 
+                    # Graduate score based on lightness difference
+                    lightness_diff = abs(d_l - b_l)
+                    tint_score = max(0, int(90 - (lightness_diff * 120)))
                     if tint_score > best_match_score:
                         best_match_score = tint_score
                         match_type = "Tint/Shade"
