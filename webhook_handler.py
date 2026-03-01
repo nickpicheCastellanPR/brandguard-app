@@ -4,6 +4,7 @@ webhook_handler.py — FastAPI receiver for Lemon Squeezy subscription webhooks.
 Run alongside Streamlit via start.sh:
     uvicorn webhook_handler:app --host 0.0.0.0 --port 8001
 """
+from __future__ import annotations
 
 import hmac
 import hashlib

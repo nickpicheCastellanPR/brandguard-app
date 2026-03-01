@@ -10,6 +10,7 @@ Public API (import subscription_manager as sub_manager):
     sub_manager.check_usage_limit(username)         → {"within_limit": True, "used": int, "limit": int, "percentage": float}
     sub_manager.get_usage_nudge_message(usage_info) → str | None
 """
+from __future__ import annotations
 
 import logging
 import os

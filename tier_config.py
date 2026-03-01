@@ -3,6 +3,7 @@ tier_config.py — Single source of truth for all subscription tier definitions.
 Every limit, module permission, and pricing figure lives here.
 Never hardcode tier limits anywhere else in the codebase.
 """
+from __future__ import annotations
 
 TIER_CONFIG = {
     "solo": {
