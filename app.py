@@ -925,11 +925,11 @@ def remove_palette_color(key, index):
 if not st.session_state['authenticated']:
     # 1. GLOBAL STYLES + LOGIN CARD CSS
     st.markdown("""<style>
-        .stApp { 
-            background-color: #f5f5f0 !important; 
-            background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%); 
-            background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%; 
-        } 
+        .stApp {
+            background-color: #f5f5f0 !important;
+            background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
+            background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+        }
         section[data-testid="stSidebar"] { display: none; } 
         .stTextInput input { 
             background-color: #ffffff !important; 
@@ -1018,14 +1018,11 @@ if not st.session_state['authenticated']:
         # FIX: HTML is flush-left to prevent "Black Box" code block rendering
         st.markdown("""
 <div class="login-content-left">
-<h1>Signet &mdash; Brand Fidelity Engine</h1>
+<h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
 <p class="subheadline">
-Calibrate your brand. Generate on-message content. Catch drift before it becomes degradation.
-</p>
-<p style="font-size:1rem; line-height:1.7; color:#3d3d3d; margin-bottom:32px; max-width:600px;">
-Signet is the brand fidelity platform built by Castellan PR. Upload your brand&rsquo;s strategy,
-message house, and voice samples &mdash; the engine calibrates to your positioning and ensures
-every output stays aligned. The more you calibrate, the more precise the output.
+When content velocity exceeds founder bandwidth, signal degradation begins.
+Signet prevents brand drift through algorithmic fidelity—measuring every
+output against your authoritative baseline before it reaches stakeholders.
 </p>
 <ul class="feature-list">
 <li>
@@ -1033,7 +1030,7 @@ every output stays aligned. The more you calibrate, the more precise the output.
 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
 </svg>
 <span class="feature-text">
-<strong>Voice DNA Calibration:</strong> Ingest gold-standard assets to lock your executive voice signature
+<strong>Voice DNA Calibration:</strong> 3-5 gold-standard assets lock your executive voice
 </span>
 </li>
 <li>
@@ -1045,7 +1042,7 @@ every output stays aligned. The more you calibrate, the more precise the output.
 <line x1="12" y1="22" x2="12" y2="18"></line>
 </svg>
 <span class="feature-text">
-<strong>Visual Fidelity Engine:</strong> Audit every image against palette, logo, and typography specifications
+<strong>Visual Fidelity Engine:</strong> Audit every image against palette specifications
 </span>
 </li>
 <li>
@@ -1054,7 +1051,7 @@ every output stays aligned. The more you calibrate, the more precise the output.
 <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
 </svg>
 <span class="feature-text">
-<strong>Signal Integrity Score:</strong> Quantify consistency across your full publishing perimeter
+<strong>Signal Integrity Score:</strong> Quantify consistency across your publishing perimeter
 </span>
 </li>
 </ul>
@@ -1137,7 +1134,7 @@ every output stays aligned. The more you calibrate, the more precise the output.
                 else:
                     st.error("Username already taken.")
 
-    st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>Built by <a href='https://castellanpr.com' target='_blank' style='color:#ab8f59; text-decoration:none;'>Castellan PR</a> &middot; castellanpr.com</div>", unsafe_allow_html=True)
+    st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR</div>", unsafe_allow_html=True)
     st.stop()
     
 # --- SIDEBAR ---
