@@ -8,6 +8,7 @@ import time # Added for Session Expiry
 from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
+import admin_panel
 import html
 
 # --- PAGE CONFIG ---
@@ -395,11 +396,24 @@ def init_wizard_state():
     if 'file_uploader_key' not in st.session_state: st.session_state['file_uploader_key'] = 0 
     if 'social_uploader_key' not in st.session_state: st.session_state['social_uploader_key'] = 1000
     if 'logo_uploader_key' not in st.session_state: st.session_state['logo_uploader_key'] = 2000
+    # Message House State
+    if 'mh_brand_promise' not in st.session_state: st.session_state['mh_brand_promise'] = ""
+    if 'mh_pillars_json' not in st.session_state: st.session_state['mh_pillars_json'] = ""
+    if 'mh_founder_positioning' not in st.session_state: st.session_state['mh_founder_positioning'] = ""
+    if 'mh_pov' not in st.session_state: st.session_state['mh_pov'] = ""
+    if 'mh_boilerplate' not in st.session_state: st.session_state['mh_boilerplate'] = ""
+    if 'mh_offlimits' not in st.session_state: st.session_state['mh_offlimits'] = ""
+    if 'mh_preapproval_claims' not in st.session_state: st.session_state['mh_preapproval_claims'] = ""
+    if 'mh_tone_constraints' not in st.session_state: st.session_state['mh_tone_constraints'] = ""
 
 init_wizard_state()
 
 if 'profiles' not in st.session_state: st.session_state['profiles'] = {}
 if 'nav_selection' not in st.session_state: st.session_state['nav_selection'] = "DASHBOARD"
+if 'tier' not in st.session_state: st.session_state['tier'] = {}
+if 'usage' not in st.session_state: st.session_state['usage'] = {}
+if 'subscription_status' not in st.session_state: st.session_state['subscription_status'] = 'inactive'
+if '_tier_resolved_at' not in st.session_state: st.session_state['_tier_resolved_at'] = 0
 
 ARCHETYPES = [
     "The Ruler", "The Creator", "The Sage", "The Innocent", 
@@ -480,46 +494,123 @@ def activate_profile(profile_name):
     
 def calculate_calibration_score(profile_data):
     """
-    Advanced 'Cluster Density' Scoring.
+    Calibration Scoring v2.
     Total = 100.
-    - Strategy: 20
-    - Visuals: 15
-    - Social: 15
-    - Voice Clusters: 50 (10 pts per fortified cluster)
+    - Strategy:       10 pts (2.5 per field)
+    - Message House:  25 pts (mh_sub_score x 0.25)
+    - Visuals:        10 pts (palette 3, visual asset 7)
+    - Social:         10 pts (>=3 assets=10, >=1=3)
+    - Voice Clusters: 45 pts (9 pts per fortified cluster x 5)
+    Hard ceiling: If MH sub-score = 0, cap total at 55.
     """
     score = 0
-    breakdown = []
-    
+    mh_sub_score = 0
+    mh_filled_fields = 0
+    mh_total_fields = 8
+    cluster_health = {}
+
     # CASE A: STRUCTURED DATA
     if isinstance(profile_data, dict) and 'inputs' in profile_data:
         inputs = profile_data['inputs']
-        
-        # 1. STRATEGY (20 PTS)
+
+        # 1. STRATEGY (10 PTS)
         strat_score = 0
-        if inputs.get('wiz_mission'): strat_score += 5
-        if inputs.get('wiz_values'): strat_score += 5
-        if inputs.get('wiz_guardrails'): strat_score += 5
-        if inputs.get('wiz_archetype'): strat_score += 5
+        if inputs.get('wiz_mission'): strat_score += 2.5
+        if inputs.get('wiz_values'): strat_score += 2.5
+        if inputs.get('wiz_guardrails'): strat_score += 2.5
+        if inputs.get('wiz_archetype'): strat_score += 2.5
         score += strat_score
 
-        # 2. VISUALS (15 PTS)
+        # 2. MESSAGE HOUSE (25 PTS via internal 0-100 sub-score x 0.25)
+        # Brand Promise: 20%
+        bp = inputs.get('mh_brand_promise', '').strip()
+        if bp:
+            mh_sub_score += 20
+            mh_filled_fields += 1
+
+        # Pillars: up to 35% (12% per complete pillar, capped at 35)
+        pillars_json = inputs.get('mh_pillars_json', '')
+        pillar_pts = 0
+        has_any_pillar = False
+        if pillars_json:
+            try:
+                pillars = json.loads(pillars_json)
+                for p in pillars:
+                    name = p.get('name', '').strip()
+                    if not name:
+                        continue
+                    has_any_pillar = True
+                    p_completeness = 0.25  # name only
+                    if p.get('tagline', '').strip():
+                        p_completeness = 0.50
+                    if p.get('headline_claim', '').strip():
+                        p_completeness = 0.75
+                    proof_count = sum(1 for j in range(1, 4) if p.get(f'proof_{j}', '').strip())
+                    if proof_count >= 2:
+                        p_completeness = 1.0
+                    pillar_pts += 12 * p_completeness
+                mh_sub_score += min(pillar_pts, 35)
+                if has_any_pillar:
+                    mh_filled_fields += 1
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Proof Points: 15% (filled / 9 total x 15)
+        if pillars_json:
+            try:
+                pillars = json.loads(pillars_json)
+                total_proofs = sum(
+                    1 for p in pillars
+                    for j in range(1, 4)
+                    if p.get(f'proof_{j}', '').strip()
+                )
+                mh_sub_score += (total_proofs / 9) * 15
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Founder Positioning: 10%
+        if inputs.get('mh_founder_positioning', '').strip():
+            mh_sub_score += 10
+            mh_filled_fields += 1
+
+        # POV Statement: 10%
+        if inputs.get('mh_pov', '').strip():
+            mh_sub_score += 10
+            mh_filled_fields += 1
+
+        # Boilerplate: 5%
+        if inputs.get('mh_boilerplate', '').strip():
+            mh_sub_score += 5
+            mh_filled_fields += 1
+
+        # Messaging Guardrails (any of 3 sub-fields): 5%
+        has_guardrail = any(
+            inputs.get(k, '').strip()
+            for k in ['mh_offlimits', 'mh_preapproval_claims', 'mh_tone_constraints']
+        )
+        if has_guardrail:
+            mh_sub_score += 5
+            mh_filled_fields += 1
+
+        mh_sub_score = min(mh_sub_score, 100)
+        score += mh_sub_score * 0.25
+
+        # 3. VISUALS (10 PTS)
         vis_score = 0
-        if inputs.get('palette_primary'): vis_score += 5
-        # Count Visual Assets
+        if inputs.get('palette_primary'): vis_score += 3
         v_blob = inputs.get('visual_dna', '')
-        if "[ASSET:" in v_blob: vis_score += 10
+        if "[ASSET:" in v_blob: vis_score += 7
         score += vis_score
 
-        # 3. SOCIAL (15 PTS)
+        # 4. SOCIAL (10 PTS)
         soc_score = 0
         s_blob = inputs.get('social_dna', '')
         s_count = s_blob.count("[ASSET:")
-        if s_count >= 3: soc_score = 15
-        elif s_count >= 1: soc_score = 5
+        if s_count >= 3: soc_score = 10
+        elif s_count >= 1: soc_score = 3
         score += soc_score
 
-        # 4. VOICE CLUSTERS (50 PTS - The Heavy Lifting)
-        # We define the 5 specific keys we are looking for
+        # 5. VOICE CLUSTERS (45 PTS — 9 pts per fortified cluster)
         voice_blob = inputs.get('voice_dna', '')
         clusters = {
             "Corporate": "Corporate Affairs",
@@ -528,16 +619,11 @@ def calculate_calibration_score(profile_data):
             "Thought": "Thought Leadership",
             "Marketing": "Brand Marketing"
         }
-        
-        cluster_health = {}
         voice_score = 0
-        
         for key, full_name in clusters.items():
-            # Count occurrences of specific cluster headers
             count = voice_blob.upper().count(f"CLUSTER: {full_name.upper()}")
-            
             if count >= 3:
-                points = 10
+                points = 9
                 status = "FORTIFIED"
                 icon = "✅"
             elif count >= 1:
@@ -548,37 +634,107 @@ def calculate_calibration_score(profile_data):
                 points = 0
                 status = "EMPTY"
                 icon = "❌"
-            
             voice_score += points
             cluster_health[key] = {"count": count, "status": status, "icon": icon}
-        
         score += voice_score
 
     # CASE B: LEGACY/PDF (Fallback)
     else:
-        # Simple length check for unstructured data
         text_data = str(profile_data.get('final_text', '') if isinstance(profile_data, dict) else profile_data)
-        score = min(len(text_data) // 50, 100) # 5000 chars = 100%
-        cluster_health = {}
+        score = min(len(text_data) // 50, 100)
+
+    # HARD CEILING: No MH data = cap at 55
+    score = min(score, 100)
+    if mh_sub_score == 0:
+        score = min(score, 55)
 
     # FINAL STATUS LABEL
-    score = min(score, 100)
     if score < 40:
         status_label = "LOW DATA"
-        color = "#ff4b4b" 
+        color = "#ff4b4b"
     elif score < 80:
         status_label = "DEVELOPING"
-        color = "#ffa421" 
+        color = "#ffa421"
     else:
         status_label = "FORTIFIED"
-        color = "#09ab3b" 
+        color = "#09ab3b"
 
     return {
         "score": score,
         "status_label": status_label,
         "color": color,
-        "clusters": cluster_health
+        "clusters": cluster_health,
+        "mh_sub_score": mh_sub_score,
+        "mh_filled_fields": mh_filled_fields,
+        "mh_total_fields": mh_total_fields,
+        "mh_ceiling_active": (mh_sub_score == 0)
     }
+
+
+def build_mh_context(inputs):
+    """
+    Builds the MESSAGE HOUSE block for AI prompts.
+    Only includes populated fields. Returns empty string if no MH data.
+    """
+    mh_parts = []
+
+    brand_promise = inputs.get('mh_brand_promise', '').strip()
+    if brand_promise:
+        mh_parts.append(f"BRAND PROMISE:\n{brand_promise}")
+
+    pillars_json = inputs.get('mh_pillars_json', '')
+    if pillars_json:
+        try:
+            pillars = json.loads(pillars_json)
+            pillar_lines = []
+            for i, p in enumerate(pillars, 1):
+                name = p.get('name', '').strip()
+                if not name:
+                    continue
+                pillar_lines.append(f"PILLAR {i}: {name}")
+                if p.get('tagline', '').strip():
+                    pillar_lines.append(f"  Tagline: {p['tagline'].strip()}")
+                if p.get('headline_claim', '').strip():
+                    pillar_lines.append(f"  Claim: {p['headline_claim'].strip()}")
+                pps = [p.get(f'proof_{j}', '').strip() for j in range(1, 4) if p.get(f'proof_{j}', '').strip()]
+                if pps:
+                    pillar_lines.append("  Proof Points:")
+                    for pp in pps:
+                        pillar_lines.append(f"  - {pp}")
+            if pillar_lines:
+                mh_parts.append("MESSAGE PILLARS:\n" + "\n".join(pillar_lines))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    for field_key, label in [
+        ('mh_founder_positioning', 'FOUNDER POSITIONING'),
+        ('mh_pov', 'POV STATEMENT'),
+        ('mh_boilerplate', 'BOILERPLATE'),
+    ]:
+        val = inputs.get(field_key, '').strip()
+        if val:
+            mh_parts.append(f"{label}: {val}")
+
+    guardrail_parts = []
+    for field_key, label in [
+        ('mh_offlimits', 'Off-limits'),
+        ('mh_preapproval_claims', 'Pre-approval required'),
+        ('mh_tone_constraints', 'Tone constraints'),
+    ]:
+        val = inputs.get(field_key, '').strip()
+        if val:
+            guardrail_parts.append(f"{label}: {val}")
+    if guardrail_parts:
+        mh_parts.append("MESSAGING GUARDRAILS:\n" + "\n".join(guardrail_parts))
+
+    if not mh_parts:
+        return ""
+
+    return (
+        "\n=== MESSAGE HOUSE (GOVERNING DOCUMENT) ===\n\n"
+        + "\n\n".join(mh_parts)
+        + "\n\n=== END MESSAGE HOUSE ===\n"
+    )
 # --- HELPER: ASSET-AWARE CONFIDENCE ENGINE ---
 def calculate_content_confidence(profile_data, content_type):
     """
@@ -1001,11 +1157,17 @@ output against your authoritative baseline before it reaches stakeholders.
                     st.session_state['org_id'] = user_data.get('org_id', user_data['username']) # Default to self if no org
                     st.session_state['is_admin'] = user_data['is_admin']
                     
-                    # 3. SYNC SUBSCRIPTION STATUS
+                    # 3. RESOLVE TIER & SYNC SUBSCRIPTION
+                    import time as _time
                     user_email = user_data.get('email', '')
-                    status = sub_manager.sync_user_status(user_data['username'], user_email)
-                    st.session_state['status'] = status
-                    
+                    tier_config = sub_manager.resolve_user_tier(user_data['username'])
+                    st.session_state['tier'] = tier_config
+                    st.session_state['subscription_status'] = tier_config.get('_subscription_status', 'inactive')
+                    st.session_state['status'] = st.session_state['subscription_status']  # backward compat
+                    st.session_state['_tier_resolved_at'] = _time.time()
+                    st.session_state['usage'] = sub_manager.check_usage_limit(user_data['username'])
+                    db.update_last_login(user_data['username'])
+
                     # 4. LOAD PROFILES & RERUN
                     st.session_state['profiles'] = db.get_profiles(user_data['username'])
                     st.rerun()
@@ -1111,7 +1273,7 @@ with st.sidebar:
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
     # 2. USER & STATUS BADGE
-    raw_user = st.session_state.get('username', 'User').upper()
+    raw_user = (st.session_state.get('username') or 'User').upper()
     import html
     user_tag = html.escape(raw_user) 
     
@@ -1189,9 +1351,21 @@ with st.sidebar:
                         <span>{data['count']}/3</span>
                     </div>
                     """, unsafe_allow_html=True)
-                
+
+                # MESSAGE HOUSE ROW
+                mh_sub = cal_data.get('mh_sub_score', 0)
+                mh_filled = cal_data.get('mh_filled_fields', 0)
+                mh_total = cal_data.get('mh_total_fields', 8)
+                mh_icon = "✅" if mh_sub >= 80 else ("⚠️" if mh_sub > 0 else "❌")
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px; color:#24363b; font-weight:600;">
+                    <span>{mh_icon} Message House</span>
+                    <span>{mh_filled}/{mh_total}</span>
+                </div>
+                """, unsafe_allow_html=True)
+
                 st.markdown("---")
-                
+
                 # 2. System Capabilities (Instructional)
                 st.markdown("<span style='color:#24363b; font-weight:800; font-size:0.75rem;'>SYSTEM CAPABILITIES:</span>", unsafe_allow_html=True)
                 if score < 40:
@@ -1200,18 +1374,53 @@ with st.sidebar:
                     st.markdown("<span style='color:#24363b; font-size:0.75rem;'>⚠️ **PARTIAL:** Safe for fortified clusters (green) only. Verify output carefully.</span>", unsafe_allow_html=True)
                 else:
                     st.markdown("<span style='color:#24363b; font-size:0.75rem;'>✅ **OPERATIONAL:** Engine is fully fortified across all domains.</span>", unsafe_allow_html=True)
-                
+
                 st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
 
                 # 3. Next Step (Actionable)
                 st.markdown("<span style='color:#24363b; font-weight:800; font-size:0.75rem;'>NEXT OBJECTIVE:</span>", unsafe_allow_html=True)
-                # Find the first weak cluster
-                weakest = next((k for k, v in cal_data['clusters'].items() if v['count'] < 3), None)
-                if weakest:
-                    needed = 3 - cal_data['clusters'][weakest]['count']
-                    st.markdown(f"<span style='color:#24363b; font-size:0.75rem;'>Upload {needed} more **{weakest}** samples to fortify this cluster.</span>", unsafe_allow_html=True)
+                if cal_data.get('mh_ceiling_active'):
+                    st.markdown(
+                        "<span style='color:#ff4b4b; font-size:0.75rem; font-weight:700;'>"
+                        "ENGINE CAPPED at 55%: Configure the Message House in Brand Architect to unlock full scoring."
+                        "</span>",
+                        unsafe_allow_html=True
+                    )
+                elif cal_data.get('mh_sub_score', 0) < 50 and cal_data.get('mh_sub_score', 0) > 0:
+                    st.markdown(
+                        "<span style='color:#ffa421; font-size:0.75rem;'>"
+                        "Message House partially complete. Finish pillars and proof points to strengthen scoring."
+                        "</span>",
+                        unsafe_allow_html=True
+                    )
                 else:
-                    st.markdown("<span style='color:#24363b; font-size:0.75rem;'>System fully calibrated.</span>", unsafe_allow_html=True)
+                    # Find the first weak cluster
+                    weakest = next((k for k, v in cal_data['clusters'].items() if v['count'] < 3), None)
+                    if weakest:
+                        needed = 3 - cal_data['clusters'][weakest]['count']
+                        st.markdown(f"<span style='color:#24363b; font-size:0.75rem;'>Upload {needed} more **{weakest}** samples to fortify this cluster.</span>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='color:#24363b; font-size:0.75rem;'>System fully calibrated.</span>", unsafe_allow_html=True)
+
+    # 3b. USAGE METER
+    _sidebar_usage = st.session_state.get('usage', {})
+    if _sidebar_usage and st.session_state.get('tier', {}).get('_tier_key', 'solo') != 'super_admin':
+        _used = _sidebar_usage.get('used', 0)
+        _limit = _sidebar_usage.get('limit', 0)
+        _pct = min(_sidebar_usage.get('percentage', 0), 100)
+        if _limit > 0:
+            _bar_color = "#ff4b4b" if _pct >= 100 else ("#ffa421" if _pct >= 80 else "#5c6b61")
+            st.markdown(f"""
+                <div style="margin-top:12px; margin-bottom:4px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.65rem; font-weight:700; color:#5c6b61; margin-bottom:3px;">
+                        <span>MONTHLY USAGE</span>
+                        <span style="color:{_bar_color};">{_used}/{_limit}</span>
+                    </div>
+                    <div style="width:100%; height:4px; background:#dcdcd9; border-radius:999px; overflow:hidden;">
+                        <div style="width:{_pct}%; height:100%; background:{_bar_color}; border-radius:999px;"></div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
@@ -1230,6 +1439,14 @@ with st.sidebar:
     # ADMIN TOOLS (NO DIVIDER)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("TEAM MANAGEMENT", width="stretch", on_click=set_page, args=("TEAM MANAGEMENT",))
+
+    # SUPER ADMIN ONLY
+    _sb_tier = st.session_state.get('tier', {}).get('_tier_key', '')
+    _sb_user = (st.session_state.get('username') or '').upper()
+    if _sb_tier == 'super_admin' or _sb_user == 'NICK_ADMIN':
+        st.markdown("---")
+        st.button("ADMIN PANEL", width="stretch", on_click=set_page, args=("ADMIN PANEL",))
+
     # Footer Spacer
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
     
@@ -1244,17 +1461,35 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     if st.button("LOGOUT", width="stretch"):
+        # End impersonation if active
+        if st.session_state.get('admin_session'):
+            admin_panel._end_impersonation()
         st.session_state['authenticated'] = False
         st.session_state['username'] = None
         st.session_state['profiles'] = {}
+        st.session_state.pop('admin_session', None)
+        st.session_state.pop('tier', None)
+        st.session_state.pop('usage', None)
+        st.session_state.pop('subscription_status', None)
         st.rerun()
 
 # --- BRIDGE VARIABLES ---
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
         
+def _get_tier_key() -> str:
+    return st.session_state.get('tier', {}).get('_tier_key', 'solo')
+
+def _is_super_admin() -> bool:
+    raw_user = (st.session_state.get('username') or '').upper()
+    return _get_tier_key() == 'super_admin' or raw_user == 'NICK_ADMIN'
+
+def _subscription_active() -> bool:
+    return st.session_state.get('subscription_status', 'inactive') == 'active'
+
+
 def show_paywall():
-    """Renders the Castellan Agency Tier Paywall."""
+    """Renders inline inactive subscription message (no st.stop — module UI still visible)."""
     st.markdown("""
         <style>
             .paywall-card {
@@ -1263,42 +1498,63 @@ def show_paywall():
                 padding: 40px;
                 text-align: center;
                 border-radius: 4px;
-                margin-top: 50px;
+                margin-top: 20px;
+                margin-bottom: 20px;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             }
             .paywall-icon { font-size: 3rem; margin-bottom: 20px; display: block; }
-            .paywall-title { 
-                color: #f5f5f0; font-family: 'Helvetica Neue', sans-serif; 
+            .paywall-title {
+                color: #f5f5f0; font-family: 'Helvetica Neue', sans-serif;
                 font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
                 font-size: 1.5rem; margin-bottom: 10px;
             }
             .paywall-desc { color: #5c6b61; margin-bottom: 30px; font-size: 1rem; line-height: 1.6; }
-            .paywall-price { color: #ab8f59; font-size: 1.2rem; font-weight: 700; margin-bottom: 30px; }
         </style>
         <div class="paywall-card">
             <span class="paywall-icon">🔒</span>
-            <div class="paywall-title">Agency Tier Restricted</div>
+            <div class="paywall-title">Subscription Inactive</div>
             <div class="paywall-desc">
-                This capability requires high-fidelity engine processing.<br>
-                Upgrade to the Agency Tier to unlock full narrative governance.
+                Your subscription is inactive. Reactivate to run AI analysis.<br>
+                Your saved data and reports remain accessible below.
             </div>
-            <div class="paywall-price"></div>
             <a href="https://castellanpr.lemonsqueezy.com" target="_blank">
                 <button style="
-                    background-color: #ab8f59; color: #1b2a2e; border: none; 
-                    padding: 12px 30px; font-weight: 800; letter-spacing: 0.1em; 
+                    background-color: #ab8f59; color: #1b2a2e; border: none;
+                    padding: 12px 30px; font-weight: 800; letter-spacing: 0.1em;
                     cursor: pointer; text-transform: uppercase;">
-                    Initialize Subscription
+                    Reactivate Subscription
                 </button>
             </a>
         </div>
     """, unsafe_allow_html=True)
-    st.stop() # CRITICAL: This halts the app so users can't see the tool below.
     
+# --- IMPERSONATION BANNER ---
+if st.session_state.get('admin_session'):
+    _imp_user = st.session_state.get('username', 'Unknown')
+    _imp_tier = st.session_state.get('tier', {}).get('display_name', 'Unknown')
+    st.markdown(f"""
+        <div style="background-color: #cc3300; color: white; padding: 10px 20px; text-align: center;
+                    font-weight: 800; letter-spacing: 0.1em; font-size: 0.85rem; margin-bottom: 15px;
+                    border-radius: 4px;">
+            ADMIN MODE: Viewing as {_imp_user} ({_imp_tier})
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("Return to Admin Panel", key="imp_return_btn"):
+        admin_panel._end_impersonation()
+
+# --- ANNOUNCEMENT BANNER ---
+_announcement = db.get_platform_setting("announcement") if st.session_state.get('authenticated') else None
+if _announcement:
+    st.info(_announcement)
+
+# --- ADMIN PANEL ROUTING ---
+if app_mode == "ADMIN PANEL":
+    admin_panel.render_admin_panel()
+
 # --- MODULES ---
 
 # 1. DASHBOARD
-if app_mode == "DASHBOARD":
+elif app_mode == "DASHBOARD":
     
     # --- DATA RETRIEVAL ---
     profiles = st.session_state.get('profiles', {})
@@ -1358,6 +1614,7 @@ if app_mode == "DASHBOARD":
         )
         st.session_state['active_profile_name'] = selected_profile
     
+    selected_profile = selected_profile or list(profiles.keys())[0]
     current_profile = profiles[selected_profile]
     
     # Calculate calibration data
@@ -1443,7 +1700,46 @@ if app_mode == "DASHBOARD":
             needed = 3 - data.get('count', 0)
             cluster_name = cluster_display_names.get(key, key)
             st.info(f"⚠️ Add {needed} more {cluster_name} asset{'s' if needed > 1 else ''} to fortify this cluster.")
-    
+
+        # MESSAGE HOUSE STATUS CARD
+        st.markdown("---")
+        st.markdown("**MESSAGE HOUSE STATUS:**")
+        mh_sub = cal_data.get('mh_sub_score', 0)
+        mh_ceiling = cal_data.get('mh_ceiling_active', False)
+        mh_filled = cal_data.get('mh_filled_fields', 0)
+        mh_total = cal_data.get('mh_total_fields', 8)
+
+        if mh_ceiling:
+            st.markdown(f"""
+            <div style='background: rgba(255,75,75,0.1); border-left: 3px solid #ff4b4b; padding: 10px; margin-top:5px;'>
+                <div style='font-size:0.8rem; color:#ff4b4b; font-weight:700;'>NOT CONFIGURED</div>
+                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
+                    Engine capped at 55%. Configure Message House to enable full governance.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("CONFIGURE MESSAGE HOUSE", type="secondary", key="dash_mh_btn"):
+                st.session_state['app_mode'] = "BRAND ARCHITECT"
+                st.rerun()
+        elif mh_sub < 50:
+            st.markdown(f"""
+            <div style='background: rgba(255,164,33,0.1); border-left: 3px solid #ffa421; padding: 10px; margin-top:5px;'>
+                <div style='font-size:0.8rem; color:#ffa421; font-weight:700;'>IN PROGRESS ({mh_filled}/{mh_total} fields)</div>
+                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
+                    Complete pillars and proof points to strengthen governance accuracy.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style='background: rgba(9,171,59,0.1); border-left: 3px solid #09ab3b; padding: 10px; margin-top:5px;'>
+                <div style='font-size:0.8rem; color:#09ab3b; font-weight:700;'>CONFIGURED ({mh_filled}/{mh_total} fields)</div>
+                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
+                    Message House active. AI enforces governing document alignment.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
     # ========================================
     # CENTER COLUMN: GOVERNANCE MODULES
     # ========================================
@@ -1552,13 +1848,10 @@ elif app_mode == "VISUAL COMPLIANCE":
         </style>
     """, unsafe_allow_html=True)
     
-    # --- AGENCY TIER CHECK ---
-    is_admin = st.session_state.get('is_admin', False)
-    sub_status = st.session_state.get('status', 'trial').lower()
-    
-    if not is_admin and sub_status != 'active':
+    # --- SUBSCRIPTION GATE ---
+    if not _is_super_admin() and not _subscription_active():
         show_paywall()
-    
+
     # --- HELPER: ASSET LIBRARY RETRIEVAL (UPDATED) ---
     def get_all_visual_assets(profile_data):
         """Parses Visual DNA AND Social DNA to find ALL saved images."""
@@ -1721,7 +2014,14 @@ elif app_mode == "VISUAL COMPLIANCE":
 
             st.divider()
 
-            if st.button("RUN COMPLIANCE CHECK", type="primary", use_container_width=True):
+            _usage = st.session_state.get('usage', {})
+            _nudge = sub_manager.get_usage_nudge_message(_usage)
+            if _nudge:
+                if _usage.get('percentage', 0) >= 100: st.warning(_nudge)
+                else: st.info(_nudge)
+
+            if st.button("RUN COMPLIANCE CHECK", type="primary", use_container_width=True,
+                         disabled=not (_is_super_admin() or _subscription_active())):
                 if uploaded_file:
                     with st.spinner("ANALYZING PIXELS & CALCULATING COMPLIANCE..."):
                         
@@ -1739,17 +2039,18 @@ elif app_mode == "VISUAL COMPLIANCE":
                             return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
 
                         visual_dna_clean = clean_dna(inputs.get('visual_dna', ''))
-                        
+                        mh_block = build_mh_context(inputs)
+
                         visual_context = f"""
                         CORE IDENTITY (THE LAW):
                         - Primary Palette (Hex): {', '.join(inputs.get('palette_primary', []))}
                         - Typography/Style Rules: {visual_dna_clean}
                         - Brand Voice: {inputs.get('wiz_tone', 'N/A')}
                         - Core Values: {inputs.get('wiz_values', 'N/A')}
-                        
+                        {mh_block}
                         CONTEXT:
                         - Asset Type: {asset_type}
-                        
+
                         GUARDRAILS (DO NOT VIOLATE):
                         {inputs.get('wiz_guardrails', '')}
                         """
@@ -1772,9 +2073,10 @@ elif app_mode == "VISUAL COMPLIANCE":
                                 verdict=result.get('verdict', 'N/A'),
                                 metadata=result
                             )
-                            
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'visual_audit')
+                            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
-                            
+
                         except Exception as e:
                             st.error(f"System Error: {e}")
                 else:
@@ -1867,12 +2169,19 @@ elif app_mode == "VISUAL COMPLIANCE":
                 r_vibe = bd.get('vibe', {}).get('reason', 'No data.')
                 
                 st.markdown(f"""
-                **1. COLOR ANALYSIS:** {r_color}  
-                **2. IDENTITY:** {r_id}  
+                **1. COLOR ANALYSIS:** {r_color}
+                **2. IDENTITY:** {r_id}
                 **3. TONE & COPY:** {r_tone}
-                **4. TYPOGRAPHY:** {r_typo}  
+                **4. TYPOGRAPHY:** {r_typo}
                 **5. VISUAL AESTHETIC:** {r_vibe}
                 """)
+
+                # Message House alignment status
+                _vc_inputs = st.session_state['profiles'].get(active_profile, {}).get('inputs', {}) if active_profile else {}
+                if build_mh_context(_vc_inputs):
+                    st.markdown("**6. MESSAGE HOUSE ALIGNMENT:** Evaluated by AI against brand promise, pillar claims, and off-limits language. Review VIOLATIONS above for any flagged messaging deviations.")
+                else:
+                    st.markdown("**6. MESSAGE HOUSE ALIGNMENT:** Message house not configured. Proofing limited to tone and voice pattern matching. Configure in Brand Architect for claim-level compliance.")
     
     # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
     if app_mode == "TEAM MANAGEMENT":
@@ -1902,22 +2211,30 @@ elif app_mode == "VISUAL COMPLIANCE":
                 
         with c2:
             st.markdown("### ADD TEAM MEMBER")
-            with st.form("add_team_member"):
-                new_user = st.text_input("USERNAME", max_chars=64)
-                new_email = st.text_input("EMAIL", max_chars=120)
-                new_pass = st.text_input("TEMP PASSWORD", type="password", max_chars=64)
-                submitted = st.form_submit_button("CREATE SEAT")
-                
-                if submitted:
-                    if new_user and new_pass:
-                        # CREATE USER LINKED TO CURRENT ORG
-                        if db.create_user(new_user, new_email, new_pass, org_id=current_org, is_admin=False):
-                            st.success(f"User {new_user} added to {current_org}!")
-                            st.rerun()
-                        else:
-                            st.error("Operation Failed: Either the username exists OR you have reached your Seat Limit.")
-                    else:
-                        st.warning("All fields required.")
+            _team_tier = st.session_state.get('tier', {}).get('_tier_key', 'solo')
+            if _team_tier == 'solo' and not _is_super_admin():
+                st.info("The **Solo** plan supports 1 seat. Upgrade to Agency or Enterprise to add team members.")
+            else:
+                _seat_check = sub_manager.check_seat_limit(current_org)
+                if not _seat_check['allowed']:
+                    _tier_name = st.session_state.get('tier', {}).get('display_name', 'your plan')
+                    st.warning(f"Seat limit reached ({_seat_check['current']}/{_seat_check['max']}) for {_tier_name}. Contact us to upgrade.")
+                else:
+                    with st.form("add_team_member"):
+                        new_user = st.text_input("USERNAME", max_chars=64)
+                        new_email = st.text_input("EMAIL", max_chars=120)
+                        new_pass = st.text_input("TEMP PASSWORD", type="password", max_chars=64)
+                        submitted = st.form_submit_button("CREATE SEAT")
+
+                        if submitted:
+                            if new_user and new_pass:
+                                if db.create_user(new_user, new_email, new_pass, org_id=current_org, is_admin=False):
+                                    st.success(f"User {new_user} added to {current_org}!")
+                                    st.rerun()
+                                else:
+                                    st.error("Operation Failed: Either the username exists OR you have reached your Seat Limit.")
+                            else:
+                                st.warning("All fields required.")
 
 # 3. COPY EDITOR (Stateful, Diff View, Rationale, Calibrated)
 elif app_mode == "COPY EDITOR":
@@ -1954,10 +2271,8 @@ elif app_mode == "COPY EDITOR":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- AGENCY TIER CHECK ---
-    is_admin = st.session_state.get('is_admin', False)
-    sub_status = st.session_state.get('status', 'trial').lower()
-    if not is_admin and sub_status != 'active':
+    # --- SUBSCRIPTION GATE ---
+    if not _is_super_admin() and not _subscription_active():
         show_paywall()
 
     # --- HELPER: UNIFIED CONFIDENCE MODEL (FEW-SHOT + SAFETY) ---
@@ -2100,7 +2415,14 @@ elif app_mode == "COPY EDITOR":
                 help="Polish: Fixes typos/minor tone. Aggressive: Total structural rewrite."
             )
             
-            if st.button("REWRITE AND ALIGN", type="primary", use_container_width=True):
+            _usage = st.session_state.get('usage', {})
+            _nudge = sub_manager.get_usage_nudge_message(_usage)
+            if _nudge:
+                if _usage.get('percentage', 0) >= 100: st.warning(_nudge)
+                else: st.info(_nudge)
+
+            if st.button("REWRITE AND ALIGN", type="primary", use_container_width=True,
+                         disabled=not (_is_super_admin() or _subscription_active())):
                 # Access via state key
                 if st.session_state['ce_draft']:
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
@@ -2114,36 +2436,40 @@ elif app_mode == "COPY EDITOR":
                             return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
 
                         voice_dna = clean_dna(inputs.get('voice_dna', ''))
-                        
-                        # 2. Build the "Voice Prompt"
+
+                        # 2. Build the "Voice Prompt" with Message House injection
+                        mh_block = build_mh_context(inputs)
                         prof_text = f"""
                         STRATEGY:
                         - Mission: {inputs.get('wiz_mission', '')}
                         - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        
+                        {mh_block}
                         VOICE DNA (LINGUISTIC RULES & SAMPLES):
                         {voice_dna}
-                        
+
                         CRITICAL GUARDRAILS (DO NOT VIOLATE):
                         {inputs.get('wiz_guardrails', '')}
                         """
-                        
+
                         # 3. Engineered Prompt
                         prompt_wrapper = f"""
-                        CONTEXT: 
+                        CONTEXT:
                         - Type: {content_type}
                         - Sender: {st.session_state['ce_sender']}
                         - Audience: {st.session_state['ce_audience']}
                         - Intensity: {edit_intensity}
-                        
+
                         TASK: Rewrite the draft below to match the Brand Rules.
-                        
+
                         STEP 1: RATIONALE
                         Analyze the draft against the brand voice. Explain 3 key changes you are making and why.
-                        
+
                         STEP 2: REWRITE
                         Provide the rewritten text. Ensure all GUARDRAILS are strictly followed.
-                        
+
+                        STEP 3: MESSAGE HOUSE ALIGNMENT
+                        If a Message House is defined in the brand profile above, flag any content that contradicts the brand promise, deviates from approved message pillars, uses off-limits language, or makes claims requiring pre-approval. If no Message House is configured, skip this step.
+
                         OUTPUT FORMAT:
                         RATIONALE:
                         [Your explanation]
@@ -2189,6 +2515,8 @@ elif app_mode == "COPY EDITOR":
                                     "rationale": rationale
                                 }
                             )
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor')
+                            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
                             
                         except Exception as e:
@@ -2199,7 +2527,12 @@ elif app_mode == "COPY EDITOR":
         # --- OUTPUT SECTION (Stateful) ---
         if st.session_state['ce_result']:
             st.divider()
-            
+
+            # Message House notice
+            _ce_inputs = st.session_state['profiles'].get(active_profile, {}).get('inputs', {}) if active_profile else {}
+            if not build_mh_context(_ce_inputs):
+                st.info("Message house not configured. Proofing limited to tone and voice pattern matching. Configure the Message House in Brand Architect for claim-level compliance checking.")
+
             # Rationale Box
             if st.session_state['ce_rationale']:
                 st.markdown(f"""
@@ -2260,10 +2593,8 @@ elif app_mode == "CONTENT GENERATOR":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- AGENCY TIER CHECK ---
-    is_admin = st.session_state.get('is_admin', False)
-    sub_status = st.session_state.get('status', 'trial').lower()
-    if not is_admin and sub_status != 'active':
+    # --- SUBSCRIPTION GATE ---
+    if not _is_super_admin() and not _subscription_active():
         show_paywall()
 
     # --- HELPER: HYBRID CONFIDENCE (FEW-SHOT + SAFETY) ---
@@ -2405,7 +2736,14 @@ elif app_mode == "CONTENT GENERATOR":
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("GENERATE DRAFT", type="primary", use_container_width=True):
+            _usage = st.session_state.get('usage', {})
+            _nudge = sub_manager.get_usage_nudge_message(_usage)
+            if _nudge:
+                if _usage.get('percentage', 0) >= 100: st.warning(_nudge)
+                else: st.info(_nudge)
+
+            if st.button("GENERATE DRAFT", type="primary", use_container_width=True,
+                         disabled=not (_is_super_admin() or _subscription_active())):
                 # Access via state keys
                 if st.session_state['cg_topic'] and st.session_state['cg_key_points']:
                     with st.spinner("ARCHITECTING CONTENT..."):
@@ -2419,20 +2757,21 @@ elif app_mode == "CONTENT GENERATOR":
                             return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
 
                         voice_dna = clean_dna(inputs.get('voice_dna', ''))
-                        
-                        # 2. Build the "Targeted Prompt"
+
+                        # 2. Build the "Targeted Prompt" with Message House injection
+                        mh_block = build_mh_context(inputs)
                         prof_text = f"""
                         STRATEGY:
                         - Mission: {inputs.get('wiz_mission', '')}
                         - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        
+                        {mh_block}
                         VOICE DNA (LINGUISTIC RULES & SAMPLES):
                         {voice_dna}
-                        
+
                         CRITICAL GUARDRAILS (DO NOT VIOLATE):
                         {inputs.get('wiz_guardrails', '')}
                         """
-                        
+
                         # Engineered Prompt (Constraint-Based)
                         prompt_wrapper = f"""
                         CONTEXT:
@@ -2503,6 +2842,8 @@ elif app_mode == "CONTENT GENERATOR":
                                     "rationale": rationale
                                 }
                             )
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'content_generator')
+                            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
                             
                         except Exception as e:
@@ -2552,10 +2893,8 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- AGENCY TIER CHECK ---
-    is_admin = st.session_state.get('is_admin', False)
-    sub_status = st.session_state.get('status', 'trial').lower()
-    if not is_admin and sub_status != 'active':
+    # --- SUBSCRIPTION GATE ---
+    if not _is_super_admin() and not _subscription_active():
         show_paywall()
 
     # --- HELPER: RESEARCH-BASED FEW-SHOT CONFIDENCE ---
@@ -2674,7 +3013,14 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("GENERATE OPTIONS", type="primary", use_container_width=True):
+            _usage = st.session_state.get('usage', {})
+            _nudge = sub_manager.get_usage_nudge_message(_usage)
+            if _nudge:
+                if _usage.get('percentage', 0) >= 100: st.warning(_nudge)
+                else: st.info(_nudge)
+
+            if st.button("GENERATE OPTIONS", type="primary", use_container_width=True,
+                         disabled=not (_is_super_admin() or _subscription_active())):
                 # Check using session state
                 if st.session_state['sm_topic']:
                     with st.spinner("SCANNING TRENDS & DRAFTING..."):
@@ -2689,15 +3035,16 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 
                         social_dna = clean_dna(inputs.get('social_dna', ''))
                         
-                        # 2. Build the "Social Prompt"
+                        # 2. Build the "Social Prompt" with Message House injection
+                        mh_block = build_mh_context(inputs)
                         prof_text = f"""
                         STRATEGY:
                         - Mission: {inputs.get('wiz_mission', '')}
                         - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        
+                        {mh_block}
                         SOCIAL MEDIA DNA (SUCCESSFUL PATTERNS):
                         {social_dna}
-                        
+
                         CRITICAL GUARDRAILS (DO NOT VIOLATE):
                         {inputs.get('wiz_guardrails', '')}
                         """
@@ -2766,6 +3113,8 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                                     "options": options
                                 }
                             )
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'social_assistant')
+                            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
                             
                         except Exception as e:
@@ -3008,7 +3357,103 @@ elif app_mode == "BRAND ARCHITECT":
             st.text_area("MISSION STATEMENT", key="wiz_mission", max_chars=2000)
             st.text_area("CORE VALUES", placeholder="e.g. Transparency, Innovation, Community", key="wiz_values", max_chars=2000)
             st.text_area("BRAND GUARDRAILS (DO'S & DON'TS)", placeholder="e.g. Don't use emojis.", key="wiz_guardrails", max_chars=2000)
-            
+
+        with st.expander("MESSAGE HOUSE"):
+            st.caption("The controlling document for all communications. Every asset Signet evaluates or generates is measured against the messaging defined here.")
+
+            # --- BRAND PROMISE ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">BRAND PROMISE</span>', unsafe_allow_html=True)
+            st.caption("One sentence. What your company ultimately delivers. Not a feature — a transformation.")
+            bp_val = st.text_area("BRAND PROMISE", key="mh_brand_promise", height=80, max_chars=500,
+                label_visibility="collapsed",
+                placeholder="e.g. We build the infrastructure that makes your company legible, credible, and trusted before the moment it needs to be.")
+            if bp_val and bp_val.count('.') > 2:
+                st.warning("Brand promise should be 1-2 sentences for maximum impact.")
+
+            st.markdown("---")
+
+            # --- MESSAGE PILLARS ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">MESSAGE PILLARS</span>', unsafe_allow_html=True)
+            st.caption("Exactly 3 pillars. Each is a full, defensible argument supporting the brand promise.")
+
+            raw_pillars_json = st.session_state.get('mh_pillars_json', '')
+            try:
+                pillars_data = json.loads(raw_pillars_json) if raw_pillars_json else [{}, {}, {}]
+                if len(pillars_data) < 3:
+                    pillars_data += [{} for _ in range(3 - len(pillars_data))]
+            except (json.JSONDecodeError, TypeError):
+                pillars_data = [{}, {}, {}]
+
+            updated_pillars = []
+            for pi in range(3):
+                p = pillars_data[pi] if pi < len(pillars_data) else {}
+                pillar_label = p.get('name', '') or f"Click to expand Pillar {pi + 1}"
+                with st.expander(f"PILLAR {pi + 1}: {pillar_label}"):
+                    p_name = st.text_input("PILLAR NAME", value=p.get('name', ''), key=f"mh_pillar_{pi}_name", max_chars=100, placeholder="e.g. The Story Is the Foundation")
+                    p_tagline = st.text_input("TAGLINE", value=p.get('tagline', ''), key=f"mh_pillar_{pi}_tagline", max_chars=150,
+                        placeholder="e.g. Before anything goes out, we build what everything else draws from.", help="The sub-message — what this pillar argues in one sentence.")
+                    p_headline = st.text_area("HEADLINE CLAIM", value=p.get('headline_claim', ''), key=f"mh_pillar_{pi}_headline", max_chars=500, height=80,
+                        placeholder="e.g. The credibility gap doesn't usually open at launch. It opens six months later...", help="1-2 sentences. The core argument of this pillar.")
+                    st.markdown('<span style="color:#ab8f59; font-weight:600; font-size:0.75rem;">PROOF POINTS</span>', unsafe_allow_html=True)
+                    pp1 = st.text_input("Proof Point 1", value=p.get('proof_1', ''), key=f"mh_pillar_{pi}_pp1", max_chars=200, placeholder="e.g. Stat, story, or credential that supports this pillar")
+                    pp2 = st.text_input("Proof Point 2", value=p.get('proof_2', ''), key=f"mh_pillar_{pi}_pp2", max_chars=200, placeholder="e.g. Client outcome or recognition")
+                    pp3 = st.text_input("Proof Point 3", value=p.get('proof_3', ''), key=f"mh_pillar_{pi}_pp3", max_chars=200, placeholder="e.g. Data point or methodology")
+                    updated_pillars.append({
+                        'name': p_name, 'tagline': p_tagline, 'headline_claim': p_headline,
+                        'proof_1': pp1, 'proof_2': pp2, 'proof_3': pp3
+                    })
+
+            st.session_state['mh_pillars_json'] = json.dumps(updated_pillars)
+
+            st.markdown("---")
+
+            # --- FOUNDER POSITIONING ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">FOUNDER POSITIONING STATEMENT</span>', unsafe_allow_html=True)
+            st.caption("One sentence. Used in byline attributions and any content published under the founder's name.")
+            st.text_area("FOUNDER POSITIONING STATEMENT", key="mh_founder_positioning", height=70, max_chars=1000,
+                label_visibility="collapsed",
+                placeholder="e.g. [Name] is the founder of [Company], a [descriptor] specializing in [domain] for [audience].")
+
+            # --- POV STATEMENT ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">POINT OF VIEW (POV) STATEMENT</span>', unsafe_allow_html=True)
+            st.caption("The founder's contrarian belief that drives all thought leadership. Must be something a reasonable person could disagree with.")
+            st.text_area("POINT OF VIEW (POV) STATEMENT", key="mh_pov", height=80, max_chars=1000,
+                label_visibility="collapsed",
+                placeholder="e.g. [Founder] believes that [widely-held assumption] is [wrong/incomplete] because [evidence]. The implication is [what should change].")
+
+            # --- BOILERPLATE ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">COMPANY BOILERPLATE</span>', unsafe_allow_html=True)
+            st.caption("2-3 sentences max. The standard company description used at the end of press releases and in media materials.")
+            boilerplate_val = st.text_area("COMPANY BOILERPLATE", key="mh_boilerplate", height=100, max_chars=1500,
+                label_visibility="collapsed",
+                placeholder="e.g. [Company] is a [descriptor] specializing in [domain]. Founded in [year] by [founder]...")
+            if boilerplate_val:
+                wc = len(boilerplate_val.split())
+                sc = boilerplate_val.count('.') + boilerplate_val.count('!') + boilerplate_val.count('?')
+                if wc > 80 or sc > 4:
+                    st.warning(f"Boilerplate is {wc} words / ~{sc} sentences. Recommended: under 80 words and 4 sentences.")
+
+            st.markdown("---")
+
+            # --- MESSAGING GUARDRAILS ---
+            st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">MESSAGING GUARDRAILS</span>', unsafe_allow_html=True)
+            st.caption("Distinct from brand style guardrails — these define messaging boundaries.")
+            st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">OFF-LIMITS TOPICS</span>', unsafe_allow_html=True)
+            st.text_area("OFF-LIMITS TOPICS", key="mh_offlimits", height=70, max_chars=1000,
+                label_visibility="collapsed",
+                placeholder="e.g. Client names without written approval, competitor pricing, pending features",
+                help="Topics that are never addressed in external communications without documented approval.")
+            st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">CLAIMS REQUIRING PRE-APPROVAL</span>', unsafe_allow_html=True)
+            st.text_area("CLAIMS REQUIRING PRE-APPROVAL", key="mh_preapproval_claims", height=70, max_chars=1000,
+                label_visibility="collapsed",
+                placeholder="e.g. New statistics, comparative claims against competitors, client outcome data",
+                help="Any claims that cannot be used externally without documented sign-off.")
+            st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">TONE CONSTRAINTS</span>', unsafe_allow_html=True)
+            st.text_area("TONE CONSTRAINTS", key="mh_tone_constraints", height=70, max_chars=1000,
+                label_visibility="collapsed",
+                placeholder="e.g. No unsubstantiated superlatives, no promises about earned media outcomes",
+                help="Specific tonal boundaries beyond general brand voice.")
+
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
             st.selectbox("CONTENT TYPE", ["Internal Email", "Executive Memo", "Press Release", "Article/Blog", "Social Post", "Website Copy", "Other"], key="wiz_sample_type")
@@ -3172,6 +3617,13 @@ elif app_mode == "BRAND ARCHITECT":
             st.button("ADD ACCENT COLOR", on_click=add_palette_color, args=('palette_accent',))
 
         if st.button("GENERATE SYSTEM", type="primary"):
+            # Brand limit check
+            if not _is_super_admin():
+                brand_check = sub_manager.check_brand_limit(st.session_state.get('user_id', ''))
+                if not brand_check['allowed']:
+                    tier_name = st.session_state.get('tier', {}).get('display_name', 'your current plan')
+                    st.error(f"Your {tier_name} plan supports up to {brand_check['max']} brands. Delete an existing brand or upgrade to add more.")
+                    st.stop()
             if not st.session_state.get("wiz_name") or not st.session_state.get("wiz_archetype"): st.error("NAME/ARCHETYPE REQUIRED")
             else:
                 with st.spinner("CALIBRATING..."):
@@ -3213,7 +3665,15 @@ elif app_mode == "BRAND ARCHITECT":
                                 "palette_primary": st.session_state['palette_primary'],
                                 "palette_secondary": st.session_state['palette_secondary'],
                                 "palette_accent": st.session_state['palette_accent'],
-                                "social_dna": social_summary # PERSIST THE DNA
+                                "social_dna": social_summary, # PERSIST THE DNA
+                                "mh_brand_promise": st.session_state.get('mh_brand_promise', ''),
+                                "mh_pillars_json": st.session_state.get('mh_pillars_json', ''),
+                                "mh_founder_positioning": st.session_state.get('mh_founder_positioning', ''),
+                                "mh_pov": st.session_state.get('mh_pov', ''),
+                                "mh_boilerplate": st.session_state.get('mh_boilerplate', ''),
+                                "mh_offlimits": st.session_state.get('mh_offlimits', ''),
+                                "mh_preapproval_claims": st.session_state.get('mh_preapproval_claims', ''),
+                                "mh_tone_constraints": st.session_state.get('mh_tone_constraints', '')
                             }
                         }
                         
@@ -3286,6 +3746,9 @@ elif app_mode == "BRAND ARCHITECT":
                         if key not in inputs: inputs[key] = ""
                     for key in ['palette_primary', 'palette_secondary', 'palette_accent']:
                         if key not in inputs: inputs[key] = []
+                    for key in ['mh_brand_promise', 'mh_pillars_json', 'mh_founder_positioning',
+                                'mh_pov', 'mh_boilerplate', 'mh_offlimits', 'mh_preapproval_claims', 'mh_tone_constraints']:
+                        if key not in inputs: inputs[key] = ""
                     
                     # 1. STRATEGY
                     with st.expander("1. STRATEGY", expanded=True):
@@ -3320,6 +3783,64 @@ elif app_mode == "BRAND ARCHITECT":
                     # 3. GUARDRAILS
                     with st.expander("3. GUARDRAILS"):
                         new_guard = st.text_area("DO'S & DON'TS", inputs['wiz_guardrails'], max_chars=2000)
+
+                    # 3.5 MESSAGE HOUSE
+                    with st.expander("MESSAGE HOUSE"):
+                        st.caption("The governing messaging document. Changes are saved with 'SAVE STRATEGY CHANGES'.")
+
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">BRAND PROMISE</span>', unsafe_allow_html=True)
+                        new_mh_brand_promise = st.text_area("BRAND PROMISE", inputs['mh_brand_promise'], max_chars=500, height=80, label_visibility="collapsed", key="mgr_mh_brand_promise")
+                        if new_mh_brand_promise and new_mh_brand_promise.count('.') > 2:
+                            st.warning("Brand promise should be 1-2 sentences.")
+
+                        st.markdown("---")
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">MESSAGE PILLARS</span>', unsafe_allow_html=True)
+
+                        try:
+                            mgr_pillars = json.loads(inputs['mh_pillars_json']) if inputs['mh_pillars_json'] else [{}, {}, {}]
+                            if len(mgr_pillars) < 3:
+                                mgr_pillars += [{} for _ in range(3 - len(mgr_pillars))]
+                        except (json.JSONDecodeError, TypeError):
+                            mgr_pillars = [{}, {}, {}]
+
+                        mgr_updated_pillars = []
+                        for pi in range(3):
+                            p = mgr_pillars[pi] if pi < len(mgr_pillars) else {}
+                            with st.expander(f"PILLAR {pi + 1}"):
+                                p_name = st.text_input("NAME", value=p.get('name', ''), key=f"mgr_mh_pillar_{pi}_name", max_chars=100)
+                                p_tagline = st.text_input("TAGLINE", value=p.get('tagline', ''), key=f"mgr_mh_pillar_{pi}_tagline", max_chars=150)
+                                p_headline = st.text_area("HEADLINE CLAIM", value=p.get('headline_claim', ''), key=f"mgr_mh_pillar_{pi}_headline", max_chars=500, height=70)
+                                pp1 = st.text_input("Proof 1", value=p.get('proof_1', ''), key=f"mgr_mh_pillar_{pi}_pp1", max_chars=200)
+                                pp2 = st.text_input("Proof 2", value=p.get('proof_2', ''), key=f"mgr_mh_pillar_{pi}_pp2", max_chars=200)
+                                pp3 = st.text_input("Proof 3", value=p.get('proof_3', ''), key=f"mgr_mh_pillar_{pi}_pp3", max_chars=200)
+                                mgr_updated_pillars.append({
+                                    'name': p_name, 'tagline': p_tagline, 'headline_claim': p_headline,
+                                    'proof_1': pp1, 'proof_2': pp2, 'proof_3': pp3
+                                })
+
+                        new_mh_pillars_json = json.dumps(mgr_updated_pillars)
+
+                        st.markdown("---")
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">FOUNDER POSITIONING STATEMENT</span>', unsafe_allow_html=True)
+                        new_mh_founder = st.text_area("FOUNDER POSITIONING STATEMENT", inputs['mh_founder_positioning'], max_chars=1000, height=70, label_visibility="collapsed", key="mgr_mh_founder")
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">POINT OF VIEW (POV) STATEMENT</span>', unsafe_allow_html=True)
+                        new_mh_pov = st.text_area("POINT OF VIEW (POV) STATEMENT", inputs['mh_pov'], max_chars=1000, height=80, label_visibility="collapsed", key="mgr_mh_pov")
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">COMPANY BOILERPLATE</span>', unsafe_allow_html=True)
+                        new_mh_boilerplate = st.text_area("COMPANY BOILERPLATE", inputs['mh_boilerplate'], max_chars=1500, height=100, label_visibility="collapsed", key="mgr_mh_boilerplate")
+                        if new_mh_boilerplate:
+                            wc = len(new_mh_boilerplate.split())
+                            sc = new_mh_boilerplate.count('.') + new_mh_boilerplate.count('!') + new_mh_boilerplate.count('?')
+                            if wc > 80 or sc > 4:
+                                st.warning(f"Boilerplate: {wc} words / ~{sc} sentences. Recommended: under 80 words, 4 sentences.")
+
+                        st.markdown("---")
+                        st.markdown('<span style="color:#ab8f59; font-weight:700; font-size:0.8rem; letter-spacing:0.05em;">MESSAGING GUARDRAILS</span>', unsafe_allow_html=True)
+                        st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">OFF-LIMITS TOPICS</span>', unsafe_allow_html=True)
+                        new_mh_offlimits = st.text_area("OFF-LIMITS TOPICS", inputs['mh_offlimits'], max_chars=1000, height=70, label_visibility="collapsed", key="mgr_mh_offlimits")
+                        st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">CLAIMS REQUIRING PRE-APPROVAL</span>', unsafe_allow_html=True)
+                        new_mh_preapproval = st.text_area("CLAIMS REQUIRING PRE-APPROVAL", inputs['mh_preapproval_claims'], max_chars=1000, height=70, label_visibility="collapsed", key="mgr_mh_preapproval")
+                        st.markdown('<span style="color:#5c6b61; font-size:0.75rem;">TONE CONSTRAINTS</span>', unsafe_allow_html=True)
+                        new_mh_tone_constraints = st.text_area("TONE CONSTRAINTS", inputs['mh_tone_constraints'], max_chars=1000, height=70, label_visibility="collapsed", key="mgr_mh_tone_constraints")
 
                     # 4. VISUAL IDENTITY (PALETTE)
                     with st.expander("4. VISUAL IDENTITY (PALETTE)"):
@@ -3779,6 +4300,14 @@ elif app_mode == "BRAND ARCHITECT":
                         profile_obj['inputs']['wiz_values'] = new_values
                         profile_obj['inputs']['wiz_tone'] = new_tone
                         profile_obj['inputs']['wiz_guardrails'] = new_guard
+                        profile_obj['inputs']['mh_brand_promise'] = new_mh_brand_promise
+                        profile_obj['inputs']['mh_pillars_json'] = new_mh_pillars_json
+                        profile_obj['inputs']['mh_founder_positioning'] = new_mh_founder
+                        profile_obj['inputs']['mh_pov'] = new_mh_pov
+                        profile_obj['inputs']['mh_boilerplate'] = new_mh_boilerplate
+                        profile_obj['inputs']['mh_offlimits'] = new_mh_offlimits
+                        profile_obj['inputs']['mh_preapproval_claims'] = new_mh_preapproval
+                        profile_obj['inputs']['mh_tone_constraints'] = new_mh_tone_constraints
                         
                         p_p = ", ".join(inputs['palette_primary'])
                         p_s = ", ".join(inputs['palette_secondary'])
@@ -3802,24 +4331,24 @@ elif app_mode == "BRAND ARCHITECT":
                         - Archetype: {new_arch}
                         - Mission: {new_mission}
                         - Values: {new_values}
-                        
+
                         2. VOICE
                         - Tone Keywords: {new_tone}
-                        
+
                         [VOICE DNA & ASSETS]
                         {clean_dna_for_llm(inputs['voice_dna'])}
-                        
+
                         3. VISUALS
                         - Primary: {p_p}
                         - Secondary: {p_s}
                         - Accents: {p_a}
-                        
+
                         [VISUAL DNA & ASSETS]
                         {clean_dna_for_llm(inputs['visual_dna'])}
-                        
+
                         4. GUARDRAILS
                         - {new_guard}
-                        
+                        {build_mh_context(profile_obj['inputs'])}
                         5. SOCIAL DNA (CALIBRATION DATA)
                         {clean_dna_for_llm(inputs['social_dna'])}
                         """
