@@ -925,6 +925,7 @@ def remove_palette_color(key, index):
 if not st.session_state['authenticated']:
     # 1. GLOBAL STYLES + LOGIN CARD CSS
     st.markdown("""<style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
         .stApp {
             background-color: #f5f5f0 !important;
             background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
@@ -949,57 +950,53 @@ if not st.session_state['authenticated']:
             border-top: 5px solid #24363b;
         }
 
-        /* --- NEW TYPOGRAPHY & LAYOUT --- */
+        /* --- TYPOGRAPHY & LAYOUT --- */
         .login-content-left h1 {
-            font-family: 'Helvetica Neue', sans-serif;
-            font-size: 2.5rem;
-            font-weight: 800;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
             color: #24363b;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
             line-height: 1.2;
         }
 
-        .subheadline {
+        .login-value {
+            font-family: 'Montserrat', sans-serif;
             font-size: 1.1rem;
             line-height: 1.7;
-            color: #3d3d3d;
+            color: #24363b;
+            margin: 28px 0;
+            max-width: 600px;
+        }
+
+        .login-workflow {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #24363b;
             margin-bottom: 32px;
             max-width: 600px;
-            font-family: sans-serif;
         }
 
-        /* --- FEATURE LIST & ICONS --- */
-        .feature-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .feature-list li {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 16px; /* Spacing between items */
+        .login-credibility {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.85rem;
+            color: #24363b;
+            line-height: 1.5;
+            margin-top: 24px;
         }
 
-        .feature-icon {
-            color: #ab8f59; /* Brand Gold */
-            margin-right: 12px; /* Icon to text spacing */
-            flex-shrink: 0;
-        }
-
-        .feature-text {
-            color: #3d3d3d;
-            font-size: 1.05rem;
-            font-family: sans-serif;
+        .login-credibility a {
+            color: #24363b;
+            text-decoration: none;
+            font-weight: 600;
         }
 
         /* --- RESPONSIVE --- */
         @media (max-width: 768px) {
-            .login-content-left h1 { font-size: 1.8rem; }
-            .subheadline { font-size: 1rem; }
-            .feature-icon { width: 20px; height: 20px; margin-right: 10px; }
+            .login-content-left h1 { font-size: 1.2rem; }
+            .login-value { font-size: 1rem; }
         }
     </style>""", unsafe_allow_html=True)
 
@@ -1018,43 +1015,10 @@ if not st.session_state['authenticated']:
         # FIX: HTML is flush-left to prevent "Black Box" code block rendering
         st.markdown("""
 <div class="login-content-left">
-<h1>YOUR BRAND JUST HIT THE SCALING THRESHOLD.</h1>
-<p class="subheadline">
-When content velocity exceeds founder bandwidth, signal degradation begins.
-Signet prevents brand drift through algorithmic fidelity—measuring every
-output against your authoritative baseline before it reaches stakeholders.
-</p>
-<ul class="feature-list">
-<li>
-<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-</svg>
-<span class="feature-text">
-<strong>Voice DNA Calibration:</strong> 3-5 gold-standard assets lock your executive voice
-</span>
-</li>
-<li>
-<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<circle cx="12" cy="12" r="10"></circle>
-<line x1="22" y1="12" x2="18" y2="12"></line>
-<line x1="6" y1="12" x2="2" y2="12"></line>
-<line x1="12" y1="6" x2="12" y2="2"></line>
-<line x1="12" y1="22" x2="12" y2="18"></line>
-</svg>
-<span class="feature-text">
-<strong>Visual Fidelity Engine:</strong> Audit every image against palette specifications
-</span>
-</li>
-<li>
-<svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<circle cx="12" cy="12" r="2"></circle>
-<path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
-</svg>
-<span class="feature-text">
-<strong>Signal Integrity Score:</strong> Quantify consistency across your publishing perimeter
-</span>
-</li>
-</ul>
+<h1>Brand Fidelity Engine</h1>
+<p class="login-value">Whether you manage one brand or ten, every piece of content should sound exactly like the brand it represents. Signet makes sure it does.</p>
+<p class="login-workflow">Define your brand profile. Audit your drafts against it. Generate new content that stays aligned. The engine calibrates to your positioning&nbsp;&mdash; and gets more precise the more you put in.</p>
+<p class="login-credibility">Built by <a href="https://castellanpr.com" target="_blank">Castellan PR</a>. For agencies, in-house teams, and independent practitioners.</p>
 </div>
 """, unsafe_allow_html=True)
 # --- RIGHT COLUMN: THE LOGIN ---
@@ -1134,7 +1098,7 @@ output against your authoritative baseline before it reaches stakeholders.
                 else:
                     st.error("Username already taken.")
 
-    st.markdown("<br><div style='text-align: center; color: #ab8f59; font-size: 0.7rem; letter-spacing: 0.2em;'>CASTELLAN PR</div>", unsafe_allow_html=True)
+    st.markdown("<br><div style='text-align: center; color: #5c6b61; font-size: 0.7rem; letter-spacing: 0.1em;'>castellanpr.com</div>", unsafe_allow_html=True)
     st.stop()
     
 # --- SIDEBAR ---
