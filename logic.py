@@ -5,7 +5,6 @@ load_dotenv()
 import json
 import re
 import math
-import colorsys
 import time
 import base64
 import io
@@ -133,27 +132,71 @@ class ColorScorer:
                     match_type = "Direct"
                     matched_brand_color = b_hex
 
-                # B. TINT/SHADE MATH (The Vector Upgrade)
-                d_h, d_l, d_s = colorsys.rgb_to_hls(*[x/255.0 for x in d_rgb])
-                b_h, b_l, b_s = colorsys.rgb_to_hls(*[x/255.0 for x in b_rgb])
-
-                # Guard: both colors must have meaningful saturation
-                # Achromatic colors (white/gray/black) have near-zero saturation,
-                # making their hue arbitrary — skip tint/shade for these
-                if d_s < 0.10 or b_s < 0.10:
+                # Guard: skip tint/shade for near-white or near-black brand
+                # colors. Their tint/shade lines cover too much of RGB space,
+                # causing false positives (e.g. "shade of white" = everything).
+                brand_dist_white = math.sqrt(sum((255 - c) ** 2 for c in b_rgb))
+                brand_dist_black = math.sqrt(sum(c ** 2 for c in b_rgb))
+                if min(brand_dist_white, brand_dist_black) < 80:
                     continue
 
-                hue_diff = abs(d_h - b_h)
-                if hue_diff > 0.5: hue_diff = 1.0 - hue_diff
+                # B. TINT CHECK (RGB Vector: brand → white)
+                # A true tint = brand color mixed with white. Each channel
+                # satisfies: D = B + t*(255 - B) for one consistent t value.
+                t_values = []
+                tint_valid = True
+                for d_ch, b_ch in zip(d_rgb, b_rgb):
+                    if b_ch >= 250:
+                        # Channel already near max — detected must also be near max
+                        if abs(d_ch - 255) > 12:
+                            tint_valid = False
+                            break
+                    else:
+                        t = (d_ch - b_ch) / (255 - b_ch)
+                        if t < -0.05 or t > 1.05:
+                            tint_valid = False
+                            break
+                        t_values.append(t)
 
-                if hue_diff < 0.05: # 5% Tolerance on Hue Family
-                    # Graduate score based on lightness difference
-                    lightness_diff = abs(d_l - b_l)
-                    tint_score = max(0, int(90 - (lightness_diff * 120)))
-                    if tint_score > best_match_score:
-                        best_match_score = tint_score
-                        match_type = "Tint/Shade"
-                        matched_brand_color = b_hex
+                if tint_valid and len(t_values) >= 2:
+                    t_spread = max(t_values) - min(t_values)
+                    avg_t = sum(t_values) / len(t_values)
+                    # Reject near-white (>85% white) and negative mixes
+                    if t_spread < 0.12 and 0.0 < avg_t < 0.85:
+                        tint_score = max(0, int(90 - avg_t * 70 - t_spread * 100))
+                        if tint_score > best_match_score:
+                            best_match_score = tint_score
+                            match_type = "Tint"
+                            matched_brand_color = b_hex
+
+                # C. SHADE CHECK (RGB Vector: brand → black)
+                # A true shade = brand color mixed with black. Each channel
+                # satisfies: D = B * (1 - s) for one consistent s value.
+                s_values = []
+                shade_valid = True
+                for d_ch, b_ch in zip(d_rgb, b_rgb):
+                    if b_ch <= 5:
+                        # Channel already near zero — detected must also be near zero
+                        if d_ch > 12:
+                            shade_valid = False
+                            break
+                    else:
+                        s = 1.0 - (d_ch / b_ch)
+                        if s < -0.05 or s > 1.05:
+                            shade_valid = False
+                            break
+                        s_values.append(s)
+
+                if shade_valid and len(s_values) >= 2:
+                    s_spread = max(s_values) - min(s_values)
+                    avg_s = sum(s_values) / len(s_values)
+                    # Reject near-black (>85% black) and negative mixes
+                    if s_spread < 0.12 and 0.0 < avg_s < 0.85:
+                        shade_score = max(0, int(90 - avg_s * 70 - s_spread * 100))
+                        if shade_score > best_match_score:
+                            best_match_score = shade_score
+                            match_type = "Shade"
+                            matched_brand_color = b_hex
 
             matches.append(best_match_score)
             if best_match_score > 60:

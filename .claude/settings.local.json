@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"import ast; ast.parse\\(open\\(''app.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
-      "Bash(py -c \":*)"
+      "Bash(py -c \":*)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''prompt_builder.py'', doraise=True\\); print\\(''prompt_builder.py: OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''visual_audit.py'', doraise=True\\); print\\(''visual_audit.py: OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''app.py: OK''\\)\")",
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''prompt_builder.py'', doraise=True\\); print\\(''prompt_builder.py: OK''\\)\")",
+      "Bash(py -c \"import py_compile; py_compile.compile\\(''prompt_builder.py'', doraise=True\\); print\\(''prompt_builder.py: OK''\\)\")",
+      "Bash(py -c \"import py_compile; py_compile.compile\\(''visual_audit.py'', doraise=True\\); print\\(''visual_audit.py: OK''\\)\")",
+      "Bash(py -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''app.py: OK''\\)\")"
     ]
   }
 }

@@ -11,6 +11,7 @@ import subscription_manager as sub_manager
 import admin_panel
 import visual_audit
 import html
+from prompt_builder import build_brand_context, build_social_context, build_mh_context, CONTENT_TYPE_TO_CLUSTER
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -672,70 +673,7 @@ def calculate_calibration_score(profile_data):
     }
 
 
-def build_mh_context(inputs):
-    """
-    Builds the MESSAGE HOUSE block for AI prompts.
-    Only includes populated fields. Returns empty string if no MH data.
-    """
-    mh_parts = []
-
-    brand_promise = inputs.get('mh_brand_promise', '').strip()
-    if brand_promise:
-        mh_parts.append(f"BRAND PROMISE:\n{brand_promise}")
-
-    pillars_json = inputs.get('mh_pillars_json', '')
-    if pillars_json:
-        try:
-            pillars = json.loads(pillars_json)
-            pillar_lines = []
-            for i, p in enumerate(pillars, 1):
-                name = p.get('name', '').strip()
-                if not name:
-                    continue
-                pillar_lines.append(f"PILLAR {i}: {name}")
-                if p.get('tagline', '').strip():
-                    pillar_lines.append(f"  Tagline: {p['tagline'].strip()}")
-                if p.get('headline_claim', '').strip():
-                    pillar_lines.append(f"  Claim: {p['headline_claim'].strip()}")
-                pps = [p.get(f'proof_{j}', '').strip() for j in range(1, 4) if p.get(f'proof_{j}', '').strip()]
-                if pps:
-                    pillar_lines.append("  Proof Points:")
-                    for pp in pps:
-                        pillar_lines.append(f"  - {pp}")
-            if pillar_lines:
-                mh_parts.append("MESSAGE PILLARS:\n" + "\n".join(pillar_lines))
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-    for field_key, label in [
-        ('mh_founder_positioning', 'FOUNDER POSITIONING'),
-        ('mh_pov', 'POV STATEMENT'),
-        ('mh_boilerplate', 'BOILERPLATE'),
-    ]:
-        val = inputs.get(field_key, '').strip()
-        if val:
-            mh_parts.append(f"{label}: {val}")
-
-    guardrail_parts = []
-    for field_key, label in [
-        ('mh_offlimits', 'Off-limits'),
-        ('mh_preapproval_claims', 'Pre-approval required'),
-        ('mh_tone_constraints', 'Tone constraints'),
-    ]:
-        val = inputs.get(field_key, '').strip()
-        if val:
-            guardrail_parts.append(f"{label}: {val}")
-    if guardrail_parts:
-        mh_parts.append("MESSAGING GUARDRAILS:\n" + "\n".join(guardrail_parts))
-
-    if not mh_parts:
-        return ""
-
-    return (
-        "\n=== MESSAGE HOUSE (GOVERNING DOCUMENT) ===\n\n"
-        + "\n\n".join(mh_parts)
-        + "\n\n=== END MESSAGE HOUSE ===\n"
-    )
+# build_mh_context is imported from prompt_builder.py
 # --- HELPER: ASSET-AWARE CONFIDENCE ENGINE ---
 def calculate_content_confidence(profile_data, content_type):
     """
@@ -2701,31 +2639,14 @@ elif app_mode == "COPY EDITOR":
                 if st.session_state['ce_draft']:
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         
-                        # --- SMART CONTEXT BUILDING ---
-                        inputs = profile_data.get('inputs', {})
-                        
-                        # 1. Clean Base64 noise (Safety)
-                        def clean_dna(text):
-                            if not text: return ""
-                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+                        # --- BRAND CONTEXT (via shared builder) ---
+                        prof_text = build_brand_context(
+                            profile_data,
+                            include_voice_samples=True,
+                            cluster_filter=CONTENT_TYPE_TO_CLUSTER.get(content_type),
+                        )
 
-                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
-
-                        # 2. Build the "Voice Prompt" with Message House injection
-                        mh_block = build_mh_context(inputs)
-                        prof_text = f"""
-                        STRATEGY:
-                        - Mission: {inputs.get('wiz_mission', '')}
-                        - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        {mh_block}
-                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
-                        {voice_dna}
-
-                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
-                        {inputs.get('wiz_guardrails', '')}
-                        """
-
-                        # 3. Engineered Prompt
+                        # Engineered Prompt
                         prompt_wrapper = f"""
                         CONTEXT:
                         - Type: {content_type}
@@ -3022,29 +2943,12 @@ elif app_mode == "CONTENT GENERATOR":
                 if st.session_state['cg_topic'] and st.session_state['cg_key_points']:
                     with st.spinner("ARCHITECTING CONTENT..."):
                         
-                        # --- SMART CONTEXT BUILDING ---
-                        inputs = profile_data.get('inputs', {})
-                        
-                        # 1. Clean Base64 noise (Safety)
-                        def clean_dna(text):
-                            if not text: return ""
-                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
-
-                        voice_dna = clean_dna(inputs.get('voice_dna', ''))
-
-                        # 2. Build the "Targeted Prompt" with Message House injection
-                        mh_block = build_mh_context(inputs)
-                        prof_text = f"""
-                        STRATEGY:
-                        - Mission: {inputs.get('wiz_mission', '')}
-                        - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        {mh_block}
-                        VOICE DNA (LINGUISTIC RULES & SAMPLES):
-                        {voice_dna}
-
-                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
-                        {inputs.get('wiz_guardrails', '')}
-                        """
+                        # --- BRAND CONTEXT (via shared builder) ---
+                        prof_text = build_brand_context(
+                            profile_data,
+                            include_voice_samples=True,
+                            cluster_filter=CONTENT_TYPE_TO_CLUSTER.get(content_type),
+                        )
 
                         # Engineered Prompt (Constraint-Based)
                         prompt_wrapper = f"""
@@ -3299,31 +3203,10 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                 if st.session_state['sm_topic']:
                     with st.spinner("SCANNING TRENDS & DRAFTING..."):
                         
-                        # --- SMART CONTEXT BUILDING ---
-                        inputs = profile_data.get('inputs', {})
-                        
-                        # 1. Clean Base64 noise
-                        def clean_dna(text):
-                            if not text: return ""
-                            return "\n".join([l for l in text.split('\n') if not l.startswith("[VISUAL_REF:")])
+                        # --- BRAND CONTEXT (via shared builder) ---
+                        prof_text = build_social_context(profile_data)
 
-                        social_dna = clean_dna(inputs.get('social_dna', ''))
-                        
-                        # 2. Build the "Social Prompt" with Message House injection
-                        mh_block = build_mh_context(inputs)
-                        prof_text = f"""
-                        STRATEGY:
-                        - Mission: {inputs.get('wiz_mission', '')}
-                        - Tone Keywords: {inputs.get('wiz_tone', '')}
-                        {mh_block}
-                        SOCIAL MEDIA DNA (SUCCESSFUL PATTERNS):
-                        {social_dna}
-
-                        CRITICAL GUARDRAILS (DO NOT VIOLATE):
-                        {inputs.get('wiz_guardrails', '')}
-                        """
-                        
-                        # 3. Image Analysis (if present)
+                        # Image Analysis (if present)
                         image_desc = "No image provided."
                         if uploaded_image:
                             img = Image.open(uploaded_image)

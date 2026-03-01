@@ -29,6 +29,7 @@ from logic import (
     sanitize_user_input,
     client,
 )
+from prompt_builder import get_cluster_status, VOICE_CLUSTER_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -439,6 +440,14 @@ MESSAGE HOUSE:
 VOICE SAMPLES (for tone reference):
 {voice_snippet}
 """
+
+    # Calibration metadata — tells the AI what voice data is available
+    cluster_statuses = get_cluster_status(profile_inputs.get("voice_dna", ""))
+    cal_lines = ["VOICE DATA STATUS:"]
+    for cname in VOICE_CLUSTER_NAMES:
+        cs = cluster_statuses.get(cname, {"count": 0, "status": "EMPTY"})
+        cal_lines.append(f"  {cname}: {cs['status']} ({cs['count']} samples)")
+    prompt += "\n" + "\n".join(cal_lines) + "\n"
 
     prompt += f"""</brand_profile>
 {injection_note}
