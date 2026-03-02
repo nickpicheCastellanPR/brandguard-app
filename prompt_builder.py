@@ -27,12 +27,33 @@ VOICE_CLUSTER_NAMES = [
 
 # Maps content types (from app.py selectboxes) to primary voice cluster
 CONTENT_TYPE_TO_CLUSTER = {
-    "Internal Email": "Internal Leadership",
+    # Corporate Affairs
     "Press Release": "Corporate Affairs",
-    "Blog Post": "Brand Marketing",
-    "Executive Memo": "Internal Leadership",
+    "Media Advisory": "Corporate Affairs",
+    "Investor Update": "Corporate Affairs",
+    "Fact Sheet": "Corporate Affairs",
+    # Crisis & Response
     "Crisis Statement": "Crisis & Response",
+    "Incident Response": "Crisis & Response",
+    "Holding Statement": "Crisis & Response",
+    # Internal Leadership
+    "Internal Email": "Internal Leadership",
+    "Executive Memo": "Internal Leadership",
+    "All-Hands Talking Points": "Internal Leadership",
+    "Intranet Page": "Internal Leadership",
+    "Policy Update": "Internal Leadership",
+    # Thought Leadership
+    "Op-Ed / Byline": "Thought Leadership",
     "Speech / Script": "Thought Leadership",
+    "White Paper Summary": "Thought Leadership",
+    "Conference Talk": "Thought Leadership",
+    # Brand Marketing
+    "Blog Post": "Brand Marketing",
+    "Marketing Email": "Brand Marketing",
+    "Newsletter": "Brand Marketing",
+    "Landing Page Copy": "Brand Marketing",
+    "Case Study": "Brand Marketing",
+    "Product Announcement": "Brand Marketing",
     "Social Campaign": "Brand Marketing",
 }
 

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!--
+    MERIDIAN LABS — Square Mark (400x400)
+    Compass rose with abstract "M" formation
+    Palette: Cyan #00B4D8 | Orange #FF6B35 | Navy #1A2332 | Gray #E8EAED
+  -->
+
+  <!-- NW Prong — Left peak of M — Cyan -->
+  <polygon points="200,200 170,168 140,48 200,156" fill="#00B4D8"/>
+
+  <!-- NE Prong — Right peak of M — Orange -->
+  <polygon points="200,200 200,156 260,48 230,168" fill="#FF6B35"/>
+
+  <!-- East Blade — Orange -->
+  <polygon points="200,200 238,184 352,200 238,216" fill="#FF6B35"/>
+
+  <!-- South Blade — Cyan -->
+  <polygon points="200,200 216,238 200,352 184,238" fill="#00B4D8"/>
+
+  <!-- West Blade — Cyan -->
+  <polygon points="200,200 162,216 48,200 162,184" fill="#00B4D8"/>
+
+  <!-- Center Circle -->
+  <circle cx="200" cy="200" r="12" fill="#E8EAED"/>
+</svg>

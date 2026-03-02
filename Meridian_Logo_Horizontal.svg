@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300">
+  <!--
+    MERIDIAN LABS — Horizontal Lockup (800x300)
+    Compass rose mark + wordmark
+    Palette: Cyan #00B4D8 | Orange #FF6B35 | Navy #1A2332 | Gray #E8EAED
+  -->
+
+  <!-- Compass Mark (scaled to 250x250, centered vertically) -->
+  <svg x="15" y="25" width="250" height="250" viewBox="0 0 400 400">
+    <!-- NW Prong — Left peak of M — Cyan -->
+    <polygon points="200,200 170,168 140,48 200,156" fill="#00B4D8"/>
+    <!-- NE Prong — Right peak of M — Orange -->
+    <polygon points="200,200 200,156 260,48 230,168" fill="#FF6B35"/>
+    <!-- East Blade — Orange -->
+    <polygon points="200,200 238,184 352,200 238,216" fill="#FF6B35"/>
+    <!-- South Blade — Cyan -->
+    <polygon points="200,200 216,238 200,352 184,238" fill="#00B4D8"/>
+    <!-- West Blade — Cyan -->
+    <polygon points="200,200 162,216 48,200 162,184" fill="#00B4D8"/>
+    <!-- Center Circle -->
+    <circle cx="200" cy="200" r="12" fill="#E8EAED"/>
+  </svg>
+
+  <!-- Wordmark -->
+  <text x="300" y="130"
+        font-family="'Helvetica Neue', 'Arial', sans-serif"
+        font-size="46" font-weight="600"
+        letter-spacing="0.18em"
+        fill="#E8EAED">MERIDIAN</text>
+  <text x="300" y="190"
+        font-family="'Helvetica Neue', 'Arial', sans-serif"
+        font-size="46" font-weight="300"
+        letter-spacing="0.32em"
+        fill="#E8EAED">LABS</text>
+</svg>

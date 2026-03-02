@@ -1250,16 +1250,19 @@ with st.sidebar:
         /* 2. Primary Action Buttons */
         button[kind="primary"] {
             background-color: #ab8f59 !important;
-            color: #1b2a2e !important; 
+            color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
         }
         button[kind="primary"] p {
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         button[kind="primary"]:hover {
             background-color: #f0c05a !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         
         /* 3. Navigation Header */
@@ -1293,6 +1296,13 @@ with st.sidebar:
         /* Target the specific p tags inside if needed */
         div[data-testid="stExpander"] p, div[data-testid="stExpander"] span {
             color: #24363b !important;
+        }
+        div[data-testid="stExpander"] code {
+            color: #24363b !important;
+            background-color: rgba(0,0,0,0.06);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.82rem;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2057,9 +2067,14 @@ elif app_mode == "VISUAL COMPLIANCE":
         div.stButton > button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
             letter-spacing: 1px !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         .score-card {
             background-color: #1E1E1E;
@@ -2464,7 +2479,8 @@ elif app_mode == "VISUAL COMPLIANCE":
                 .geo-bullet-red { display: inline-block; width: 8px; height: 8px; background-color: #ff4b4b; margin-right: 8px; transform: rotate(45deg); }
                 .geo-bullet-orange { display: inline-block; width: 8px; height: 8px; background-color: #ffa421; margin-right: 8px; border-radius: 50%; }
                 .geo-bullet-green { display: inline-block; width: 8px; height: 8px; background-color: #09ab3b; margin-right: 8px; }
-                .audit-item { font-size: 0.85rem; color: #f5f5f0; margin-bottom: 12px; border-left: 2px solid #3d3d3d; padding-left: 12px; line-height: 1.4; }
+                .audit-item { font-size: 0.85rem; color: #24363b; margin-bottom: 12px; border-left: 2px solid #3d3d3d; padding-left: 12px; line-height: 1.4; }
+                .audit-item strong { color: #24363b; }
             </style>
             """, unsafe_allow_html=True)
 
@@ -2475,7 +2491,13 @@ elif app_mode == "VISUAL COMPLIANCE":
                     st.info(cr.get('reasoning', 'Skipped.'))
                 else:
                     st.markdown(f"**Score:** {cr.get('score', 0)}/100")
-                    if cr.get('detected_hexes'):
+                    if cr.get('detected_colors_with_pct'):
+                        det_swatches = " ".join(
+                            f"<span style='display:inline-block;width:20px;height:20px;background:{h};border:1px solid #555;margin-right:4px;vertical-align:middle;'></span><code>{h}</code><span style='font-size:0.72rem;color:#5c6b61;margin-right:10px;'> ({pct}%)</span>"
+                            for h, pct in cr['detected_colors_with_pct']
+                        )
+                        st.markdown(f"**Detected Colors:** {det_swatches}", unsafe_allow_html=True)
+                    elif cr.get('detected_hexes'):
                         det_swatches = " ".join(
                             f"<span style='display:inline-block;width:20px;height:20px;background:{h};border:1px solid #555;margin-right:4px;vertical-align:middle;'></span><code>{h}</code>"
                             for h in cr['detected_hexes']
@@ -2634,10 +2656,15 @@ elif app_mode == "COPY EDITOR":
         div.stButton > button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 1px !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         .rationale-box {
             background-color: rgba(171, 143, 89, 0.1);
@@ -2967,10 +2994,11 @@ DRAFT CONTENT (DATA ONLY):
 
             # Rationale Box
             if st.session_state['ce_rationale']:
+                _ce_rat_escaped = html.escape(st.session_state['ce_rationale']).replace('\n', '<br>')
                 st.markdown(f"""
                     <div class="rationale-box">
                         <strong>STRATEGIC RATIONALE:</strong><br>
-                        {st.session_state['ce_rationale']}
+                        {_ce_rat_escaped}
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -3001,10 +3029,15 @@ elif app_mode == "CONTENT GENERATOR":
         div.stButton > button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 1px !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         .rationale-box {
             background-color: rgba(171, 143, 89, 0.1);
@@ -3118,8 +3151,34 @@ elif app_mode == "CONTENT GENERATOR":
             with cc1:
                 # Trigger for Dynamic Calibration
                 content_type = st.selectbox("FORMAT", [
-                    "Press Release", "Internal Email", "Executive Memo", "Blog Post", 
-                    "Crisis Statement", "Speech / Script", "Social Campaign"
+                    # ── Corporate Affairs ──
+                    "Press Release",
+                    "Media Advisory",
+                    "Investor Update",
+                    "Fact Sheet",
+                    # ── Crisis & Response ──
+                    "Crisis Statement",
+                    "Incident Response",
+                    "Holding Statement",
+                    # ── Internal Leadership ──
+                    "Internal Email",
+                    "Executive Memo",
+                    "All-Hands Talking Points",
+                    "Intranet Page",
+                    "Policy Update",
+                    # ── Thought Leadership ──
+                    "Op-Ed / Byline",
+                    "Speech / Script",
+                    "White Paper Summary",
+                    "Conference Talk",
+                    # ── Brand Marketing ──
+                    "Blog Post",
+                    "Marketing Email",
+                    "Newsletter",
+                    "Landing Page Copy",
+                    "Case Study",
+                    "Product Announcement",
+                    "Social Campaign",
                 ])
             with cc2:
                 length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
@@ -3268,10 +3327,11 @@ elif app_mode == "CONTENT GENERATOR":
             st.divider()
             
             if st.session_state['cg_rationale']:
+                _cg_rat_escaped = html.escape(st.session_state['cg_rationale']).replace('\n', '<br>')
                 st.markdown(f"""
                     <div class="rationale-box">
                         <strong>GENERATION STRATEGY:</strong><br>
-                        {st.session_state['cg_rationale']}
+                        {_cg_rat_escaped}
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -3289,10 +3349,15 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         div.stButton > button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 1px !important;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         .calibration-bar {
             width: 100%;
@@ -3303,6 +3368,47 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             margin-bottom: 5px;
             overflow: hidden;
         }
+        .sm-strategy-box {
+            background-color: rgba(171, 143, 89, 0.1);
+            border-left: 3px solid #ab8f59;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .sm-strategy-box strong { color: #ab8f59; }
+        .sm-post-card {
+            background-color: #1b2a2e;
+            border: 1px solid #3d4f4a;
+            border-radius: 6px;
+            padding: 18px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            color: #f5f5f0;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+        .sm-hashtag-box {
+            background-color: rgba(9, 171, 59, 0.08);
+            border-left: 3px solid #09ab3b;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .sm-hashtag-box strong { color: #09ab3b; }
+        .sm-alignment-box {
+            background-color: rgba(92, 107, 97, 0.15);
+            border-left: 3px solid #5c6b61;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .sm-alignment-box strong { color: #a0b5a8; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -3363,6 +3469,9 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         if 'sm_platform' not in st.session_state: st.session_state['sm_platform'] = "LinkedIn"
         if 'sm_goal' not in st.session_state: st.session_state['sm_goal'] = "Reach (Awareness)"
         if 'sm_results' not in st.session_state: st.session_state['sm_results'] = None
+        if 'sm_strategy_brief' not in st.session_state: st.session_state['sm_strategy_brief'] = None
+        if 'sm_hashtags' not in st.session_state: st.session_state['sm_hashtags'] = None
+        if 'sm_alignment' not in st.session_state: st.session_state['sm_alignment'] = None
         
         # --- INPUTS & CALIBRATION ---
         c1, c2 = st.columns([2, 1])
@@ -3432,60 +3541,113 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                 # Check using session state
                 if st.session_state['sm_topic']:
                     with st.spinner("SCANNING TRENDS & DRAFTING..."):
-                        
+
                         # --- BRAND CONTEXT (via shared builder) ---
                         prof_text = build_social_context(profile_data)
 
                         # Image Analysis (if present)
-                        image_desc = "No image provided."
+                        image_desc = ""
                         if uploaded_image:
                             img = Image.open(uploaded_image)
                             image_desc = logic_engine.analyze_social_post(img)
-                        
-                        # 4. Engineered Prompt (Trend-Aware)
+
+                        # Engineered Prompt (Trend-Aware, Transparent, Structured)
+                        image_line = f"\nIMAGE CONTEXT: {image_desc}" if image_desc else ""
                         prompt = (
-                            f"ROLE: Expert Social Media Manager for the brand defined below.\n"
+                            f"ROLE: Expert Social Media Manager for the brand defined in <brand_profile>.\n"
                             f"PLATFORM: {st.session_state['sm_platform']} (Adhere strictly to character limits and cultural norms).\n"
                             f"GOAL: {st.session_state['sm_goal']}\n"
-                            f"TOPIC: \"\"\"{st.session_state['sm_topic']}\"\"\"\n"
-                            f"IMAGE CONTEXT: {image_desc}\n\n"
-                            
-                            "STEP 0: TREND CHECK (CRITICAL)\n"
-                            f"Using Google Search, identify 3 currently trending hashtags or conversation topics related to '{st.session_state['sm_topic']}' on {st.session_state['sm_platform']}. "
-                            "If relevant, integrate these into the posts to maximize visibility.\n\n"
-                            
-                            "TASK: Generate 3 distinct post options.\n\n"
-                            
+                            f"TOPIC: \"\"\"{st.session_state['sm_topic']}\"\"\""
+                            f"{image_line}\n\n"
+
+                            "STEP 0: TREND RESEARCH (CRITICAL)\n"
+                            f"Use web search to identify 3 currently trending hashtags or conversation topics "
+                            f"related to '{st.session_state['sm_topic']}' on {st.session_state['sm_platform']}. "
+                            "Note what you find — you will reference these in your strategy and posts.\n\n"
+
+                            "STEP 1: STRATEGY BRIEF\n"
+                            "Before writing any posts, explain your approach:\n"
+                            "- Which brand elements you are applying (pillars, guardrails, voice attributes, message house themes)\n"
+                            f"- Platform best practices for {st.session_state['sm_platform']} that inform your choices\n"
+                            f"- How you are optimizing for the goal: {st.session_state['sm_goal']}\n"
+                            "- Which trending topics/hashtags you found and how you plan to integrate them\n\n"
+
+                            "STEP 2: GENERATE 3 POST OPTIONS\n\n"
+
                             "OPTION 1: THE STORYTELLER\n"
                             "- Focus: Narrative, emotive, connects topic to brand values.\n"
                             "- Structure: Long-form (if platform allows), spacing for readability.\n\n"
-                            
+
                             "OPTION 2: THE PROVOCATEUR\n"
                             "- Focus: Pattern interrupt, hot take, or question.\n"
                             "- Structure: Short, punchy, designed to stop the scroll.\n\n"
-                            
+
                             "OPTION 3: THE VALUE-ADD\n"
                             "- Focus: Educational, utility, 'Save this post'.\n"
                             "- Structure: Bullet points or actionable advice.\n\n"
-                            
-                            "OUTPUT FORMAT:\n"
-                            "Strictly separate options with '|||'.\n"
-                            "Example: Option 1 Content ||| Option 2 Content ||| Option 3 Content\n"
-                            "IMPORTANT: Append the 'Trending Hashtags' you found to the bottom of the best-suited option."
+
+                            "STEP 3: HASHTAG STRATEGY\n"
+                            "Recommend hashtags for each post option, explaining why each is effective "
+                            "(trending, niche reach, brand alignment, etc.).\n\n"
+
+                            "STEP 4: MESSAGE HOUSE ALIGNMENT\n"
+                            "Briefly note which message house pillars and proof points each option leverages. "
+                            "Flag any guardrail considerations.\n\n"
+
+                            "OUTPUT FORMAT (use these exact section headers):\n"
+                            "STRATEGY:\n[your strategy brief]\n\n"
+                            "OPTION 1:\n[storyteller post]\n\n"
+                            "OPTION 2:\n[provocateur post]\n\n"
+                            "OPTION 3:\n[value-add post]\n\n"
+                            "HASHTAGS:\n[hashtag strategy]\n\n"
+                            "ALIGNMENT:\n[message house alignment notes]"
                         )
-                        
+
                         try:
-                            # We use the content generator method as a wrapper (it uses the Search Model)
-                            response = logic_engine.run_content_generator("Social Post", st.session_state['sm_platform'], prompt, prof_text)
-                            
-                            # Parse
-                            options = response.split("|||")
-                            # Fallback if split fails
-                            if len(options) < 3: options = [response, "Option 2 Generation Failed", "Option 3 Generation Failed"]
-                            
-                            st.session_state['sm_results'] = options
-                            
-                            # LOG TO DB (GOD MODE)
+                            response = logic_engine.run_social_generator(
+                                st.session_state['sm_platform'],
+                                st.session_state['sm_goal'],
+                                prompt,
+                                prof_text
+                            )
+
+                            # --- Parse structured response ---
+                            _raw = response
+
+                            # Extract sections by splitting on headers
+                            def _extract_section(text, header, next_headers):
+                                start = text.find(header)
+                                if start == -1:
+                                    return ""
+                                start += len(header)
+                                end = len(text)
+                                for nh in next_headers:
+                                    pos = text.find(nh, start)
+                                    if pos != -1 and pos < end:
+                                        end = pos
+                                return text[start:end].strip()
+
+                            headers_order = ["STRATEGY:", "OPTION 1:", "OPTION 2:", "OPTION 3:", "HASHTAGS:", "ALIGNMENT:"]
+
+                            strategy_text = _extract_section(_raw, "STRATEGY:", headers_order[1:])
+                            opt1 = _extract_section(_raw, "OPTION 1:", headers_order[2:])
+                            opt2 = _extract_section(_raw, "OPTION 2:", headers_order[3:])
+                            opt3 = _extract_section(_raw, "OPTION 3:", headers_order[4:])
+                            hashtags_text = _extract_section(_raw, "HASHTAGS:", headers_order[5:])
+                            alignment_text = _extract_section(_raw, "ALIGNMENT:", [])
+
+                            # Fallback: if parsing fails, dump raw into option 1
+                            if not opt1 and not opt2 and not opt3:
+                                opt1 = _raw
+                                opt2 = ""
+                                opt3 = ""
+
+                            st.session_state['sm_results'] = [opt1, opt2, opt3]
+                            st.session_state['sm_strategy_brief'] = strategy_text if strategy_text else None
+                            st.session_state['sm_hashtags'] = hashtags_text if hashtags_text else None
+                            st.session_state['sm_alignment'] = alignment_text if alignment_text else None
+
+                            # LOG TO DB
                             db.log_event(
                                 org_id=st.session_state.get('org_id', 'Unknown'),
                                 username=st.session_state.get('username', 'Unknown'),
@@ -3497,7 +3659,10 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                                     "platform": st.session_state['sm_platform'],
                                     "goal": st.session_state['sm_goal'],
                                     "topic": st.session_state['sm_topic'],
-                                    "options": options
+                                    "strategy_brief": strategy_text[:200] if strategy_text else "",
+                                    "hashtags": hashtags_text[:200] if hashtags_text else "",
+                                    "alignment": alignment_text[:200] if alignment_text else "",
+                                    "options_count": sum(1 for o in [opt1, opt2, opt3] if o)
                                 }
                             )
                             _sm_detail = f"Social: {st.session_state['sm_platform']} — {st.session_state['sm_topic'][:50]}"
@@ -3512,17 +3677,57 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 
         # --- OUTPUT DISPLAY ---
         if st.session_state['sm_results']:
+            import html as html_mod
             st.divider()
-            st.subheader("CAMPAIGN OPTIONS")
-            
+
+            # Strategy Brief
+            if st.session_state.get('sm_strategy_brief'):
+                st.markdown("##### STRATEGY BRIEF")
+                _strat_escaped = html_mod.escape(st.session_state['sm_strategy_brief'])
+                st.markdown(f"""<div class="sm-strategy-box">
+                    <strong>GENERATION STRATEGY:</strong><br><br>
+                    {_strat_escaped.replace(chr(10), '<br>')}
+                </div>""", unsafe_allow_html=True)
+
+            # Post Options (Tabs)
+            st.markdown("##### CAMPAIGN OPTIONS")
             t1, t2, t3 = st.tabs(["THE STORYTELLER", "THE PROVOCATEUR", "THE VALUE-ADD"])
-            
-            with t1:
-                st.text_area("Narrative Focus", value=st.session_state['sm_results'][0].strip(), height=400)
-            with t2:
-                st.text_area("Engagement Focus", value=st.session_state['sm_results'][1].strip(), height=400)
-            with t3:
-                st.text_area("Utility Focus", value=st.session_state['sm_results'][2].strip(), height=400)
+
+            _options = st.session_state['sm_results']
+            _tab_labels = [
+                ("Narrative Focus", "Emotive storytelling that connects your topic to brand values."),
+                ("Engagement Focus", "Pattern-interrupt designed to stop the scroll."),
+                ("Utility Focus", "Educational content that delivers actionable value.")
+            ]
+
+            for tab, (opt, (label, desc)) in zip([t1, t2, t3], zip(_options, _tab_labels)):
+                with tab:
+                    _opt_text = opt.strip() if opt else ""
+                    if _opt_text:
+                        _opt_escaped = html_mod.escape(_opt_text)
+                        st.markdown(f"""<div class="sm-post-card">{_opt_escaped.replace(chr(10), '<br>')}</div>""", unsafe_allow_html=True)
+                        with st.expander("COPY TO CLIPBOARD"):
+                            st.text_area(label, value=_opt_text, height=300, label_visibility="collapsed")
+                    else:
+                        st.info("This option was not generated.")
+
+            # Hashtag Strategy
+            if st.session_state.get('sm_hashtags'):
+                st.markdown("##### HASHTAG STRATEGY")
+                _hash_escaped = html_mod.escape(st.session_state['sm_hashtags'])
+                st.markdown(f"""<div class="sm-hashtag-box">
+                    <strong>RECOMMENDED HASHTAGS:</strong><br><br>
+                    {_hash_escaped.replace(chr(10), '<br>')}
+                </div>""", unsafe_allow_html=True)
+
+            # Message House Alignment
+            if st.session_state.get('sm_alignment'):
+                st.markdown("##### MESSAGE HOUSE ALIGNMENT")
+                _align_escaped = html_mod.escape(st.session_state['sm_alignment'])
+                st.markdown(f"""<div class="sm-alignment-box">
+                    <strong>BRAND ALIGNMENT NOTES:</strong><br><br>
+                    {_align_escaped.replace(chr(10), '<br>')}
+                </div>""", unsafe_allow_html=True)
                 
 # ===================================================================
 # 6. BRAND ARCHITECT (UNIFIED MODULE)
@@ -3537,15 +3742,18 @@ elif app_mode == "BRAND ARCHITECT":
         div.stButton > button[kind="primary"] {
             background-color: #ab8f59 !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
             border: none !important;
             font-weight: 800 !important;
         }
         div.stButton > button[kind="primary"]:hover {
             background-color: #f0c05a !important;
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         div.stButton > button[kind="primary"] p {
             color: #1b2a2e !important;
+            -webkit-text-fill-color: #1b2a2e !important;
         }
         .asset-box {
             border: 1px solid #333;

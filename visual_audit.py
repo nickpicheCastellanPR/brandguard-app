@@ -159,12 +159,14 @@ def run_color_compliance(image, profile_inputs: dict) -> dict:
             "skipped": True,
         }
 
-    detected_hexes = []
+    detected_colors_with_pct = []  # [(hex, pct), ...]
+    detected_hexes = []            # [hex, ...] for backward compat
     score = 50
     reasoning = "Visual inspection only."
 
     try:
-        detected_hexes = extract_dominant_colors(image)
+        detected_colors_with_pct = extract_dominant_colors(image)
+        detected_hexes = [h for h, _ in detected_colors_with_pct]
         # Build a pseudo profile_text with all brand hex codes for the scorer
         hex_text = " ".join(all_brand_hexes)
         score, reasoning = ColorScorer.grade_color_match(detected_hexes, hex_text)
@@ -196,6 +198,7 @@ def run_color_compliance(image, profile_inputs: dict) -> dict:
     return {
         "score": score,
         "detected_hexes": detected_hexes,
+        "detected_colors_with_pct": detected_colors_with_pct,
         "brand_hexes": all_brand_hexes,
         "reasoning": reasoning,
         "findings": findings,
@@ -260,6 +263,7 @@ BRAND GUARDRAILS:
 Analyze the image and report on:
 
 1. LOGO CHECK: Is the brand logo present? If yes, assess placement, sizing, clear space, distortion, and background contrast. If no logo is expected (e.g., internal document), note that.
+   IMPORTANT: When a single guideline applies to multiple elements of the same logo (e.g., a wordmark + icon mark), produce ONE consolidated finding per guideline with a nuanced verdict. Do NOT generate separate PASS and FAIL findings for the same guideline applied to different parts of the same logo. Instead, describe the overall compliance in one finding that acknowledges what passes and what drifts.
 
 2. VISUAL IDENTITY: Does the overall visual style align with the brand archetype and tone? Note any elements that conflict with brand guidelines.
 

@@ -12,7 +12,12 @@
       "Bash(py -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''app.py: OK''\\)\")",
       "Bash(py -c \"import py_compile; [py_compile.compile\\(f, doraise=True\\) for f in [''app.py'',''brand_ui.py'',''db_manager.py'',''subscription_manager.py'',''admin_panel.py'',''logic.py'']]\")",
       "Bash(py -3 -c \"import py_compile; py_compile.compile\\(''db_manager.py'', doraise=True\\); print\\(''db_manager.py: OK''\\)\")",
-      "Bash(py -3 -c \"import py_compile; py_compile.compile\\(''subscription_manager.py'', doraise=True\\); print\\(''subscription_manager.py: OK''\\)\")"
+      "Bash(py -3 -c \"import py_compile; py_compile.compile\\(''subscription_manager.py'', doraise=True\\); print\\(''subscription_manager.py: OK''\\)\")",
+      "Bash(py -3 -c \"import anthropic; print\\(anthropic.__version__\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''logic.py'', doraise=True\\); print\\(''logic.py OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''app.py OK''\\)\")",
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''logic.py'', doraise=True\\); print\\(''logic.py OK''\\)\")",
+      "Bash(py -c \"import py_compile; py_compile.compile\\(''logic.py'', doraise=True\\); print\\(''logic.py OK''\\)\")"
     ]
   }
 }

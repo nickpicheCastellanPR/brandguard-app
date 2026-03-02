@@ -29,8 +29,8 @@ SHIELD_DRIFT = (
     '<svg width="20" height="24" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">'
     '<path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" '
     'fill="none" stroke="#ab8f59" stroke-width="1.5"/>'
-    '<line x1="7" y1="5" x2="12" y2="13" stroke="#3d3d3d" stroke-width="1.5" stroke-linecap="round"/>'
-    '<line x1="12" y1="13" x2="9" y2="19" stroke="#3d3d3d" stroke-width="1.5" stroke-linecap="round"/>'
+    '<line x1="7" y1="5" x2="12" y2="13" stroke="#ab8f59" stroke-width="1.5" stroke-linecap="round"/>'
+    '<line x1="12" y1="13" x2="9" y2="19" stroke="#ab8f59" stroke-width="1.5" stroke-linecap="round"/>'
     '</svg>'
 )
 
@@ -54,7 +54,7 @@ _SEVERITY_CONFIG = {
     "drift": {
         "shield": SHIELD_DRIFT,
         "label": "DRIFT",
-        "color": "#3d3d3d",
+        "color": "#ffa421",
     },
     "degradation": {
         "shield": SHIELD_DEGRADATION,
@@ -94,7 +94,7 @@ def render_severity(level: str, text: str) -> str:
         f'<span style="display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; line-height:1.4;">'
         f'{shield}'
         f'<span style="font-variant:small-caps; font-weight:700; color:{color};">{label}</span>'
-        f'<span style="color:#3d3d3d;">{text}</span>'
+        f'<span style="color:#a0a0a0;">{text}</span>'
         f'</span>'
     )
 
