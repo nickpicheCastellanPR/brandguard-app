@@ -249,7 +249,7 @@ def check_seat_limit(org_id: str) -> dict:
 
 # ── Usage metering ───────────────────────────────────────────────────────────
 
-def record_ai_action(username: str, module_name: str):
+def record_ai_action(username: str, module_name: str, action_detail: str = None):
     """Records a weighted AI action for usage metering. No-op for super_admin.
     Checks st.session_state for impersonation context."""
     user = db.get_user_full(username)
@@ -268,9 +268,9 @@ def record_ai_action(username: str, module_name: str):
 
     is_impersonating = bool(st.session_state.get("admin_session"))
     if is_impersonating:
-        db.record_usage_action_impersonated(username, org_id, module_name, weight, billing_month)
+        db.record_usage_action_impersonated(username, org_id, module_name, weight, billing_month, action_detail)
     else:
-        db.record_usage_action(username, org_id, module_name, weight, billing_month)
+        db.record_usage_action(username, org_id, module_name, weight, billing_month, action_detail)
 
 
 def check_usage_limit(username: str) -> dict:

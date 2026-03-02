@@ -1609,3 +1609,287 @@ Create `brand_ui.py` as the single source for all brand-specific UI elements: th
 - Do NOT block data access for suspended users — they can view brands, export data, and use deterministic tools. Only AI modules are blocked.
 - Do NOT allow suspension of super_admin accounts
 - Do NOT automate suspension — it is always a manual admin decision based on reviewing the usage data
+
+3/1/2026 7:11PM PST
+# PROMPT 9: Dashboard — Replace Welcome Page with Working Dashboard
+
+## Before You Start
+
+Read these files in full:
+- `app.py` — find the current post-login landing page (the "BRAND FIDELITY BEGINS HERE" welcome screen) and understand how it renders, what data it pulls, and what conditional logic determines what the user sees
+- `db_manager.py` — understand how brand profiles, voice samples, social samples, usage tracking, and activity logs are queried
+- `brand_ui.py` — brand color constants and shared UI components
+- `tier_config.py` — tier limits, brand counts
+- `subscription_manager.py` — `resolve_user_tier()`, org/role logic
+
+You need to understand: what data exists in the database right now, how the current page renders, and what user context is available (username, tier, org, role, active brand).
+
+---
+
+## Context
+
+The current post-login page is a static welcome screen with marketing copy, two buttons (Build Brand Profile, Try a Sample Brand), and a "Brand Profile contains" explainer list. This was useful during early development. It is no longer appropriate. The platform has grown significantly — paywall, tiers, organizations, multiple modules, calibration engine, message house — and the landing page hasn't kept up.
+
+This prompt replaces the static welcome page with a working dashboard that answers five questions in 3 seconds: Where am I? How healthy is it? What needs my attention? What did I do last? What should I do next?
+
+The welcome state (zero brands, first-time user) becomes a conditional view within the dashboard, not a separate page.
+
+**This prompt changes only the post-login landing page.** It does not touch the pre-login page (Prompt 7), modules, Brand Architect, admin panel, or any other page.
+
+---
+
+## TASK 1: Dashboard Layout — Returning User (Has Brands)
+
+When a user logs in and has at least one brand, they see the dashboard. The dashboard is organized in four panels, top to bottom.
+
+### Panel 1: Brand Header
+
+**Left side:** Active brand name as H2 (Montserrat Bold 700, ALL CAPS, cream #f5f5f0). Below it, a brand selector dropdown if the user has multiple brands — switching brands reloads the entire dashboard with the new brand's data.
+
+**Right side:** Engine Confidence score as a large number. This is the single most prominent metric on the page.
+
+Display format:
+```
+ENGINE CONFIDENCE
+      72%
+```
+
+The percentage should be large (48px+), gold (#ab8f59), Montserrat Black (900). The label "ENGINE CONFIDENCE" above it in small caps, gold(#ab8f59), 14px.
+
+Below the score, a single-line status based on the value:
+- 90-100%: "Fully calibrated" in gold
+- 60-89%: "Partially calibrated — complete your profile to improve precision" in charcoal
+- Below 60%: "Under-calibrated — outputs may be generic. Complete your brand profile." in copper (#a6784d)
+
+If the message house hard ceiling is active (message house = 0%, score capped at 55%), show: "Confidence capped — add a message house to remove the ceiling." This replaces the standard status line, not stacks on top of it.
+
+### Panel 2: Calibration Overview
+
+A compact diagnostic view showing every component that feeds the Engine Confidence score. The user should see at a glance what's complete, what's partially done, and what's missing.
+
+**Section A — Profile Completion (top row, horizontal)**
+
+Four compact indicators side by side:
+
+| Component | Display | How to Calculate |
+|---|---|---|
+| Strategy | Completion percentage | Count populated fields (Brand Name, Archetype, Tone Keywords, Mission, Values, Guardrails) / 6 |
+| Message House | Completion percentage | Use existing message house sub-score from calibration engine |
+| Visual Identity | Completion percentage | Hex palette defined + logo uploaded. 0%, 50%, or 100% |
+| Overall | Engine Confidence % | The master score |
+
+Each as a small card or block: component name (small caps, sage), percentage (bold, teal), and a thin progress bar beneath (gold #ab8f59 fill on cream #f5f5f0 track). Clicking any card navigates to the relevant section of the Brand Architect.
+
+**Section B — Voice Calibration (below profile completion)**
+
+Eight rows — one for each voice cluster and one for each social platform:
+
+```
+VOICE CLUSTERS
+Corporate Affairs        ███░░  3/5  Calibrated
+Crisis & Response        ░░░░░  0/5  Not Calibrated
+Internal Leadership      █░░░░  1/5  Partially Calibrated
+Thought Leadership       ███░░  3/5  Calibrated
+Brand Marketing          █████  5/5  Fully Calibrated
+
+SOCIAL PLATFORMS
+LinkedIn                 ██░░░  2/5  Partially Calibrated
+Instagram                ░░░░░  0/5  Not Calibrated
+Twitter / X              ███░░  3/5  Calibrated
+```
+
+**Calibration thresholds and labels:**
+
+| Samples | Label | Visual Treatment |
+|---|---|---|
+| 0 / 5 | Not Calibrated | Empty bar. Label in copper (#a6784d). |
+| 1-2 / 5 | Partially Calibrated | Partial fill. Label in charcoal (#3d3d3d). |
+| 3-4 / 5 | Calibrated | Fill past the threshold mark. Label in teal (#24363b). |
+| 5 / 5 | Fully Calibrated | Full bar. Label in gold (#ab8f59). |
+
+**The progress bar design:** Each bar should have a subtle threshold marker at the 3/5 position — a small notch or line that visually indicates the "confident calibration" threshold. When the bar fill crosses this line, the user can see they've reached the calibration minimum. The remaining 2 slots (4/5 and 5/5) show there's still room to improve for full calibration points.
+
+**Clicking any row** should navigate to the relevant upload section in the Brand Architect (voice cluster section for clusters, social samples section for platforms).
+
+**Label for social section:** "SOCIAL PLATFORMS" not "SOCIAL MEDIA" — shorter, cleaner.
+
+### Panel 3: Recent Activity
+
+A compact activity log showing the most recent 15 actions associated with the active brand.
+
+**Columns:**
+```
+TIME          USER        MODULE              DETAIL
+Today 2:14pm  Nick P.     Content Generator   Generated press release
+Today 11:30am Nick P.     Visual Audit        Audited Homepage.png
+Yesterday     Sarah K.    Copy Editor         Proofed blog draft
+Mar 1         Nick P.     Social Assistant     Generated LinkedIn post
+```
+
+**Scoping rules:**
+- **Individual contributor (no org, or org member role):** Sees only their own actions. "USER" column hidden since it's always them — saves space.
+- **Org admin / owner:** Sees actions from all users in their organization. "USER" column visible with display names.
+- **Super admin:** Sees actions from all users across all organizations. "USER" column visible, plus an "ORG" column.
+
+**Data source:** Pull from `usage_tracking` table (which already records username, module, timestamp per action from Prompt 1). If the table doesn't currently store a detail/description field, add one — a brief text like "Generated press release" or "Audited screenshot." If adding a column is too invasive for this prompt, use the module name as the detail and note the limitation.
+
+**Time formatting:**
+- Today: "Today 2:14pm"
+- Yesterday: "Yesterday 4:30pm"
+- This week: Day name, e.g., "Tuesday 9:15am"
+- Older: Date, e.g., "Mar 1"
+
+**Empty state:** If no activity exists for this brand yet, show: "No activity yet. Use a module to get started." — not a blank space.
+
+**No pagination.** Show the most recent 15 and stop. This is a glance panel, not a full log. Link below to activity log for users wishing to view a complete history.
+
+### Panel 4: Quick Actions
+
+Four module buttons in a horizontal row at the bottom of the dashboard:
+
+```
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ CONTENT GENERATOR│  │ SOCIAL ASSISTANT │  │ COPY EDITOR      │  │ VISUAL AUDIT     │
+└──────────────────┘  └──────────────────┘  └──────────────────┘  └──────────────────┘
+```
+
+These use the standard button styling from Prompt 8 (gold outlined, Montserrat Bold ALL CAPS). Each button navigates to that module. No descriptions, no icons, no feature explanations — just fast paths to work. The help buttons on the module pages themselves (from Prompt 6) handle explanation.
+
+---
+
+## TASK 2: Welcome State — Zero Brands
+
+When a user logs in and has no brands (new user, or deleted all brands), the dashboard renders a different view. This is not a separate page — it's the same dashboard with conditional content.
+
+**What they see:**
+
+The Brand Header (Panel 1) shows: "No brand selected" where the brand name would be. Engine Confidence shows "—" instead of a percentage.
+
+The Calibration Overview (Panel 2) is replaced with:
+
+```
+GET STARTED
+
+Define your brand profile to begin. The engine calibrates to your positioning — strategy, message house, and voice — and gets more precise the more you put in.
+
+[CREATE BRAND PROFILE]       [LOAD SAMPLE BRAND]
+```
+
+Two buttons, side by side, both using standard button styling. "CREATE BRAND PROFILE" navigates to the Brand Architect. "LOAD SAMPLE BRAND" loads the Meridian Labs sample brand (from Prompt 3) and refreshes the dashboard.
+
+The Activity Log (Panel 3) shows its empty state: "No activity yet."
+
+The Quick Actions (Panel 4) are still visible — but if the user clicks one without a brand selected, the module should redirect them back with a message: "Select or create a brand first."
+
+**This welcome state should only appear when the user truly has zero brands.** If they have even one brand (including the sample), they see the full dashboard.
+
+---
+
+## TASK 3: Navigation Updates
+
+### Signet Logo → Dashboard
+
+If there is a Signet logo or "Signet" text in the sidebar or header, clicking it should navigate to the dashboard. This is the "home" action. Implement using `st.session_state` to track the current page and reset to dashboard on logo click.
+
+### Remove Welcome Page Code
+
+The old welcome page rendering code (the "BRAND FIDELITY BEGINS HERE" screen, the explainer bullets, the legacy copy) should be removed entirely. It is replaced by the dashboard (for returning users) and the welcome state within the dashboard (which is identical to the old welcome page (for zero-brand users). Clarification, if a user deletes all brands, such that they have none built, clicking dashboard should return them to this zero-state page. Do not leave dead code.
+
+---
+
+## TASK 4: Activity Logging Enhancement
+
+The dashboard depends on meaningful activity data. Verify that every AI module action is being logged with enough detail to populate the activity log. 
+
+**Required fields per activity record:**
+- `username` — who performed the action
+- `timestamp` — when
+- `module_name` — which module (content_generator, social_assistant, copy_editor, visual_audit)
+- `brand_id` — which brand was active
+- `action_detail` — brief description of what was done
+
+If `action_detail` doesn't exist in `usage_tracking`, add it:
+```sql
+ALTER TABLE usage_tracking ADD COLUMN action_detail TEXT DEFAULT NULL;
+```
+
+When recording actions in each module, populate this field:
+- Content Generator: "Generated {content_type}" (e.g., "Generated press release", "Generated blog post")
+- Social Assistant: "Generated {platform} post" (e.g., "Generated LinkedIn post")
+- Copy Editor: "Audited draft" or "Audited {content_type} draft"
+- Visual Audit: "Audited {filename}" (e.g., "Audited homepage.png")
+
+If the module doesn't know the content type at the time of logging, use the module name as a fallback: "Content Generator action", "Visual Audit action."
+
+---
+
+## TASK 5: Calibration Display Logic
+
+### Updating Terminology in Calibration Engine
+
+The internal calibration engine may still use the terms "Empty," "Unstable," and "Fortified" in code and display strings. Update ALL user-facing references:
+
+| Internal Term | User-Facing Term | Threshold |
+|---|---|---|
+| Empty | Not Calibrated | 0 samples |
+| Unstable | Partially Calibrated | 1-2 samples |
+| Fortified | Calibrated | 3-4 samples |
+| (new) | Fully Calibrated | 5 samples |
+
+**Internal code can keep the old terms** if renaming variables would be too disruptive — just make sure the user never sees "Fortified" or "Empty" or "Unstable" on screen. Map them at the display layer.
+
+### Social Platform Sample Counts
+
+The dashboard needs to display sample counts per social platform (LinkedIn, Instagram, Twitter/X). Verify how social samples are currently stored:
+
+- If they're stored with platform metadata (e.g., a `platform` field on each social sample), query and group by platform for the dashboard display.
+- If they're stored as a flat collection without platform tagging, add a `platform` field to the social samples table/column:
+```sql
+ALTER TABLE social_samples ADD COLUMN platform TEXT DEFAULT NULL;
+```
+Valid values: "linkedin", "instagram", "twitter"
+
+Then update the social sample upload UI in the Brand Architect to require platform selection when uploading a sample.
+
+If social samples are currently stored as JSON within the brands table, add the platform field to the JSON structure.
+
+**The dashboard must show per-platform counts.** If the data model doesn't support this yet, this prompt adds the support.
+
+### Calibration Scoring for Social Platforms
+
+Social platforms use the same threshold logic as voice clusters:
+- 0/5: Not Calibrated
+- 1-2/5: Partially Calibrated
+- 3-4/5: Calibrated
+- 5/5: Fully Calibrated
+
+The existing "Social (10%)" weight in the calibration engine (from the message house overhaul) should factor in per-platform completeness. If the current scoring just checks "3+ social posts total," update it to average the per-platform scores. For example: LinkedIn 3/5 + Instagram 0/5 + Twitter 3/5 = (100% + 0% + 100%) / 3 = 66.7% of the Social weight.
+
+---
+
+## Styling
+
+All dashboard elements must follow the Castellan brand styling established in Prompts 6 and 8. We spent a lot of time fixing this, let's make sure we don't break it again.:
+
+- **Typography:** Montserrat per the type hierarchy from Prompt 8
+- **Buttons:** Standard outlined gold buttons per Prompt 8
+- **No Streamlit default blue anywhere**
+- **No emoji** — use the shield indicators from Prompt 6 only where audit severity is being shown (not on the dashboard)
+- **Progress bars:** Gold (#ab8f59) fill on a cream(#f5f5f0) track with 4px height. The 3/5 threshold marker as a 1px vertical line in charcoal (#3d3d3d) at the 60% position of the bar.
+
+---
+
+## What NOT to Do
+
+- Do NOT change any other page (modules, Brand Architect, admin panel, login page)
+- Do NOT add analytics charts or complex data visualizations — this is a status dashboard, not a reporting tool
+- Do NOT show usage counts, action budgets, or tier limits on the dashboard (removed in Prompt 6)
+- Do NOT use the terms "Fortified," "Unstable," or "Empty" in any user-facing text
+- Do NOT add marketing copy to the dashboard — no taglines, no feature descriptions, no "Welcome back!"
+- Do NOT display Engine Confidence decimals — round to nearest integer
+- Do NOT use emoji for status indicators
+- Do NOT show the sample brand load button to returning users on the dashboard — it lives in the Brand Architect now
+- Do NOT paginate the activity log — 15 most recent, then stop
+- Do NOT show other users' activity to individual contributors
+- Do NOT break the existing calibration engine scoring — only update the display labels and add social platform granularity
+-Do Not break any existing styling/design elements

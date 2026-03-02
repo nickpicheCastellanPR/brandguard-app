@@ -161,6 +161,11 @@ def run_migrations():
             conn.execute("ALTER TABLE usage_tracking ADD COLUMN is_impersonated BOOLEAN DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+    if 'action_detail' not in ut_columns:
+        try:
+            conn.execute("ALTER TABLE usage_tracking ADD COLUMN action_detail TEXT DEFAULT NULL")
+        except sqlite3.OperationalError:
+            pass
 
     # --- Create admin_audit_log table ---
     conn.execute('''
@@ -534,13 +539,13 @@ def count_user_brands(org_id, exclude_sample=True):
     return count
 
 
-def record_usage_action(username, org_id, module, action_weight, billing_month):
+def record_usage_action(username, org_id, module, action_weight, billing_month, action_detail=None):
     """Records an AI action in the usage_tracking table."""
     conn = sqlite3.connect(DB_NAME)
     conn.execute('''
-        INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (username, org_id, module, action_weight, billing_month))
+        INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month, action_detail)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (username, org_id, module, action_weight, billing_month, action_detail))
     conn.commit()
     conn.close()
 
@@ -912,13 +917,13 @@ def get_monthly_usage_trend(months=6):
     return results
 
 
-def record_usage_action_impersonated(username, org_id, module, action_weight, billing_month):
+def record_usage_action_impersonated(username, org_id, module, action_weight, billing_month, action_detail=None):
     """Records an AI action flagged as impersonated (does not count toward soft cap)."""
     conn = sqlite3.connect(DB_NAME)
     conn.execute('''
-        INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month, is_impersonated)
-        VALUES (?, ?, ?, ?, ?, 1)
-    ''', (username, org_id, module, action_weight, billing_month))
+        INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month, is_impersonated, action_detail)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
+    ''', (username, org_id, module, action_weight, billing_month, action_detail))
     conn.commit()
     conn.close()
 

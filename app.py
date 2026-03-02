@@ -616,12 +616,16 @@ def calculate_calibration_score(profile_data):
         if "[ASSET:" in v_blob: vis_score += 7
         score += vis_score
 
-        # 4. SOCIAL (10 PTS)
+        # 4. SOCIAL (10 PTS — per-platform scoring)
         soc_score = 0
         s_blob = inputs.get('social_dna', '')
-        s_count = s_blob.count("[ASSET:")
-        if s_count >= 3: soc_score = 10
-        elif s_count >= 1: soc_score = 3
+        social_platforms = count_social_by_platform(s_blob)
+        platforms_with_samples = sum(1 for c in social_platforms.values() if c >= 1)
+        platforms_calibrated = sum(1 for c in social_platforms.values() if c >= 3)
+        if platforms_calibrated >= 2: soc_score = 10
+        elif platforms_calibrated >= 1: soc_score = 7
+        elif platforms_with_samples >= 2: soc_score = 5
+        elif platforms_with_samples >= 1: soc_score = 3
         score += soc_score
 
         # 5. VOICE CLUSTERS (45 PTS — 9 pts per fortified cluster)
@@ -681,8 +685,74 @@ def calculate_calibration_score(profile_data):
         "mh_sub_score": mh_sub_score,
         "mh_filled_fields": mh_filled_fields,
         "mh_total_fields": mh_total_fields,
-        "mh_ceiling_active": (mh_sub_score == 0)
+        "mh_ceiling_active": (mh_sub_score == 0),
+        "social_platforms": social_platforms if isinstance(profile_data, dict) and 'inputs' in profile_data else {"LinkedIn": 0, "Instagram": 0, "Twitter/X": 0}
     }
+
+
+# --- DASHBOARD HELPER FUNCTIONS ---
+
+def count_social_by_platform(social_dna: str) -> dict:
+    """Parse social_dna blob and return per-platform sample counts."""
+    import re
+    platforms = {"LinkedIn": 0, "Instagram": 0, "Twitter/X": 0}
+    if not social_dna:
+        return platforms
+    for match in re.finditer(r'\[ASSET:\s*(LINKEDIN|INSTAGRAM|TWITTER|X)\s', social_dna, re.IGNORECASE):
+        plat = match.group(1).upper()
+        if plat == "LINKEDIN":
+            platforms["LinkedIn"] += 1
+        elif plat == "INSTAGRAM":
+            platforms["Instagram"] += 1
+        elif plat in ("TWITTER", "X"):
+            platforms["Twitter/X"] += 1
+    return platforms
+
+
+def calculate_strategy_completion(inputs: dict) -> dict:
+    """Return strategy field completion status."""
+    fields = ['wiz_mission', 'wiz_values', 'wiz_guardrails', 'wiz_archetype']
+    filled = sum(1 for f in fields if inputs.get(f))
+    return {"filled": filled, "total": 4, "pct": (filled / 4) * 100}
+
+
+def calculate_visual_completion(inputs: dict) -> dict:
+    """Return visual identity completion status."""
+    has_palette = bool(inputs.get('palette_primary'))
+    has_visual_assets = "[ASSET:" in inputs.get('visual_dna', '')
+    filled = int(has_palette) + int(has_visual_assets)
+    return {"has_palette": has_palette, "has_visual_assets": has_visual_assets, "pct": (filled / 2) * 100}
+
+
+def map_calibration_status(internal_label: str) -> str:
+    """Map internal status labels to user-facing terminology."""
+    mapping = {
+        "FORTIFIED": "Calibrated",
+        "UNSTABLE": "Partially Calibrated",
+        "EMPTY": "Not Calibrated",
+        "LOW DATA": "Not Calibrated",
+        "DEVELOPING": "Partially Calibrated",
+    }
+    return mapping.get(internal_label, internal_label)
+
+
+def format_activity_time(timestamp_str: str, created_at) -> str:
+    """Format activity log timestamp for dashboard display."""
+    from datetime import datetime as dt, date, timedelta
+    try:
+        if isinstance(created_at, str) and len(created_at) >= 10:
+            event_date = dt.strptime(created_at[:10], "%Y-%m-%d").date()
+        else:
+            return timestamp_str or ""
+        today = date.today()
+        if event_date == today:
+            return f"Today {timestamp_str}"
+        elif event_date == today - timedelta(days=1):
+            return f"Yesterday {timestamp_str}"
+        else:
+            return f"{event_date.strftime('%b %d')} {timestamp_str}"
+    except (ValueError, TypeError):
+        return timestamp_str or ""
 
 
 # build_mh_context is imported from prompt_builder.py
@@ -1604,217 +1674,284 @@ elif app_mode == "DASHBOARD":
         st.stop()  # Don't show the rest of dashboard
     
     # --- RETURNING USER STATE (1+ PROFILES) ---
-    st.title("COMMAND CENTER")
     # Profile selector (auto-select if only one profile)
     if len(profiles) == 1:
         selected_profile = list(profiles.keys())[0]
-        st.info(f"Using profile: **{selected_profile}**")
         st.session_state['active_profile_name'] = selected_profile
     else:
         selected_profile = st.selectbox(
             "SELECT BRAND PROFILE",
             list(profiles.keys()),
-            index=list(profiles.keys()).index(active_profile_name) if active_profile_name in profiles else 0
+            index=list(profiles.keys()).index(active_profile_name) if active_profile_name in profiles else 0,
+            key="dash_profile_selector"
         )
         st.session_state['active_profile_name'] = selected_profile
-    
+
     selected_profile = selected_profile or list(profiles.keys())[0]
     current_profile = profiles[selected_profile]
-    
+
     # Calculate calibration data
     cal_data = calculate_calibration_score(current_profile)
-    
-    # --- THREE-COLUMN LAYOUT ---
-    col_left, col_center, col_right = st.columns([1.2, 1.5, 1.3])
-    
+    score = cal_data.get('score', 0)
+    status_label = cal_data.get('status_label', 'UNKNOWN')
+    cluster_health = cal_data.get('clusters', {})
+    social_platforms = cal_data.get('social_platforms', {"LinkedIn": 0, "Instagram": 0, "Twitter/X": 0})
+    mh_sub = cal_data.get('mh_sub_score', 0)
+    mh_ceiling = cal_data.get('mh_ceiling_active', False)
+    mh_filled = cal_data.get('mh_filled_fields', 0)
+    mh_total = cal_data.get('mh_total_fields', 8)
+
+    # Get structured inputs for completion helpers
+    _dash_inputs = current_profile.get('inputs', {}) if isinstance(current_profile, dict) else {}
+
+    # Calibration color
+    if score < 40:
+        cal_color = "#bd0000"
+    elif score < 80:
+        cal_color = "#eeba2b"
+    else:
+        cal_color = "#5c6b61"
+
     # ========================================
-    # LEFT COLUMN: PROFILE STATUS
+    # PANEL 1: BRAND HEADER (full-width)
     # ========================================
-    with col_left:
-        st.markdown("### PROFILE STATUS")
-        
-        # Calibration Score Display
-        score = cal_data.get('score', 0)
-        status_label = cal_data.get('status_label', 'UNKNOWN')
-        
-        # Color coding (using approved colors)
-        if score < 40:
-            color = "#bd0000"  # Red
-        elif score < 80:
-            color = "#eeba2b"  # Orange
-        else:
-            color = "#5c6b61"  # Green
-        
+    _p1_left, _p1_right = st.columns([3, 1])
+    with _p1_left:
         st.markdown(f"""
-        <div style='background: rgba(27, 42, 46, 0.6); padding: 20px; border-left: 4px solid {color}; margin-bottom: 20px;'>
-            <div style='font-size: 0.9rem; color: #ab8f59; margin-bottom: 5px;'>CALIBRATION</div>
-            <div style='font-size: 2rem; font-weight: 800; color: {color};'>{score}%</div>
-            <div style='font-size: 0.85rem; color: #5c6b61; margin-top: 5px;'>{status_label}</div>
+        <div style='padding: 10px 0 5px 0;'>
+            <div style='font-size: 1.6rem; font-weight: 700; color: #f5f5f0; letter-spacing: 0.05em;'>{selected_profile}</div>
+            <div style='font-size: 0.85rem; color: #5c6b61; margin-top: 2px;'>{len(profiles)} brand{'s' if len(profiles) != 1 else ''} loaded</div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Cluster Status
-        cluster_health = cal_data.get('clusters', {})
-        
-        if cluster_health:
-            st.markdown("**VOICE CLUSTER STATUS:**")
-            
-            cluster_display_names = {
-                "Corporate": "Corporate Affairs",
-                "Crisis": "Crisis & Response",
-                "Internal": "Internal Leadership",
-                "Thought": "Thought Leadership",
-                "Marketing": "Brand Marketing"
-            }
-            
-            for key, full_name in cluster_display_names.items():
-                if key in cluster_health:
-                    data = cluster_health[key]
-                    count = data.get('count', 0)
-                    icon = data.get('icon', brand_ui.SHIELD_DEGRADATION)
+    with _p1_right:
+        st.markdown(f"""
+        <div style='text-align: right; padding: 5px 0;'>
+            <div style='font-size: 0.75rem; color: #ab8f59; letter-spacing: 0.1em;'>ENGINE CONFIDENCE</div>
+            <div style='font-size: 2.2rem; font-weight: 800; color: {cal_color}; line-height: 1.1;'>{int(score)}%</div>
+            <div style='font-size: 0.8rem; color: {cal_color};'>{map_calibration_status(status_label)}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-                    st.markdown(f"{icon} {full_name} ({count} assets)", unsafe_allow_html=True)
-        
-        # Engine Readiness Summary
-        st.markdown("---")
-        st.markdown("**ENGINE READINESS:**")
-        
-        fortified_clusters = [
-            cluster_display_names.get(key, key) 
-            for key, data in cluster_health.items() 
-            if data.get('count', 0) >= 3
-        ]
-        
-        if fortified_clusters:
-            st.markdown("Calibrated for content generation and copy review in:")
-            for cluster in fortified_clusters:
-                st.markdown(f"• {cluster}")
-        else:
-            st.warning("Engine requires 3+ assets per cluster for reliable output.")
-        
-        # Show next fortification target
-        unstable_clusters = [
-            (key, data) 
-            for key, data in cluster_health.items() 
-            if data.get('count', 0) > 0 and data.get('count', 0) < 3
-        ]
-        
-        if unstable_clusters:
-            key, data = unstable_clusters[0]
-            needed = 3 - data.get('count', 0)
-            cluster_name = cluster_display_names.get(key, key)
-            st.markdown(brand_ui.render_severity("drift", f"Add {needed} more {cluster_name} asset{'s' if needed > 1 else ''} to fortify this cluster."), unsafe_allow_html=True)
+    st.markdown("<div style='border-bottom: 1px solid #5c6b61; margin: 5px 0 20px 0;'></div>", unsafe_allow_html=True)
 
-        # MESSAGE HOUSE STATUS CARD
-        st.markdown("---")
-        st.markdown("**MESSAGE HOUSE STATUS:**")
-        mh_sub = cal_data.get('mh_sub_score', 0)
-        mh_ceiling = cal_data.get('mh_ceiling_active', False)
-        mh_filled = cal_data.get('mh_filled_fields', 0)
-        mh_total = cal_data.get('mh_total_fields', 8)
+    # ========================================
+    # PANEL 2: CALIBRATION OVERVIEW
+    # ========================================
+    _p2_left, _p2_right = st.columns([1, 1])
+
+    with _p2_left:
+        st.markdown("<div style='font-size: 0.9rem; color: #ab8f59; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 600;'>CALIBRATION SUMMARY</div>", unsafe_allow_html=True)
+
+        # Strategy card
+        strat = calculate_strategy_completion(_dash_inputs)
+        _strat_pct = strat['pct']
+        st.markdown(f"""
+        <div style='background: rgba(27, 42, 46, 0.5); border-left: 3px solid #5c6b61; padding: 10px 12px; margin-bottom: 8px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <span style='font-size: 0.8rem; font-weight: 600;'>Strategy</span>
+                <span style='font-size: 0.8rem; color: #ab8f59;'>{strat['filled']}/{strat['total']} Fields</span>
+            </div>
+            <div style='background: #1b2a2e; height: 4px; margin-top: 6px; border-radius: 2px;'>
+                <div style='background: #5c6b61; height: 4px; width: {_strat_pct}%; border-radius: 2px;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Message House card
+        _mh_pct = min(mh_sub, 100)
+        _mh_color = "#ff4b4b" if mh_ceiling else ("#ffa421" if mh_sub < 50 else "#5c6b61")
+        _mh_label = "Not Configured" if mh_ceiling else (f"{mh_filled}/{mh_total} Fields" if mh_sub < 50 else f"{mh_filled}/{mh_total} Fields")
+        st.markdown(f"""
+        <div style='background: rgba(27, 42, 46, 0.5); border-left: 3px solid {_mh_color}; padding: 10px 12px; margin-bottom: 8px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <span style='font-size: 0.8rem; font-weight: 600;'>Message House</span>
+                <span style='font-size: 0.8rem; color: {_mh_color};'>{_mh_label}</span>
+            </div>
+            <div style='background: #1b2a2e; height: 4px; margin-top: 6px; border-radius: 2px;'>
+                <div style='background: {_mh_color}; height: 4px; width: {_mh_pct}%; border-radius: 2px;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         if mh_ceiling:
-            st.markdown(f"""
-            <div style='background: rgba(255,75,75,0.1); border-left: 3px solid #ff4b4b; padding: 10px; margin-top:5px;'>
-                <div style='font-size:0.8rem; color:#ff4b4b; font-weight:700;'>NOT CONFIGURED</div>
-                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
-                    Engine capped at 55%. Configure Message House to enable full fidelity enforcement.
-                </div>
+            st.markdown("<div style='font-size: 0.75rem; color: #ff4b4b; margin: -4px 0 8px 12px;'>Engine capped at 55% — configure Message House to unlock full calibration.</div>", unsafe_allow_html=True)
+
+        # Visual Identity card
+        vis = calculate_visual_completion(_dash_inputs)
+        _vis_pct = vis['pct']
+        _vis_status = []
+        if vis['has_palette']: _vis_status.append("Palette")
+        if vis['has_visual_assets']: _vis_status.append("Assets")
+        _vis_label = " + ".join(_vis_status) if _vis_status else "Not Configured"
+        st.markdown(f"""
+        <div style='background: rgba(27, 42, 46, 0.5); border-left: 3px solid #5c6b61; padding: 10px 12px; margin-bottom: 8px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <span style='font-size: 0.8rem; font-weight: 600;'>Visual Identity</span>
+                <span style='font-size: 0.8rem; color: #ab8f59;'>{_vis_label}</span>
             </div>
-            """, unsafe_allow_html=True)
-            if st.button("CONFIGURE MESSAGE HOUSE", type="secondary", key="dash_mh_btn"):
-                st.session_state['app_mode'] = "BRAND ARCHITECT"
-                st.rerun()
-        elif mh_sub < 50:
-            st.markdown(f"""
-            <div style='background: rgba(255,164,33,0.1); border-left: 3px solid #ffa421; padding: 10px; margin-top:5px;'>
-                <div style='font-size:0.8rem; color:#ffa421; font-weight:700;'>IN PROGRESS ({mh_filled}/{mh_total} fields)</div>
-                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
-                    Complete pillars and proof points to strengthen fidelity accuracy.
-                </div>
+            <div style='background: #1b2a2e; height: 4px; margin-top: 6px; border-radius: 2px;'>
+                <div style='background: #5c6b61; height: 4px; width: {_vis_pct}%; border-radius: 2px;'></div>
             </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div style='background: rgba(9,171,59,0.1); border-left: 3px solid #09ab3b; padding: 10px; margin-top:5px;'>
-                <div style='font-size:0.8rem; color:#09ab3b; font-weight:700;'>CONFIGURED ({mh_filled}/{mh_total} fields)</div>
-                <div style='font-size:0.75rem; color:#a0a0a0; margin-top:4px;'>
-                    Message House active. AI enforces message house alignment.
-                </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Social Calibration card
+        _soc_total = sum(social_platforms.values())
+        _soc_calibrated = sum(1 for c in social_platforms.values() if c >= 3)
+        _soc_pct = min((_soc_calibrated / 3) * 100, 100)
+        _soc_label = f"{_soc_calibrated}/3 Platforms" if _soc_total > 0 else "Not Configured"
+        st.markdown(f"""
+        <div style='background: rgba(27, 42, 46, 0.5); border-left: 3px solid #5c6b61; padding: 10px 12px; margin-bottom: 8px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <span style='font-size: 0.8rem; font-weight: 600;'>Social Calibration</span>
+                <span style='font-size: 0.8rem; color: #ab8f59;'>{_soc_label}</span>
             </div>
-            """, unsafe_allow_html=True)
+            <div style='background: #1b2a2e; height: 4px; margin-top: 6px; border-radius: 2px;'>
+                <div style='background: #5c6b61; height: 4px; width: {_soc_pct}%; border-radius: 2px;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with _p2_right:
+        st.markdown("<div style='font-size: 0.9rem; color: #ab8f59; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 600;'>CALIBRATION DETAIL</div>", unsafe_allow_html=True)
+
+        # Voice Clusters (5 rows — each rendered individually for SVG compatibility)
+        cluster_display_names = {
+            "Corporate": "Corporate Affairs",
+            "Crisis": "Crisis & Response",
+            "Internal": "Internal Leadership",
+            "Thought": "Thought Leadership",
+            "Marketing": "Brand Marketing"
+        }
+        for key, full_name in cluster_display_names.items():
+            data = cluster_health.get(key, {"count": 0, "status": "EMPTY"})
+            count = data.get('count', 0)
+            status = data.get('status', 'EMPTY')
+            icon = data.get('icon', brand_ui.SHIELD_DEGRADATION)
+            pct = min((count / 3) * 100, 100)
+            mapped = map_calibration_status(status)
+            _status_color = "#5c6b61" if status == "FORTIFIED" else ("#eeba2b" if status == "UNSTABLE" else "#5c6b61")
+            st.markdown(f"""<div style='display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 6px 0;'>
+                <span style='flex-shrink: 0;'>{icon}</span>
+                <span style='flex: 1; font-size: 0.8rem; min-width: 120px;'>{full_name}</span>
+                <div style='flex: 1; background: #1b2a2e; height: 4px; border-radius: 2px; min-width: 60px;'>
+                    <div style='background: {_status_color}; height: 4px; width: {pct}%; border-radius: 2px;'></div>
+                </div>
+                <span style='font-size: 0.75rem; color: #5c6b61; min-width: 50px; text-align: right;'>{count}/3</span>
+                <span style='font-size: 0.7rem; color: {_status_color}; min-width: 110px; text-align: right;'>{mapped}</span>
+            </div>""", unsafe_allow_html=True)
+
+        # Social Platforms (3 rows)
+        st.markdown("<div style='font-size: 0.8rem; color: #ab8f59; margin: 8px 0 6px 0; font-weight: 600;'>SOCIAL PLATFORMS</div>", unsafe_allow_html=True)
+        for plat_name, plat_count in social_platforms.items():
+            plat_pct = min((plat_count / 3) * 100, 100)
+            if plat_count >= 3:
+                plat_status = "Calibrated"
+                plat_color = "#5c6b61"
+            elif plat_count >= 1:
+                plat_status = "Partially Calibrated"
+                plat_color = "#eeba2b"
+            else:
+                plat_status = "Not Calibrated"
+                plat_color = "#5c6b61"
+            st.markdown(f"""<div style='display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 4px 0;'>
+                <span style='flex: 1; font-size: 0.8rem; min-width: 80px;'>{plat_name}</span>
+                <div style='flex: 1; background: #1b2a2e; height: 4px; border-radius: 2px; min-width: 60px;'>
+                    <div style='background: {plat_color}; height: 4px; width: {plat_pct}%; border-radius: 2px;'></div>
+                </div>
+                <span style='font-size: 0.75rem; color: #5c6b61; min-width: 50px; text-align: right;'>{plat_count}/3</span>
+                <span style='font-size: 0.7rem; color: {plat_color}; min-width: 110px; text-align: right;'>{plat_status}</span>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='border-bottom: 1px solid rgba(92, 107, 97, 0.3); margin: 20px 0;'></div>", unsafe_allow_html=True)
 
     # ========================================
-    # CENTER COLUMN: FIDELITY MODULES
+    # PANEL 3: RECENT ACTIVITY
     # ========================================
-    with col_center:
-        st.markdown("### FIDELITY MODULES")
-        
-        module_descriptions = {
-            "VISUAL COMPLIANCE": "Audit images against palette standards",
-            "COPY EDITOR": "Enforce voice across written content",
-            "CONTENT GENERATOR": "Generate brand-calibrated copy",
-            "SOCIAL MEDIA ASSISTANT": "Cross-channel consistency analysis"
-        }
-        
-        for module_name, description in module_descriptions.items():
-            if st.button(module_name, use_container_width=True):
-                st.session_state['app_mode'] = module_name
-                st.rerun()
-            st.caption(description)
-            st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-    
-    # ========================================
-    # RIGHT COLUMN: RECENT OPERATIONS
-    # ========================================
-    with col_right:
-        st.markdown("### RECENT OPERATIONS")
-        
-        # Fetch activity logs
-        try:
-            logs = db.get_org_logs(org_id, limit=10)
-            
-            # Filter for non-admins (show only their activity)
-            if not is_admin:
-                logs = [log for log in logs if log.get('username') == username]
-            
-            if logs:
-                for log in logs:
-                    timestamp = log.get('timestamp', '')
-                    activity = log.get('activity_type', 'UNKNOWN')
-                    verdict = log.get('verdict', '')
-                    score = log.get('score', 0)
-                    asset = log.get('asset_name', '')
-                    
-                    # Format display based on activity type
-                    if 'VISUAL' in activity:
-                        detail = f"PASS ({score}%)" if score > 60 else f"FAIL ({score}%)"
-                    elif 'EDIT' in activity or 'COPY' in activity:
-                        detail = verdict
-                    elif 'GENERATION' in activity or 'CONTENT' in activity:
-                        metadata = json.loads(log.get('metadata_json', '{}'))
-                        word_count = metadata.get('word_count', 'N/A')
-                        detail = f"{word_count} words" if isinstance(word_count, int) else verdict
-                    else:
-                        detail = verdict
-                    
-                    st.markdown(f"""
-                    <div style='background: rgba(27, 42, 46, 0.4); padding: 10px; margin-bottom: 8px; border-left: 2px solid #5c6b61;'>
-                        <div style='font-size: 0.75rem; color: #ab8f59;'>{timestamp} │ {activity}</div>
-                        <div style='font-size: 0.85rem; margin-top: 4px;'>└─ {detail}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("No recent activity logged.")
-        
-        except Exception as e:
-            st.error(f"Error loading activity log: {e}")
-        
-        # View full log button
-        if st.button("VIEW FULL LOG", use_container_width=True):
-            # Manually force the navigation state
+    _p3_left, _p3_right = st.columns([3, 1])
+    with _p3_left:
+        st.markdown("<div style='font-size: 0.9rem; color: #ab8f59; letter-spacing: 0.1em; font-weight: 600;'>RECENT ACTIVITY</div>", unsafe_allow_html=True)
+    with _p3_right:
+        if st.button("VIEW FULL LOG", use_container_width=True, key="dash_view_log"):
             st.session_state.app_mode = "ACTIVITY LOG"
             st.rerun()
+
+    try:
+        logs = db.get_org_logs(org_id, limit=15)
+        if not is_admin:
+            logs = [log for log in logs if log.get('username') == username]
+
+        if logs:
+            _is_impersonating = bool(st.session_state.get('admin_session'))
+            _log_html = ""
+            for log in logs:
+                _ts = log.get('timestamp', '')
+                _created = log.get('created_at', '')
+                _time_display = format_activity_time(_ts, _created)
+                _activity = log.get('activity_type', 'UNKNOWN')
+                _asset = log.get('asset_name', '')
+                _verdict = log.get('verdict', '')
+                _score_val = log.get('score', 0)
+                _log_user = log.get('username', '')
+
+                if 'VISUAL' in _activity:
+                    _detail = f"{'PASS' if _score_val > 60 else 'REVIEW'} ({_score_val}%)"
+                elif 'EDIT' in _activity or 'COPY' in _activity:
+                    _detail = _verdict
+                elif 'GENERATION' in _activity or 'CONTENT' in _activity:
+                    try:
+                        _meta = json.loads(log.get('metadata_json', '{}'))
+                        _wc = _meta.get('word_count', '')
+                        _detail = f"{_wc} words" if isinstance(_wc, int) else _verdict
+                    except (json.JSONDecodeError, TypeError):
+                        _detail = _verdict
+                else:
+                    _detail = _verdict
+
+                _user_col = f"<span style='color: #5c6b61; margin-right: 8px;'>{_log_user}</span>" if _is_impersonating or is_admin else ""
+                _asset_display = f" &mdash; {_asset}" if _asset else ""
+                _log_html += f"""
+                <div style='background: rgba(27, 42, 46, 0.4); padding: 8px 12px; margin-bottom: 4px; border-left: 2px solid #5c6b61; font-size: 0.8rem;'>
+                    <span style='color: #ab8f59;'>{_time_display}</span>
+                    <span style='color: #5c6b61; margin: 0 6px;'>|</span>
+                    {_user_col}<span style='font-weight: 600;'>{_activity}</span>{_asset_display}
+                    <span style='color: #5c6b61; margin: 0 6px;'>|</span>
+                    <span>{_detail}</span>
+                </div>
+                """
+            st.markdown(_log_html, unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='color: #5c6b61; font-size: 0.85rem; padding: 15px 0;'>No activity recorded yet. Run an audit or generate content to see results here.</div>", unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error loading activity log: {e}")
+
+    st.markdown("<div style='border-bottom: 1px solid rgba(92, 107, 97, 0.3); margin: 20px 0;'></div>", unsafe_allow_html=True)
+
+    # ========================================
+    # PANEL 4: QUICK ACTIONS
+    # ========================================
+    st.markdown("<div style='font-size: 0.9rem; color: #ab8f59; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 600;'>QUICK ACTIONS</div>", unsafe_allow_html=True)
+    _qa1, _qa2, _qa3, _qa4 = st.columns(4)
+    with _qa1:
+        if st.button("VISUAL AUDIT", use_container_width=True, key="dash_qa_visual"):
+            st.session_state['app_mode'] = "VISUAL COMPLIANCE"
+            st.rerun()
+        st.caption("Audit images against palette standards")
+    with _qa2:
+        if st.button("COPY EDITOR", use_container_width=True, key="dash_qa_copy"):
+            st.session_state['app_mode'] = "COPY EDITOR"
+            st.rerun()
+        st.caption("Enforce voice across written content")
+    with _qa3:
+        if st.button("CONTENT GENERATOR", use_container_width=True, key="dash_qa_content"):
+            st.session_state['app_mode'] = "CONTENT GENERATOR"
+            st.rerun()
+        st.caption("Generate brand-calibrated copy")
+    with _qa4:
+        if st.button("SOCIAL ASSISTANT", use_container_width=True, key="dash_qa_social"):
+            st.session_state['app_mode'] = "SOCIAL MEDIA ASSISTANT"
+            st.rerun()
+        st.caption("Cross-channel consistency analysis")
 
     # ========================================
     # BRAND MANAGEMENT (below 3-col layout)
@@ -2246,7 +2383,7 @@ elif app_mode == "VISUAL COMPLIANCE":
 
                         # Record AI action ONLY if AI was actually used
                         if ai_was_used:
-                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'visual_audit')
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'visual_audit', f"Audit: {uploaded_file.name} — {verdict} ({overall_score}%)")
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
 
                         st.rerun()
@@ -2744,10 +2881,11 @@ elif app_mode == "COPY EDITOR":
                                     "rationale": rationale
                                 }
                             )
-                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor')
+                            _ce_detail = f"Rewrite: {st.session_state['ce_draft'][:60]}..."
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor', _ce_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
-                            
+
                         except Exception as e:
                             st.error(f"Error: {e}")
                 else:
@@ -3050,10 +3188,11 @@ elif app_mode == "CONTENT GENERATOR":
                                     "rationale": rationale
                                 }
                             )
-                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'content_generator')
+                            _cg_detail = f"Generate: {st.session_state['cg_topic'][:60]}"
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'content_generator', _cg_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
-                            
+
                         except Exception as e:
                             st.error(f"Error: {e}")
                 else:
@@ -3296,10 +3435,11 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                                     "options": options
                                 }
                             )
-                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'social_assistant')
+                            _sm_detail = f"Social: {st.session_state['sm_platform']} — {st.session_state['sm_topic'][:50]}"
+                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'social_assistant', _sm_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             st.rerun()
-                            
+
                         except Exception as e:
                             st.error(f"Error: {e}")
                 else:
