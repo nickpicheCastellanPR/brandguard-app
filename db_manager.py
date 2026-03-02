@@ -670,6 +670,24 @@ def update_user_fields(username, **fields):
     return True
 
 
+def reset_user_password(username, new_password):
+    """Reset a user's password. Returns True on success."""
+    hashed = ph.hash(new_password)
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hashed, username))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_user_by_email(email):
+    """Look up a username by email address. Returns username or None."""
+    conn = sqlite3.connect(DB_NAME)
+    row = conn.execute("SELECT username FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 def suspend_user(username, reason, admin_username):
     """Suspend a user account. Returns True on success."""
     conn = sqlite3.connect(DB_NAME)

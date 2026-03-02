@@ -216,6 +216,24 @@ def _render_user_management():
                         else:
                             st.info("No changes detected.")
 
+        # --- Password Reset (separate from edit form) ---
+        st.markdown("#### Reset Password")
+        with st.form("admin_reset_password"):
+            reset_new_pw = st.text_input("New Password", type="password", max_chars=64,
+                                         key="admin_reset_pw_input")
+            reset_confirm_pw = st.text_input("Confirm Password", type="password", max_chars=64,
+                                             key="admin_reset_pw_confirm")
+            if st.form_submit_button("Reset Password"):
+                if not reset_new_pw or len(reset_new_pw) < 8:
+                    st.error("Password must be at least 8 characters.")
+                elif reset_new_pw != reset_confirm_pw:
+                    st.error("Passwords do not match.")
+                else:
+                    db.reset_user_password(edit_user, reset_new_pw)
+                    db.log_admin_action(_admin_user(), "password_reset", "user", edit_user,
+                                        {"reset_by": _admin_user()})
+                    st.success(f"Password reset for '{edit_user}'.")
+
     # --- Delete User ---
     with col_delete:
         st.markdown("#### Delete User")

@@ -1101,7 +1101,42 @@ if not st.session_state['authenticated']:
                     st.rerun()
                 else:
                     st.error("Invalid Credentials")
-        
+
+            # --- Account Recovery Links ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                if st.button("Forgot Username?", key="forgot_username_btn"):
+                    st.session_state['_show_forgot_username'] = True
+            with rc2:
+                if st.button("Forgot Password?", key="forgot_password_btn"):
+                    st.session_state['_show_forgot_password'] = True
+
+            if st.session_state.get('_show_forgot_username'):
+                with st.form("forgot_username_form"):
+                    fu_email = st.text_input("Enter your email address", key="fu_email")
+                    if st.form_submit_button("Look Up Username"):
+                        found = db.get_user_by_email(fu_email)
+                        if found:
+                            st.success(f"Your username is: **{found}**")
+                        else:
+                            st.error("No account found with that email address.")
+                        st.session_state['_show_forgot_username'] = False
+
+            if st.session_state.get('_show_forgot_password'):
+                st.markdown("""
+                <div style="background:rgba(36,54,59,0.05); border-left:3px solid #ab8f59;
+                            padding:12px 16px; font-size:0.85rem; color:#24363b; margin-top:8px;">
+                    <strong>Password Reset</strong><br>
+                    Contact your organization admin to reset your password.
+                    If you are the admin, contact <a href="mailto:support@castellanpr.com"
+                    style="color:#24363b; font-weight:600;">support@castellanpr.com</a>.
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("Close", key="close_forgot_pw"):
+                    st.session_state['_show_forgot_password'] = False
+                    st.rerun()
+
         with reg_tab:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user", max_chars=64)
             r_pass = st.text_input("CHOOSE PASSWORD", type="password", key="r_pass", max_chars=64)
@@ -1367,6 +1402,25 @@ with st.sidebar:
             End-to-End Encrypted.
         </div>
     """, unsafe_allow_html=True)
+
+    with st.expander("CHANGE PASSWORD"):
+        with st.form("change_password_form"):
+            cp_current = st.text_input("Current Password", type="password", key="cp_current")
+            cp_new = st.text_input("New Password", type="password", key="cp_new")
+            cp_confirm = st.text_input("Confirm New Password", type="password", key="cp_confirm")
+            if st.form_submit_button("Update Password"):
+                _cp_user = st.session_state.get('username', '')
+                if not cp_current or not cp_new:
+                    st.error("All fields are required.")
+                elif len(cp_new) < 8:
+                    st.error("New password must be at least 8 characters.")
+                elif cp_new != cp_confirm:
+                    st.error("New passwords do not match.")
+                elif not db.check_login(_cp_user, cp_current):
+                    st.error("Current password is incorrect.")
+                else:
+                    db.reset_user_password(_cp_user, cp_new)
+                    st.success("Password updated.")
 
     if st.button("LOGOUT", width="stretch"):
         # End impersonation if active
@@ -4909,25 +4963,120 @@ elif app_mode == "ACTIVITY LOG":
             )
 
             selected_log = logs[selected_idx]
-            detail_col1, detail_col2 = st.columns(2)
+            _activity = selected_log.get('activity_type', '')
 
-            with detail_col1:
-                st.markdown("**METADATA**")
-                st.write(f"**Org:** {selected_log.get('org_id')}")
-                st.write(f"**User:** {selected_log.get('username')}")
-                st.write(f"**Time:** {selected_log.get('timestamp')}")
-                st.write(f"**Activity:** {selected_log.get('activity_type')}")
-                st.write(f"**Asset:** {selected_log.get('asset_name')}")
-                st.write(f"**Score:** {selected_log.get('score')}")
-                st.write(f"**Verdict:** {selected_log.get('verdict')}")
+            # -- Header row --
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between; align-items:center;
+                        padding:12px 16px; background:rgba(27,42,46,0.6);
+                        border-left:3px solid #ab8f59; margin-bottom:16px;">
+                <span style="font-weight:700; color:#ab8f59; letter-spacing:0.05em;">{_activity}</span>
+                <span style="color:#5c6b61; font-size:0.8rem;">{selected_log.get('timestamp', '')} &middot; {selected_log.get('username', '')}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-            with detail_col2:
-                st.markdown("**FULL PAYLOAD (JSON)**")
-                try:
-                    metadata = json.loads(selected_log.get('metadata_json', '{}'))
-                    st.json(metadata)
-                except:
-                    st.code(selected_log.get('metadata_json', '{}'))
+            # -- Parse metadata --
+            try:
+                metadata = json.loads(selected_log.get('metadata_json', '{}'))
+            except:
+                metadata = {}
+
+            _asset = selected_log.get('asset_name', '')
+            _score = selected_log.get('score', '-')
+            _verdict = selected_log.get('verdict', '')
+
+            # -- Render per activity type --
+            if _activity == "VISUAL AUDIT":
+                _scores = metadata.get('scores', {})
+                _summary = metadata.get('summary', '')
+                st.markdown(f"**Asset:** {_asset}")
+                sc1, sc2, sc3, sc4 = st.columns(4)
+                with sc1: st.metric("OVERALL", _score)
+                with sc2: st.metric("COLOR", _scores.get('color', '-'))
+                with sc3: st.metric("VISUAL", _scores.get('visual', '-'))
+                with sc4: st.metric("COPY", _scores.get('copy', '-'))
+                st.markdown(f"**Verdict:** {_verdict}")
+                if _summary:
+                    st.markdown(f"**Summary:** {_summary}")
+
+            elif _activity == "COPY EDIT":
+                st.markdown(f"**Asset:** {_asset} &nbsp;|&nbsp; **Score:** {_score} &nbsp;|&nbsp; **Verdict:** {_verdict}")
+                _draft = metadata.get('draft', '')
+                _rewrite = metadata.get('rewrite', '')
+                _rationale = metadata.get('rationale', '')
+                if _draft:
+                    with st.expander("ORIGINAL DRAFT", expanded=False):
+                        st.text(_draft[:2000])
+                if _rewrite:
+                    with st.expander("REWRITTEN OUTPUT", expanded=True):
+                        st.markdown(_rewrite[:2000])
+                if _rationale:
+                    with st.expander("RATIONALE", expanded=False):
+                        st.markdown(_rationale[:2000])
+
+            elif _activity in ("GENERATOR", "CONTENT GENERATION"):
+                _topic = metadata.get('topic', '')
+                _key_points = metadata.get('key_points', '')
+                _draft = metadata.get('draft', '')
+                _rationale = metadata.get('rationale', '')
+                st.markdown(f"**Topic:** {_topic}")
+                if _key_points:
+                    st.markdown(f"**Key Points:** {_key_points}")
+                if _draft:
+                    with st.expander("GENERATED CONTENT", expanded=True):
+                        st.markdown(_draft[:3000])
+                if _rationale:
+                    with st.expander("RATIONALE", expanded=False):
+                        st.markdown(_rationale[:2000])
+
+            elif _activity in ("SOCIAL GEN", "SOCIAL GENERATION"):
+                _platform = metadata.get('platform', '')
+                _goal = metadata.get('goal', '')
+                _topic = metadata.get('topic', '')
+                _options = metadata.get('options', [])
+                st.markdown(f"**Platform:** {_platform} &nbsp;|&nbsp; **Goal:** {_goal}")
+                if _topic:
+                    st.markdown(f"**Topic:** {_topic}")
+                if _options:
+                    for j, opt in enumerate(_options):
+                        with st.expander(f"OPTION {j+1}", expanded=(j == 0)):
+                            if isinstance(opt, dict):
+                                st.markdown(opt.get('content', opt.get('text', str(opt))))
+                            else:
+                                st.markdown(str(opt))
+
+            elif _activity == "STRATEGY UPDATE":
+                _name = metadata.get('name', '')
+                _arch = metadata.get('arch', '')
+                _stype = metadata.get('type', '')
+                st.markdown(f"**Asset:** {_asset} &nbsp;|&nbsp; **Verdict:** {_verdict}")
+                if _name:
+                    st.markdown(f"**Profile:** {_name}")
+                if _stype:
+                    st.markdown(f"**Type:** {_stype}")
+                if _arch:
+                    with st.expander("UPDATED CONTENT", expanded=False):
+                        st.text(_arch[:2000])
+
+            elif _activity in ("ASSET INJECTION", "ASSET DELETED"):
+                _dtype = metadata.get('type', '')
+                _content = metadata.get('content', '')
+                st.markdown(f"**Asset:** {_asset} &nbsp;|&nbsp; **Type:** {_dtype} &nbsp;|&nbsp; **Verdict:** {_verdict}")
+                if _content:
+                    st.markdown(f"**Preview:** {_content}")
+
+            elif _activity in ("PROFILE CREATED", "PROFILE DELETED"):
+                _method = metadata.get('method', '')
+                st.markdown(f"**Asset:** {_asset} &nbsp;|&nbsp; **Verdict:** {_verdict}")
+                if _method:
+                    st.markdown(f"**Method:** {_method}")
+
+            else:
+                # Fallback: show structured metadata
+                st.markdown(f"**Asset:** {_asset} &nbsp;|&nbsp; **Score:** {_score} &nbsp;|&nbsp; **Verdict:** {_verdict}")
+                if metadata:
+                    with st.expander("RAW METADATA", expanded=True):
+                        st.json(metadata)
         
         else:
             st.warning("No activity logs found matching your filters")
