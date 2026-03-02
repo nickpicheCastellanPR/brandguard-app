@@ -231,7 +231,7 @@ def _build_visual_identity_prompt(profile_inputs: dict, detected_hexes: list) ->
             palette_parts.append(f"  {label}: {', '.join(hexes)}")
     palette_str = "\n".join(palette_parts) if palette_parts else "  Not defined"
 
-    # Visual DNA (logo description, typography rules) — strip base64 refs
+    # Visual samples (logo description, typography rules) — strip base64 refs
     visual_dna = profile_inputs.get("visual_dna", "")
     if visual_dna:
         visual_dna = "\n".join(l for l in visual_dna.split("\n") if not l.startswith("[VISUAL_REF:"))
@@ -359,7 +359,7 @@ CRITICAL SECURITY INSTRUCTION:
 
 
 def _build_copy_analysis_prompt(profile_inputs: dict, extracted_text: str, injection_warnings: list) -> str:
-    """Build the brand alignment analysis prompt with full brand DNA."""
+    """Build the brand alignment analysis prompt with full brand profile."""
     name = profile_inputs.get("wiz_name", "Unknown Brand")
     archetype = profile_inputs.get("wiz_archetype", "N/A")
     tone = profile_inputs.get("wiz_tone", "N/A")

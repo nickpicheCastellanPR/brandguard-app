@@ -86,7 +86,7 @@ _PILLARS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Voice DNA blob — 15 samples across 5 clusters (3 each)
+# Voice samples blob — 15 samples across 5 clusters (3 each)
 # The calibration scorer counts occurrences of "CLUSTER: {NAME}" (upper-cased).
 # Each [ASSET: CLUSTER: ... ] header must appear at least 3x per cluster
 # for the cluster to be marked "FORTIFIED" (9 pts each, 45 pts total).
@@ -488,7 +488,7 @@ P.S. If you love Meridian, tell a friend. If you don't, tell us. feedback@meridi
 """.strip()
 
 # ---------------------------------------------------------------------------
-# Social DNA blob — 3 social media samples
+# Social samples blob — 3 social media samples
 # ---------------------------------------------------------------------------
 _SOCIAL_DNA = """
 [ASSET: LINKEDIN POST | DATE: 2025-09-20]
@@ -580,7 +580,7 @@ Pillar 3: Pricing That Doesn't Punish Growth — Your observability bill shouldn
 
 Founder POV: The observability industry optimizes for power users and punishes everyone else. We think that's backwards.
 
-SOCIAL DNA SUMMARY:
+SOCIAL SAMPLES SUMMARY:
 LinkedIn and Twitter presence focused on developer empathy, pricing transparency, and accessibility-first philosophy. CEO-led thought leadership with direct, peer-level voice. No corporate jargon. No competitor bashing.
 
 VOICE CALIBRATION:

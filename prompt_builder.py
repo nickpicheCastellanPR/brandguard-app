@@ -54,7 +54,7 @@ _MH_FIELDS = [
 # ---------------------------------------------------------------------------
 
 def _clean_dna(text: str) -> str:
-    """Strip [VISUAL_REF:] base64 image lines from DNA blobs."""
+    """Strip [VISUAL_REF:] base64 image lines from sample blobs."""
     if not text:
         return ""
     return "\n".join(
@@ -280,7 +280,7 @@ def _build_completeness_block(
         )
     if not inputs.get("wiz_tone", "").strip():
         notices.append(
-            "No tone keywords defined. Voice matching relies on DNA samples only."
+            "No tone keywords defined. Voice matching relies on reference samples only."
         )
 
     if notices:
@@ -424,7 +424,7 @@ def build_social_context(brand_data: dict) -> str:
     """
     Build brand context for the Social Assistant.
 
-    Uses social_dna as primary DNA (instead of voice_dna), plus includes
+    Uses social_dna as primary source (instead of voice_dna), plus includes
     Brand Marketing voice cluster samples for tone alignment.
     """
     inputs = brand_data.get("inputs", {})
@@ -466,13 +466,13 @@ def build_social_context(brand_data: dict) -> str:
     if mh_block:
         sections.append(mh_block)
 
-    # --- Social DNA (primary for social module) ---
+    # --- Social samples (primary for social module) ---
     social_dna = _clean_dna(inputs.get("social_dna", ""))
     if social_dna.strip():
         sections.append(
-            "=== SOCIAL MEDIA DNA (SUCCESSFUL PATTERNS) ===\n\n"
+            "=== SOCIAL MEDIA SAMPLES (SUCCESSFUL PATTERNS) ===\n\n"
             + social_dna
-            + "\n\n=== END SOCIAL MEDIA DNA ==="
+            + "\n\n=== END SOCIAL MEDIA SAMPLES ==="
         )
 
     # --- Brand Marketing voice samples (secondary tone reference) ---

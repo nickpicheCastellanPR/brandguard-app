@@ -215,6 +215,134 @@ _MODULE_HELP_MAP = {
 }
 
 
+# ─── GLOBAL CSS INJECTION ────────────────────────────────────────────────────
+# Call these once, early in app rendering, before any content is drawn.
+
+def inject_typography_css():
+    """Inject the Castellan type hierarchy — Montserrat everywhere."""
+    import streamlit as st
+
+    st.markdown("""
+    <style>
+    /* Global font family — Montserrat is loaded via <link> tag in app.py.
+       Colors are NOT set here, they come from the Castellan Identity System CSS
+       which handles dark-bg vs light-bg pages. */
+    html, body, [class*="css"] {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+    }
+
+    /* H1 */
+    h1, .stTitle, [data-testid="stTitle"] {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        line-height: 1.1 !important;
+    }
+
+    /* H2 */
+    h2 {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+        line-height: 1.2 !important;
+    }
+
+    /* H3 */
+    h3 {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.03em !important;
+        line-height: 1.3 !important;
+    }
+
+    /* H4 */
+    h4 {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.02em !important;
+        line-height: 1.4 !important;
+    }
+
+    /* Body / paragraph text */
+    p, .stMarkdown, .stText, li {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        letter-spacing: 0.01em !important;
+        line-height: 1.7 !important;
+    }
+
+    /* Sidebar text */
+    [data-testid="stSidebar"] {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+    }
+
+    /* Input labels */
+    .stTextInput label, .stTextArea label, .stSelectbox label {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.02em !important;
+        font-size: 14px !important;
+    }
+
+    /* No italics anywhere */
+    em, i {
+        font-style: normal !important;
+        font-weight: 500 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def inject_button_css():
+    """Inject the approved button style — one style, everywhere."""
+    import streamlit as st
+
+    st.markdown("""
+    <style>
+    /* Override ALL Streamlit buttons */
+    .stButton > button {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        color: #ab8f59 !important;
+        -webkit-text-fill-color: #ab8f59 !important;
+        background-color: transparent !important;
+        border: 1.5px solid #ab8f59 !important;
+        border-radius: 0px !important;
+        padding: 12px 32px !important;
+        width: 100% !important;
+        transition: background-color 0.2s, color 0.2s !important;
+    }
+    .stButton > button:hover {
+        background-color: #ab8f59 !important;
+        color: #f5f5f0 !important;
+        -webkit-text-fill-color: #f5f5f0 !important;
+        border-color: #ab8f59 !important;
+    }
+    .stButton > button:focus {
+        box-shadow: none !important;
+        color: #ab8f59 !important;
+        -webkit-text-fill-color: #ab8f59 !important;
+    }
+    .stButton > button:active {
+        background-color: #a6784d !important;
+        color: #f5f5f0 !important;
+        -webkit-text-fill-color: #f5f5f0 !important;
+        border-color: #a6784d !important;
+    }
+    /* Button child elements inherit text color */
+    .stButton > button p, .stButton > button span, .stButton > button div {
+        color: inherit !important;
+        -webkit-text-fill-color: inherit !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def render_module_help(module_key: str):
     """Render a styled help expander for a module.
 

@@ -355,7 +355,7 @@ CRITICAL SECURITY INSTRUCTION:
 """
         
         text_prompt = """
-TASK: Reverse-engineer the 'Social DNA' of this post.
+TASK: Reverse-engineer the social voice profile of this post.
 
 INSTRUCTIONS:
 1. TRANSCRIPT: Read the exact caption text visible in the image. Ignore user comments.

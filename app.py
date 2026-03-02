@@ -60,6 +60,9 @@ if st.session_state.get('authenticated'):
     
     st.session_state['last_active_ts'] = current_ts
 
+# --- GOOGLE FONTS (must load before any CSS references Montserrat) ---
+st.markdown('<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">', unsafe_allow_html=True)
+
 # --- THE CASTELLAN IDENTITY SYSTEM (CSS) ---
 st.markdown("""
 <style>
@@ -101,7 +104,7 @@ st.markdown("""
         font-weight: 600 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
-        font-family: 'Helvetica Neue', sans-serif !important;
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
     }
     div[role="radiogroup"] label:hover {
         background-color: rgba(36, 54, 59, 0.05) !important;
@@ -117,16 +120,16 @@ st.markdown("""
 
     /* 4. HEADERS */
     h1 {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-weight: 800 !important;
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+        font-weight: 900 !important;
         text-transform: uppercase;
         color: var(--c-cream) !important;
         padding-bottom: 15px;
         border-bottom: 1px solid var(--c-gold-muted);
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
     }
-    
-    h2, h3 { color: var(--c-gold-muted) !important; text-transform: uppercase; font-weight: 700; }
+
+    h2, h3 { font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif; color: var(--c-gold-muted) !important; text-transform: uppercase; font-weight: 700; }
 
     /* 5. INPUTS (FIXED VISIBILITY) */
     .stTextInput input, 
@@ -261,34 +264,44 @@ st.markdown("""
         -webkit-text-fill-color: var(--c-gold-muted) !important;
     }
 
-    /* 6. BUTTONS (GLOBAL) */
-    .stButton button {
-        background-color: transparent !important;
-        border: 1px solid var(--c-gold-muted) !important;
-        color: var(--c-gold-muted) !important;
-        border-radius: 0px !important;
+    /* 6. BUTTONS (GLOBAL — one style, no variants) */
+    .stButton button, .stButton > button, button[kind="primary"], button[kind="secondary"] {
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
         font-weight: 700 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.15em;
-        transition: all 0.2s;
-        padding: 0.6rem 1.2rem;
+        font-size: 14px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        color: #ab8f59 !important;
+        -webkit-text-fill-color: #ab8f59 !important;
+        background-color: transparent !important;
+        border: 1.5px solid #ab8f59 !important;
+        border-radius: 0px !important;
+        padding: 12px 32px !important;
+        width: 100% !important;
+        transition: background-color 0.2s, color 0.2s !important;
     }
-    .stButton button:hover {
-        background-color: var(--c-gold-muted) !important;
-        color: var(--c-teal-deep) !important;
-        box-shadow: 0 0 15px rgba(171, 143, 89, 0.4);
-        transform: translateY(-1px);
+    .stButton button:hover, .stButton > button:hover {
+        background-color: #ab8f59 !important;
+        color: #f5f5f0 !important;
+        -webkit-text-fill-color: #f5f5f0 !important;
+        border-color: #ab8f59 !important;
     }
-    button[kind="primary"] {
-        background: var(--c-gold-muted) !important;
-        color: var(--c-teal-deep) !important;
-        border: none !important;
+    .stButton button:focus, .stButton > button:focus {
+        box-shadow: none !important;
+        color: #ab8f59 !important;
+        -webkit-text-fill-color: #ab8f59 !important;
     }
-    
-    /* Red delete button override */
-    button[kind="secondary"] {
-        border-color: #ff5f56 !important;
-        color: #ff5f56 !important;
+    .stButton button:active, .stButton > button:active {
+        background-color: #a6784d !important;
+        color: #f5f5f0 !important;
+        -webkit-text-fill-color: #f5f5f0 !important;
+        border-color: #a6784d !important;
+    }
+    /* Button child elements inherit text color */
+    .stButton button p, .stButton button span, .stButton button div,
+    .stButton > button p, .stButton > button span, .stButton > button div {
+        color: inherit !important;
+        -webkit-text-fill-color: inherit !important;
     }
 
     /* 7. DASHBOARD CARDS (Static) */
@@ -338,47 +351,45 @@ st.markdown("""
         z-index: 100;
     }
 
-    /* Login Feature List Icons */
-    .feature-list {
-        list-style: none;
-        padding: 0;
-        margin: 20px 0;
+    /* 12. BRANDED HTML TABLES (Activity Log, God Mode, etc.) */
+    .activity-log-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 0.85rem;
+        user-select: text;
+        -webkit-user-select: text;
     }
-    
-    .feature-list li {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 16px;
-        line-height: 1.6;
-    }
-    
-    .feature-icon {
-        flex-shrink: 0;
-        width: 24px;
-        height: 24px;
-        margin-right: 12px;
-        margin-top: 2px;
+    .activity-log-table th {
+        background-color: #1b2a2e;
         color: #ab8f59;
-        stroke-width: 2;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 12px 14px;
+        border-bottom: 2px solid #ab8f59;
+        text-align: left;
     }
-    
-    .feature-text {
-        flex: 1;
-        color: #3d3d3d;
+    .activity-log-table td {
+        padding: 10px 14px;
+        color: #f5f5f0;
+        border-bottom: 1px solid rgba(92, 107, 97, 0.3);
     }
-    
-    .feature-text strong {
-        color: #24363b;
-        font-weight: 600;
+    .activity-log-table tr:hover td {
+        background-color: rgba(171, 143, 89, 0.08);
     }
 
     /* CLEANUP */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
-    
+
 </style>
 """, unsafe_allow_html=True)
+
+# --- GLOBAL TYPOGRAPHY & BUTTON CSS (from brand_ui) ---
+brand_ui.inject_typography_css()
+brand_ui.inject_button_css()
 
 # --- SESSION STATE & AUTH ---
 if 'authenticated' not in st.session_state: st.session_state['authenticated'] = False
@@ -851,7 +862,7 @@ def convert_to_html_brand_card(brand_name, content):
     <html>
     <head>
         <style>
-            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f5f5f0; color: #24363b; padding: 40px; line-height: 1.6; }}
+            body {{ font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f0; color: #24363b; padding: 40px; line-height: 1.6; }}
             .brand-card {{ max-width: 800px; margin: 0 auto; background: white; padding: 60px; border-top: 10px solid #24363b; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }}
             h1 {{ font-size: 3em; color: #24363b; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.05em; }}
             .subtitle {{ font-size: 1.2em; color: #ab8f59; font-weight: bold; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 40px; }}
@@ -925,13 +936,21 @@ def remove_palette_color(key, index):
 if not st.session_state['authenticated']:
     # 1. GLOBAL STYLES + LOGIN CARD CSS
     st.markdown("""<style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
         .stApp {
             background-color: #f5f5f0 !important;
             background-image: linear-gradient(rgba(36, 54, 59, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 54, 59, 0.05) 1px, transparent 1px), radial-gradient(circle at 0% 0%, rgba(92, 107, 97, 0.5) 0%, rgba(92, 107, 97, 0.1) 40%, transparent 70%), radial-gradient(circle at 100% 100%, rgba(36, 54, 59, 0.4) 0%, rgba(36, 54, 59, 0.1) 40%, transparent 70%);
             background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
         }
-        section[data-testid="stSidebar"] { display: none; } 
+        section[data-testid="stSidebar"] { display: none; }
+        /* Force internal containers transparent so .stApp cream+grid shows through */
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stHeader"],
+        [data-testid="stBottom"] {
+            background-color: transparent !important;
+            background: transparent !important;
+        }
         .stTextInput input { 
             background-color: #ffffff !important; 
             color: #24363b !important; 
@@ -1393,7 +1412,7 @@ def show_paywall():
             }
             .paywall-icon { margin-bottom: 20px; display: flex; justify-content: center; }
             .paywall-title {
-                color: #f5f5f0; font-family: 'Helvetica Neue', sans-serif;
+                color: #f5f5f0; font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
                 font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
                 font-size: 1.5rem; margin-bottom: 10px;
             }
@@ -1490,8 +1509,7 @@ elif app_mode == "DASHBOARD":
                 BRAND FIDELITY BEGINS HERE
             </h2>
             <p style='font-size: 1.1rem; line-height: 1.6; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;'>
-                Signet measures signal degradation across your brand's publishing perimeter. 
-                To begin, build a Brand Profile containing your authoritative signal.
+                Whether you manage one brand or ten, every piece of content should sound exactly like the brand it represents. Signet makes sure it does.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1519,12 +1537,12 @@ elif app_mode == "DASHBOARD":
         <div style='max-width: 600px; margin: 40px auto 0 auto; padding: 20px; border-left: 3px solid #5c6b61;'>
             <p style='margin-bottom: 10px; font-weight: 600; color: #ab8f59;'>A Brand Profile contains:</p>
             <ul style='line-height: 1.8;'>
-                <li>Voice DNA (3-5 gold-standard text assets)</li>
-                <li>Visual Standards (color palette, logo specifications)</li>
-                <li>Strategic Foundation (mission, values, guardrails)</li>
+                <li>Voice Samples (3+ reference samples per communication type)</li>
+                <li>Visual Identity (color palette, logo specifications)</li>
+                <li>Strategy &amp; Message House (mission, values, guardrails, positioning)</li>
             </ul>
             <p style='margin-top: 20px; color: #5c6b61;'>
-                Once calibrated, fidelity modules become operational.
+                Once calibrated, all modules are ready to use.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1879,11 +1897,11 @@ elif app_mode == "VISUAL COMPLIANCE":
 
     # --- HELPER: ASSET LIBRARY RETRIEVAL (UPDATED) ---
     def get_all_visual_assets(profile_data):
-        """Parses Visual DNA AND Social DNA to find ALL saved images."""
+        """Parses visual and social sample blobs to find ALL saved images."""
         inputs = profile_data.get('inputs', {})
         assets = {}
         
-        # WE NOW SCAN BOTH VISUAL AND SOCIAL DNA
+        # WE NOW SCAN BOTH VISUAL AND SOCIAL SAMPLE BLOBS
         sources = [inputs.get('visual_dna', ''), inputs.get('social_dna', '')]
 
         import base64
@@ -1951,7 +1969,7 @@ elif app_mode == "VISUAL COMPLIANCE":
 
     # 1. Check if Profile is Active
     active_profile_name = st.session_state.get('active_profile_name')
-    if not active_profile_name:
+    if not active_profile_name or active_profile_name not in st.session_state.get('profiles', {}):
         st.warning("No Brand Profile Loaded. Please select one in the Sidebar.")
     else:
         profile_data = st.session_state['profiles'][active_profile_name]
@@ -2770,7 +2788,7 @@ elif app_mode == "CONTENT GENERATOR":
         action = ""
 
         # 1. ASSET VOLUME CHECK (The Research Layer)
-        # We count how many times this specific format appears in the DNA
+        # We count how many times this specific format appears in the voice samples
         type_key = content_type.upper().split(" ")[0] # "INTERNAL", "PRESS", "BLOG"
         asset_count = voice_dna.upper().count(f"TYPE: {type_key}") + voice_dna.upper().count(f"ASSET: {type_key}")
         
@@ -3312,7 +3330,7 @@ elif app_mode == "BRAND ARCHITECT":
             return None
 
     def parse_assets_from_text(text_blob):
-        """Splits the DNA text block into manageable assets based on headers."""
+        """Splits the sample text block into manageable assets based on headers."""
         if not text_blob: return []
         # Split by the divider line we used
         raw_assets = text_blob.split("----------------\n")
@@ -3351,7 +3369,7 @@ elif app_mode == "BRAND ARCHITECT":
         if inputs.get('wiz_values'): score += 10
         if inputs.get('wiz_archetype'): score += 10
         
-        # 2. DNA Layers (60%) - The Asset Layer
+        # 2. Sample Layers (60%) - The Asset Layer
         has_social = len(inputs.get('social_dna', '')) > 20 or "[ASSET:" in inputs.get('social_dna', '')
         has_voice = len(inputs.get('voice_dna', '')) > 20 or "[ASSET:" in inputs.get('voice_dna', '')
         has_visual = len(inputs.get('visual_dna', '')) > 20 or "[ASSET:" in inputs.get('visual_dna', '')
@@ -3640,14 +3658,14 @@ elif app_mode == "BRAND ARCHITECT":
                 st.caption("Edit the analysis below to ensure it matches your brand standards.")
                 
                 edited_analysis = st.text_area(
-                    "SOCIAL DNA", 
+                    "SOCIAL SAMPLES", 
                     value=st.session_state['temp_social_analysis'], 
                     height=200,
                     key="social_edit_box",
                     max_chars=5000
                 )
                 
-                if st.button("CONFIRM & ADD TO DNA", type="primary"):
+                if st.button("CONFIRM & ADD TO SAMPLES", type="primary"):
                     entry = {
                         "file": s_file,
                         "platform": s_plat,
@@ -3656,7 +3674,7 @@ elif app_mode == "BRAND ARCHITECT":
                     st.session_state['wiz_social_list'].append(entry)
                     st.session_state['temp_social_analysis'] = "" # Reset
                     st.session_state['social_uploader_key'] += 1 # Reset Uploader
-                    st.success("Added to Social DNA Buffer")
+                    st.success("Added to Social Samples Buffer")
                     st.rerun()
 
             # BUFFER DISPLAY
@@ -3758,7 +3776,7 @@ elif app_mode == "BRAND ARCHITECT":
                         --- BEGIN SAMPLES ---
                         {all_samples}
                         --- END SAMPLES ---
-                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social DNA: {social_summary}
+                        3. VISUALS: Palette: {palette_str}. Logo: {logo_summary}. Social Samples: {social_summary}
                         4. GUARDRAILS: {st.session_state.wiz_guardrails}
                         """
                         
@@ -3776,7 +3794,7 @@ elif app_mode == "BRAND ARCHITECT":
                                 "palette_primary": st.session_state['palette_primary'],
                                 "palette_secondary": st.session_state['palette_secondary'],
                                 "palette_accent": st.session_state['palette_accent'],
-                                "social_dna": social_summary, # PERSIST THE DNA
+                                "social_dna": social_summary, # PERSIST THE SOCIAL SAMPLES
                                 "mh_brand_promise": st.session_state.get('mh_brand_promise', ''),
                                 "mh_pillars_json": st.session_state.get('mh_pillars_json', ''),
                                 "mh_founder_positioning": st.session_state.get('mh_founder_positioning', ''),
@@ -4215,7 +4233,7 @@ elif app_mode == "BRAND ARCHITECT":
                                 with st.spinner("DECONSTRUCTING RHETORICAL PATTERNS..."):
                                     try:
                                         prompt = f"""
-                                        TASK: Extract the 'Voice DNA' from this text.
+                                        TASK: Extract the voice profile from this text.
                                         ROLE: Expert Linguist.
                                         CONTEXT: This belongs to the '{voice_type}' cluster.
                                         CONSTRAINTS: No chat. No emojis. Bullet points only.
@@ -4397,11 +4415,11 @@ elif app_mode == "BRAND ARCHITECT":
                         st.info("These fields display the raw data blocks. To edit this content, use the Asset Library tools above.")
                         edit_tab1, edit_tab2, edit_tab3 = st.tabs(["RAW SOCIAL", "RAW VOICE", "RAW VISUAL"])
                         with edit_tab1:
-                            st.text_area("SOCIAL DNA BLOB", inputs['social_dna'], height=200, disabled=True)
+                            st.text_area("SOCIAL SAMPLES BLOB", inputs['social_dna'], height=200, disabled=True)
                         with edit_tab2:
-                            st.text_area("VOICE DNA BLOB", inputs['voice_dna'], height=200, disabled=True)
+                            st.text_area("VOICE SAMPLES BLOB", inputs['voice_dna'], height=200, disabled=True)
                         with edit_tab3:
-                            st.text_area("VISUAL DNA BLOB", inputs['visual_dna'], height=200, disabled=True)
+                            st.text_area("VISUAL SAMPLES BLOB", inputs['visual_dna'], height=200, disabled=True)
 
                     if st.button("SAVE STRATEGY CHANGES", type="primary"):
                         # 1. Update Standard Inputs
@@ -4446,7 +4464,7 @@ elif app_mode == "BRAND ARCHITECT":
                         2. VOICE
                         - Tone Keywords: {new_tone}
 
-                        [VOICE DNA & ASSETS]
+                        [VOICE SAMPLES & ASSETS]
                         {clean_dna_for_llm(inputs['voice_dna'])}
 
                         3. VISUALS
@@ -4454,13 +4472,13 @@ elif app_mode == "BRAND ARCHITECT":
                         - Secondary: {p_s}
                         - Accents: {p_a}
 
-                        [VISUAL DNA & ASSETS]
+                        [VISUAL SAMPLES & ASSETS]
                         {clean_dna_for_llm(inputs['visual_dna'])}
 
                         4. GUARDRAILS
                         - {new_guard}
                         {build_mh_context(profile_obj['inputs'])}
-                        5. SOCIAL DNA (CALIBRATION DATA)
+                        5. SOCIAL SAMPLES (CALIBRATION DATA)
                         {clean_dna_for_llm(inputs['social_dna'])}
                         """
                         
@@ -4847,62 +4865,69 @@ elif app_mode == "ACTIVITY LOG":
         if logs:
             st.markdown(f"**SHOWING {len(logs)} ENTRIES**")
             st.markdown("---")
-            
-            # Display as table
-            import pandas as pd
-            
-            # Prepare data for table
-            table_data = []
-            for log in logs:
-                table_data.append({
-                    "TIME": log.get('timestamp', ''),
-                    "USER": log.get('username', ''),
-                    "ACTIVITY": log.get('activity_type', ''),
-                    "ASSET": log.get('asset_name', '')[:30] + "..." if len(log.get('asset_name', '')) > 30 else log.get('asset_name', ''),
-                    "SCORE": log.get('score', '-'),
-                    "VERDICT": log.get('verdict', '')
-                })
-            
-            df = pd.DataFrame(table_data)
-            
-            # Interactive table with row selection
-            selection = st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row"
-            )
-            
-            # --- DETAIL VIEW ---
+
+            # Build HTML table (selectable text, brand-styled)
+            _rows_html = ""
+            for i, log in enumerate(logs):
+                asset_raw = log.get('asset_name', '')
+                asset_display = (asset_raw[:30] + "...") if len(asset_raw) > 30 else asset_raw
+                _rows_html += (
+                    f"<tr>"
+                    f"<td>{log.get('timestamp', '')}</td>"
+                    f"<td>{log.get('username', '')}</td>"
+                    f"<td>{log.get('activity_type', '')}</td>"
+                    f"<td>{asset_display}</td>"
+                    f"<td>{log.get('score', '-')}</td>"
+                    f"<td>{log.get('verdict', '')}</td>"
+                    f"</tr>"
+                )
+
+            st.markdown(f"""
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid #5c6b61; border-radius: 2px;">
+            <table class="activity-log-table">
+                <thead><tr>
+                    <th>TIME</th><th>USER</th><th>ACTIVITY</th>
+                    <th>ASSET</th><th>SCORE</th><th>VERDICT</th>
+                </tr></thead>
+                <tbody>{_rows_html}</tbody>
+            </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- DETAIL VIEW (selectbox-driven) ---
             st.markdown("---")
             st.markdown("### ENTRY DETAILS")
-            
-            if selection and len(selection.selection.rows) > 0:
-                row_idx = selection.selection.rows[0]
-                selected_log = logs[row_idx]
-                
-                detail_col1, detail_col2 = st.columns(2)
-                
-                with detail_col1:
-                    st.markdown("**METADATA**")
-                    st.write(f"**Org:** {selected_log.get('org_id')}")
-                    st.write(f"**User:** {selected_log.get('username')}")
-                    st.write(f"**Time:** {selected_log.get('timestamp')}")
-                    st.write(f"**Activity:** {selected_log.get('activity_type')}")
-                    st.write(f"**Asset:** {selected_log.get('asset_name')}")
-                    st.write(f"**Score:** {selected_log.get('score')}")
-                    st.write(f"**Verdict:** {selected_log.get('verdict')}")
-                
-                with detail_col2:
-                    st.markdown("**FULL PAYLOAD (JSON)**")
-                    try:
-                        metadata = json.loads(selected_log.get('metadata_json', '{}'))
-                        st.json(metadata)
-                    except:
-                        st.code(selected_log.get('metadata_json', '{}'))
-            else:
-                st.info("Select a row above to view full details")
+
+            detail_options = [
+                f"{i+1}. {log.get('activity_type', '')} — {log.get('asset_name', '')[:40]}"
+                for i, log in enumerate(logs)
+            ]
+            selected_idx = st.selectbox(
+                "SELECT ENTRY", range(len(detail_options)),
+                format_func=lambda i: detail_options[i],
+                key="activity_log_detail_select"
+            )
+
+            selected_log = logs[selected_idx]
+            detail_col1, detail_col2 = st.columns(2)
+
+            with detail_col1:
+                st.markdown("**METADATA**")
+                st.write(f"**Org:** {selected_log.get('org_id')}")
+                st.write(f"**User:** {selected_log.get('username')}")
+                st.write(f"**Time:** {selected_log.get('timestamp')}")
+                st.write(f"**Activity:** {selected_log.get('activity_type')}")
+                st.write(f"**Asset:** {selected_log.get('asset_name')}")
+                st.write(f"**Score:** {selected_log.get('score')}")
+                st.write(f"**Verdict:** {selected_log.get('verdict')}")
+
+            with detail_col2:
+                st.markdown("**FULL PAYLOAD (JSON)**")
+                try:
+                    metadata = json.loads(selected_log.get('metadata_json', '{}'))
+                    st.json(metadata)
+                except:
+                    st.code(selected_log.get('metadata_json', '{}'))
         
         else:
             st.warning("No activity logs found matching your filters")
@@ -4926,33 +4951,15 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         # Custom CSS for the Admin Panel to match the Theme
         st.markdown("""
         <style>
-            /* Force Tables to look like Data Terminals */
-            div[data-testid="stDataFrame"] div[class*="stDataFrame"] {
-                background-color: #1b2a2e !important;
-                border: 1px solid #5c6b61;
-            }
-            div[data-testid="stDataFrame"] table {
-                color: #f5f5f0 !important;
-                font-family: 'Courier New', monospace !important;
-                font-size: 0.85rem !important;
-            }
-            div[data-testid="stDataFrame"] th {
-                background-color: #24363b !important;
-                color: #ab8f59 !important;
-                border-bottom: 1px solid #ab8f59 !important;
-                text-transform: uppercase;
-                letter-spacing: 0.1em;
-            }
-            div[data-testid="stDataFrame"] td {
-                border-bottom: 1px solid #3d3d3d !important;
-            }
             /* Style the Metrics */
             div[data-testid="stMetricValue"] {
                 color: #ab8f59 !important;
-                font-family: 'Helvetica Neue', sans-serif !important;
+                -webkit-text-fill-color: #ab8f59 !important;
+                font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif !important;
             }
             div[data-testid="stMetricLabel"] {
                 color: #5c6b61 !important;
+                -webkit-text-fill-color: #5c6b61 !important;
             }
         </style>
         """, unsafe_allow_html=True)
@@ -4982,50 +4989,60 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         with tab_users:
             users_raw = conn.execute("SELECT username, email, org_id, is_admin, created_at FROM users").fetchall()
             if users_raw:
-                df_users = pd.DataFrame(users_raw, columns=["USERNAME", "EMAIL", "ORG_ID", "ROLE", "CREATED_AT"])
-                df_users['ROLE'] = df_users['ROLE'].apply(lambda x: "ADMIN" if x else "USER")
-                st.dataframe(df_users, width="stretch", hide_index=True, use_container_width=True)
+                _u_rows = ""
+                for row in users_raw:
+                    role = "ADMIN" if row[3] else "USER"
+                    _u_rows += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{role}</td><td>{row[4]}</td></tr>"
+                st.markdown(f"""
+                <div style="overflow-x:auto; max-height:400px; overflow-y:auto; border:1px solid #5c6b61;">
+                <table class="activity-log-table">
+                    <thead><tr><th>USERNAME</th><th>EMAIL</th><th>ORG_ID</th><th>ROLE</th><th>CREATED_AT</th></tr></thead>
+                    <tbody>{_u_rows}</tbody>
+                </table></div>
+                """, unsafe_allow_html=True)
             else:
                 st.info("No users found.")
 
         with tab_logs:
             # Fetch last 100 logs globally
             logs_raw = conn.execute("SELECT timestamp, org_id, username, activity_type, asset_name, verdict, metadata_json FROM activity_log ORDER BY id DESC LIMIT 100").fetchall()
-            
+
             if logs_raw:
-                df_logs = pd.DataFrame(logs_raw, columns=["TIME", "ORG", "USER", "ACTION", "ASSET", "VERDICT", "META"])
-                
-                # Filter for readability
-                display_cols = ["TIME", "ORG", "USER", "ACTION", "VERDICT"]
-                
-                selection = st.dataframe(
-                    df_logs[display_cols], 
-                    width="stretch", 
-                    hide_index=True,
-                    on_select="rerun", 
-                    selection_mode="single-row",
-                    use_container_width=True
-                )
-                
+                _l_rows = ""
+                for row in logs_raw:
+                    _l_rows += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[5]}</td></tr>"
+                st.markdown(f"""
+                <div style="overflow-x:auto; max-height:400px; overflow-y:auto; border:1px solid #5c6b61;">
+                <table class="activity-log-table">
+                    <thead><tr><th>TIME</th><th>ORG</th><th>USER</th><th>ACTION</th><th>VERDICT</th></tr></thead>
+                    <tbody>{_l_rows}</tbody>
+                </table></div>
+                """, unsafe_allow_html=True)
+
                 # Detail View (The Inspector)
                 st.markdown("<h5 style='color: #ab8f59; margin-top: 20px;'>DEEP INSPECTOR</h5>", unsafe_allow_html=True)
-                if selection and len(selection.selection.rows) > 0:
-                    row_idx = selection.selection.rows[0]
-                    selected_log = df_logs.iloc[row_idx]
-                    
-                    c_meta, c_raw = st.columns(2)
-                    with c_meta:
-                        st.caption("ACTION METADATA")
-                        st.write(f"**Org:** {selected_log['ORG']}")
-                        st.write(f"**User:** {selected_log['USER']}")
-                        st.write(f"**Asset:** {selected_log['ASSET']}")
-                    
-                    with c_raw:
-                        st.caption("PAYLOAD (JSON)")
-                        st.json(selected_log["META"])
-                    
-                else:
-                    st.caption("Select a log entry above to audit the specific JSON payload.")
+                _log_options = [
+                    f"{i+1}. {row[3]} — {row[2]} ({row[0][:16]})"
+                    for i, row in enumerate(logs_raw)
+                ]
+                _sel_idx = st.selectbox(
+                    "SELECT ENTRY", range(len(_log_options)),
+                    format_func=lambda i: _log_options[i],
+                    key="godmode_log_detail_select"
+                )
+                _sel_row = logs_raw[_sel_idx]
+                c_meta, c_raw = st.columns(2)
+                with c_meta:
+                    st.caption("ACTION METADATA")
+                    st.write(f"**Org:** {_sel_row[1]}")
+                    st.write(f"**User:** {_sel_row[2]}")
+                    st.write(f"**Asset:** {_sel_row[4]}")
+                with c_raw:
+                    st.caption("PAYLOAD (JSON)")
+                    try:
+                        st.json(_sel_row[6])
+                    except:
+                        st.code(_sel_row[6])
             else:
                 st.info("No global logs generated yet.")
         

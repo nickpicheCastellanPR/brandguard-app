@@ -625,6 +625,9 @@ def _start_impersonation(target_username):
     st.session_state['org_id'] = target.get('org_id') or target['username']
     st.session_state['is_admin'] = bool(target.get('is_admin', 0))
     st.session_state['profiles'] = db.get_profiles(target['username'])
+    # Reset active profile to first available (admin's profile name won't exist for target)
+    target_profiles = st.session_state['profiles']
+    st.session_state['active_profile_name'] = list(target_profiles.keys())[0] if target_profiles else None
 
     # Resolve tier for target
     tier_config = sub_manager.resolve_user_tier(target['username'])
