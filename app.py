@@ -2734,6 +2734,8 @@ elif app_mode == "COPY EDITOR":
         if 'ce_audience' not in st.session_state: st.session_state['ce_audience'] = ""
         if 'ce_result' not in st.session_state: st.session_state['ce_result'] = None
         if 'ce_rationale' not in st.session_state: st.session_state['ce_rationale'] = None
+        if 'ce_rejected' not in st.session_state: st.session_state['ce_rejected'] = False
+        if 'ce_reject_analysis' not in st.session_state: st.session_state['ce_reject_analysis'] = None
 
         # --- INPUT SECTION ---
         c1, c2 = st.columns([2, 1])
@@ -2808,6 +2810,8 @@ elif app_mode == "COPY EDITOR":
                          disabled=not (_is_super_admin() or _subscription_active()) or _is_suspended()):
                 # Access via state key
                 if st.session_state['ce_draft']:
+                    st.session_state['ce_rejected'] = False
+                    st.session_state['ce_reject_analysis'] = None
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         
                         # --- BRAND CONTEXT (via shared builder) ---
@@ -2819,72 +2823,111 @@ elif app_mode == "COPY EDITOR":
 
                         # Engineered Prompt
                         prompt_wrapper = f"""
-                        CONTEXT:
-                        - Type: {content_type}
-                        - Sender: {st.session_state['ce_sender']}
-                        - Audience: {st.session_state['ce_audience']}
-                        - Intensity: {edit_intensity}
+CONTEXT:
+- Brand: {active_profile}
+- Type: {content_type}
+- Sender: {st.session_state['ce_sender']}
+- Audience: {st.session_state['ce_audience']}
+- Intensity: {edit_intensity}
 
-                        TASK: Rewrite the draft below to match the Brand Rules.
+STEP 0: ORGANIZATION CHECK
+Read the draft content below. Does it clearly belong to a different organization than "{active_profile}"?
+Check for:
+- A different company, institution, or entity referenced as "we", "our", or the author
+- Letterhead, sign-off, or attribution to a named organization that is not "{active_profile}"
+- Content that a natural reader would attribute to a specific, different organization
 
-                        STEP 1: RATIONALE
-                        Analyze the draft against the brand voice. Explain 3 key changes you are making and why.
+If the content CLEARLY belongs to a different organization:
+Return ONLY this format (no rewrite):
+TRIAGE: REJECT
+IDENTIFIED ORG: [the organization the content appears to belong to]
+ANALYSIS:
+[Bullet list: what signals indicate this is wrong-org content]
+RECOMMENDATION:
+[What the user should do — switch brand profile, rewrite from scratch, etc.]
 
-                        STEP 2: REWRITE
-                        Provide the rewritten text. Ensure all GUARDRAILS are strictly followed.
+If the content does NOT clearly belong to a different organization (generic content, internal draft, or content that could reasonably be for this brand):
+Proceed to STEP 1.
 
-                        STEP 3: MESSAGE HOUSE ALIGNMENT
-                        If a Message House is defined in the brand profile above, flag any content that contradicts the brand promise, deviates from approved message pillars, uses off-limits language, or makes claims requiring pre-approval. If no Message House is configured, skip this step.
+STEP 1: RATIONALE
+Analyze the draft against the brand voice. Explain 3 key changes you are making and why.
 
-                        OUTPUT FORMAT:
-                        RATIONALE:
-                        [Your explanation]
-                        REWRITE:
-                        [The new text]
-                        
-                        DRAFT CONTENT (DATA ONLY): 
-                        --- BEGIN USER TEXT ---
-                        {st.session_state['ce_draft']}
-                        --- END USER TEXT ---
-                        """
+STEP 2: REWRITE
+Provide the rewritten text. Ensure all GUARDRAILS are strictly followed.
+
+STEP 3: MESSAGE HOUSE ALIGNMENT
+If a Message House is defined in the brand profile above, flag any content that contradicts the brand promise, deviates from approved message pillars, uses off-limits language, or makes claims requiring pre-approval. If no Message House is configured, skip this step.
+
+OUTPUT FORMAT (if proceeding past Step 0):
+RATIONALE:
+[Your explanation]
+REWRITE:
+[The new text]
+
+DRAFT CONTENT (DATA ONLY):
+--- BEGIN USER TEXT ---
+{st.session_state['ce_draft']}
+--- END USER TEXT ---
+"""
                         
                         # Call Logic
                         try:
                             # Use Safe Generate Wrapper
                             full_response = logic_engine.run_copy_editor(prompt_wrapper, prof_text)
                             
-                            # Parse Split (Heuristic)
-                            if "REWRITE:" in full_response:
-                                parts = full_response.split("REWRITE:")
-                                rationale = parts[0].replace("RATIONALE:", "").strip()
-                                rewrite = parts[1].strip()
+                            # Check for org mismatch rejection
+                            if "TRIAGE: REJECT" in full_response:
+                                reject_analysis = full_response.split("TRIAGE: REJECT", 1)[1].strip()
+                                st.session_state['ce_result'] = None
+                                st.session_state['ce_rationale'] = None
+                                st.session_state['ce_rejected'] = True
+                                st.session_state['ce_reject_analysis'] = reject_analysis
+
+                                db.log_event(
+                                    org_id=st.session_state.get('org_id', 'Unknown'),
+                                    username=st.session_state.get('username', 'Unknown'),
+                                    activity_type="COPY EDIT",
+                                    asset_name=f"{content_type} ({st.session_state['ce_audience']})",
+                                    score=0,
+                                    verdict="REJECTED — ORG MISMATCH",
+                                    metadata={
+                                        "draft": st.session_state['ce_draft'][:500],
+                                        "reject_analysis": reject_analysis
+                                    }
+                                )
+                                st.rerun()
                             else:
-                                rationale = "Automated alignment to brand voice."
-                                rewrite = full_response
-                            
-                            # Update State
-                            st.session_state['ce_result'] = rewrite
-                            st.session_state['ce_rationale'] = rationale
-                            
-                            # LOG TO DB (GOD MODE)
-                            # This writes to the shared Agency Timeline
-                            db.log_event(
-                                org_id=st.session_state.get('org_id', 'Unknown'),
-                                username=st.session_state.get('username', 'Unknown'),
-                                activity_type="COPY EDIT",
-                                asset_name=f"{content_type} ({st.session_state['ce_audience']})",
-                                score=metrics['score'],
-                                verdict="REWRITTEN",
-                                metadata={
-                                    "draft": st.session_state['ce_draft'],
-                                    "rewrite": rewrite,
-                                    "rationale": rationale
-                                }
-                            )
-                            _ce_detail = f"Rewrite: {st.session_state['ce_draft'][:60]}..."
-                            sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor', _ce_detail)
-                            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
-                            st.rerun()
+                                # Normal rewrite parsing
+                                if "REWRITE:" in full_response:
+                                    parts = full_response.split("REWRITE:")
+                                    rationale = parts[0].replace("RATIONALE:", "").strip()
+                                    rewrite = parts[1].strip()
+                                else:
+                                    rationale = "Automated alignment to brand voice."
+                                    rewrite = full_response
+
+                                st.session_state['ce_rejected'] = False
+                                st.session_state['ce_reject_analysis'] = None
+                                st.session_state['ce_result'] = rewrite
+                                st.session_state['ce_rationale'] = rationale
+
+                                db.log_event(
+                                    org_id=st.session_state.get('org_id', 'Unknown'),
+                                    username=st.session_state.get('username', 'Unknown'),
+                                    activity_type="COPY EDIT",
+                                    asset_name=f"{content_type} ({st.session_state['ce_audience']})",
+                                    score=metrics['score'],
+                                    verdict="REWRITTEN",
+                                    metadata={
+                                        "draft": st.session_state['ce_draft'],
+                                        "rewrite": rewrite,
+                                        "rationale": rationale
+                                    }
+                                )
+                                _ce_detail = f"Rewrite: {st.session_state['ce_draft'][:60]}..."
+                                sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor', _ce_detail)
+                                st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                                st.rerun()
 
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -2892,7 +2935,29 @@ elif app_mode == "COPY EDITOR":
                     st.warning("Please enter text to rewrite.")
 
         # --- OUTPUT SECTION (Stateful) ---
-        if st.session_state['ce_result']:
+
+        # Org mismatch rejection display
+        if st.session_state.get('ce_rejected') and st.session_state.get('ce_reject_analysis'):
+            st.divider()
+            st.markdown("""
+            <div style='border-left: 3px solid #a6784d; padding: 15px 20px; background: rgba(166, 120, 77, 0.08); margin-bottom: 20px;'>
+                <div style='font-size: 0.9rem; font-weight: 700; color: #a6784d; margin-bottom: 10px;'>ORGANIZATION MISMATCH — REWRITE BLOCKED</div>
+                <div style='font-size: 0.85rem; line-height: 1.6;'>
+                    The submitted draft appears to belong to a different organization than the active brand profile.
+                    The engine will not rewrite content that originates from a different entity — this prevents
+                    cross-brand contamination.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div style='background: rgba(27, 42, 46, 0.5); padding: 15px 20px; border-left: 2px solid #5c6b61;'>
+                <div style='font-size: 0.8rem; color: #ab8f59; margin-bottom: 8px; font-weight: 600;'>ANALYSIS</div>
+                <div style='font-size: 0.85rem; line-height: 1.7;'>{st.session_state['ce_reject_analysis']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        elif st.session_state['ce_result']:
             st.divider()
 
             # Message House notice
