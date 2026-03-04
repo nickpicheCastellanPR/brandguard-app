@@ -303,8 +303,11 @@ def get_users_by_org(org_id):
 
 # --- 3. STUDIO PROFILE MANAGEMENT (Org-Based) ---
 def save_profile(user_id, profile_name, profile_data):
+    if not profile_name or not profile_name.strip():
+        return False
+
     conn = sqlite3.connect(DB_NAME)
-    
+
     # 1. Resolve Org ID from User
     org_res = conn.execute("SELECT org_id FROM users WHERE username = ?", (user_id,)).fetchone()
     # Fallback to user_id itself if no Org exists (Solo Mode)
@@ -694,8 +697,12 @@ def get_user_by_email(email):
 
 
 def suspend_user(username, reason, admin_username):
-    """Suspend a user account. Returns True on success."""
+    """Suspend a user account. Returns True on success, False if target is super_admin."""
     conn = sqlite3.connect(DB_NAME)
+    row = conn.execute("SELECT subscription_tier FROM users WHERE username = ?", (username,)).fetchone()
+    if row and row[0] == "super_admin":
+        conn.close()
+        return False
     conn.execute(
         "UPDATE users SET is_suspended = 1, suspended_at = ?, suspended_reason = ?, suspended_by = ? WHERE username = ?",
         (datetime.now().isoformat(), reason, admin_username, username)

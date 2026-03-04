@@ -2253,7 +2253,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                     if selected_asset_names:
                         selected_imgs = [all_assets[n] for n in selected_asset_names]
                         collage = create_reference_collage(selected_imgs)
-                        st.image(collage, caption="Active Reference Sheet (The 'Gold Standard')", use_container_width=True)
+                        st.image(collage, caption="Active Reference Sheet (Brand Benchmark)", use_container_width=True)
                     else:
                         st.info("No visual references selected. Auditing based on Text Rules only.")
                 else:
@@ -4070,7 +4070,7 @@ elif app_mode == "BRAND ARCHITECT":
                             st.session_state['wiz_samples_list'].pop(i)
                             st.rerun()
 
-        with st.expander("3. SOCIAL MEDIA (GOLD STANDARD)"):
+        with st.expander("3. SOCIAL MEDIA (BRAND BENCHMARK)"):
             st.caption("Upload 'Representative' posts that capture your ideal look & feel.")
             
             c1, c2 = st.columns([1, 2])

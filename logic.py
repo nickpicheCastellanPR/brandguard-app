@@ -484,7 +484,7 @@ OUTPUT FORMAT (Strictly follow this structure):
             reference_instruction = """
 CRITICAL: I have provided multiple images. 
 - First Image: The 'CANDIDATE' asset being audited.
-- Following Image(s): The 'GOLD STANDARD REFERENCE' from the brand kit.
+- Following Image(s): The 'BRAND BENCHMARK REFERENCE' from the brand kit.
 COMPARE the Candidate against the Reference. Does it match the aesthetic, logo placement, and quality?
 """
 
