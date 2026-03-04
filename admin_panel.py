@@ -167,10 +167,10 @@ def _render_user_management():
                                             index=list(TIER_CONFIG.keys()).index(
                                                 user_data.get('subscription_tier', 'solo')),
                                             format_func=lambda k: TIER_CONFIG[k]['display_name'])
-                    edit_status = st.selectbox("Status",
-                                              ["active", "inactive", "past_due", "cancelled"],
-                                              index=["active", "inactive", "past_due", "cancelled"].index(
-                                                  user_data.get('subscription_status', 'inactive')))
+                    _status_options = ["active", "inactive", "past_due", "cancelled", "trial"]
+                    _current_status = user_data.get('subscription_status', 'inactive')
+                    _status_idx = _status_options.index(_current_status) if _current_status in _status_options else 1
+                    edit_status = st.selectbox("Status", _status_options, index=_status_idx)
                     orgs = db.get_all_organizations()
                     org_options = ["Solo (No Org)"] + [o['org_id'] for o in orgs]
                     current_org = user_data.get('org_id') or "Solo (No Org)"
