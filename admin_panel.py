@@ -211,6 +211,10 @@ def _render_user_management():
                                                 {"beta_tester": edit_beta})
 
                         if changes:
+                            # If tier or status changed, set override so LS doesn't overwrite
+                            if 'subscription_tier' in changes or 'subscription_status' in changes:
+                                changes['subscription_override_until'] = (datetime.now() + timedelta(days=90)).isoformat()
+                                changes['last_subscription_sync'] = datetime.now().isoformat()
                             db.update_user_fields(edit_user, **changes)
                             db.log_admin_action(_admin_user(), "user_edited", "user", edit_user,
                                                 {"changes": changes, "old_values": old_vals})
@@ -487,7 +491,11 @@ def _render_subscription_overrides():
                             f"new brands until under the limit, but existing brands remain accessible."
                         )
 
-                    db.update_user_fields(tier_user, subscription_tier=new_tier, subscription_status='active')
+                    # Set override so LS poll doesn't overwrite admin changes (90 days)
+                    _override = (datetime.now() + timedelta(days=90)).isoformat()
+                    db.update_user_fields(tier_user, subscription_tier=new_tier, subscription_status='active',
+                                          subscription_override_until=_override,
+                                          last_subscription_sync=datetime.now().isoformat())
                     db.log_admin_action(_admin_user(), "tier_changed", "subscription", tier_user,
                                         {"old_tier": current_tier, "new_tier": new_tier})
                     st.success(f"Tier changed: {current_tier} -> {new_tier}")
@@ -986,7 +994,10 @@ def _render_system_health():
                     for u in selected_users:
                         old = db.get_user_full(u)
                         old_tier = old.get('subscription_tier', 'solo') if old else 'solo'
-                        db.update_user_fields(u, subscription_tier=bulk_tier, subscription_status='active')
+                        _override = (datetime.now() + timedelta(days=90)).isoformat()
+                        db.update_user_fields(u, subscription_tier=bulk_tier, subscription_status='active',
+                                              subscription_override_until=_override,
+                                              last_subscription_sync=datetime.now().isoformat())
                         db.log_admin_action(_admin_user(), "tier_changed", "subscription", u,
                                             {"old_tier": old_tier, "new_tier": bulk_tier, "bulk": True})
                     st.success(f"Tier updated for {len(selected_users)} users.")
@@ -997,7 +1008,10 @@ def _render_system_health():
                                            key="admin_bulk_status")
                 if st.button("Apply Status to Selected", key="admin_bulk_status_btn"):
                     for u in selected_users:
-                        db.update_user_fields(u, subscription_status=bulk_status)
+                        _override = (datetime.now() + timedelta(days=90)).isoformat()
+                        db.update_user_fields(u, subscription_status=bulk_status,
+                                              subscription_override_until=_override,
+                                              last_subscription_sync=datetime.now().isoformat())
                     st.success(f"Status updated for {len(selected_users)} users.")
                     st.rerun()
 

@@ -129,7 +129,8 @@ def resolve_user_tier(username: str) -> dict:
     comp_expires = user.get("comp_expires_at")
     if comp_expires:
         try:
-            if datetime.fromisoformat(comp_expires) > datetime.now():
+            comp_dt = comp_expires if isinstance(comp_expires, datetime) else datetime.fromisoformat(str(comp_expires))
+            if comp_dt > datetime.now():
                 return _build_tier_result(tier_key, "active")
             else:
                 # Comp expired — clear it and fall through to normal resolution
@@ -141,7 +142,8 @@ def resolve_user_tier(username: str) -> dict:
     override_until = user.get("subscription_override_until")
     if override_until:
         try:
-            if datetime.fromisoformat(override_until) > datetime.now():
+            override_dt = override_until if isinstance(override_until, datetime) else datetime.fromisoformat(str(override_until))
+            if override_dt > datetime.now():
                 return _build_tier_result(tier_key, "active")
         except (ValueError, TypeError):
             pass
@@ -166,7 +168,7 @@ def resolve_user_tier(username: str) -> dict:
     last_sync = user.get("last_subscription_sync")
     if last_sync:
         try:
-            synced_at = datetime.fromisoformat(last_sync)
+            synced_at = last_sync if isinstance(last_sync, datetime) else datetime.fromisoformat(str(last_sync))
             age = (datetime.now() - synced_at).total_seconds()
             if age < LS_CACHE_TTL_SECONDS:
                 return _build_tier_result(tier_key, sub_status)
