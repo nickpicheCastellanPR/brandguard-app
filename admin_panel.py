@@ -203,7 +203,7 @@ def _render_user_management():
                             changes['org_role'] = edit_role
                             old_vals['org_role'] = user_data.get('org_role', 'member')
                         if edit_beta != bool(user_data.get('is_beta_tester', 0)):
-                            changes['is_beta_tester'] = 1 if edit_beta else 0
+                            changes['is_beta_tester'] = edit_beta
                             old_vals['is_beta_tester'] = user_data.get('is_beta_tester', 0)
                             # Log beta flag change specifically
                             action = "beta_flag_set" if edit_beta else "beta_flag_removed"
