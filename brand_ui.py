@@ -36,10 +36,10 @@ SHIELD_DRIFT = (
 
 SHIELD_DEGRADATION = (
     '<svg width="20" height="24" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">'
-    '<path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#24363b"/>'
-    '<line x1="6" y1="4" x2="13" y2="12" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>'
-    '<line x1="13" y1="12" x2="8" y2="20" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>'
-    '<line x1="14" y1="6" x2="10" y2="15" stroke="#a6784d" stroke-width="1.5" stroke-linecap="round"/>'
+    '<path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#ab8f59"/>'
+    '<line x1="6" y1="4" x2="13" y2="12" stroke="#24363b" stroke-width="2" stroke-linecap="round"/>'
+    '<line x1="13" y1="12" x2="8" y2="20" stroke="#24363b" stroke-width="2" stroke-linecap="round"/>'
+    '<line x1="14" y1="6" x2="10" y2="15" stroke="#24363b" stroke-width="1.5" stroke-linecap="round"/>'
     '</svg>'
 )
 

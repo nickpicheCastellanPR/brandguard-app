@@ -1,11 +1,11 @@
 # SIGNET TEST REPORT
-Generated: 2026-03-06 08:51:05
+Generated: 2026-03-06 13:22:19
 Python: 3.14.2
 SQLite: 3.50.4
 
 ## SUMMARY
-- Total Tests: 135
-- Passed: 132
+- Total Tests: 141
+- Passed: 138
 - Warnings: 3
 - Failed: 0
 - Errors: 0
@@ -194,6 +194,14 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - [PASS] Cat 14: Webhook empty body
 - [PASS] Cat 14: Platform settings CRUD
 - [PASS] Cat 14: Table row counts
+### Cat 15
+
+- [PASS] Cat 15: password_reset_tokens table
+- [PASS] Cat 15: Create and validate reset token
+- [PASS] Cat 15: Consume reset token
+- [PASS] Cat 15: Invalid token returns None
+- [PASS] Cat 15: Set and get trial info
+- [PASS] Cat 15: Expire trial
 
 ## MODULE INVENTORY
 
@@ -222,8 +230,10 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - `check_login` (function)
 - `check_milestone` (function)
 - `check_seat_availability` (function)
+- `consume_reset_token` (function)
 - `count_user_brands` (function)
 - `create_organization` (function)
+- `create_reset_token` (function)
 - `create_user` (function)
 - `create_user_admin` (function)
 - `datetime` (function)
@@ -232,6 +242,7 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - `delete_sample_brand` (function)
 - `delete_user_full` (function)
 - `estimate_api_cost` (function)
+- `expire_trial` (function)
 - `get_acquisition_sources` (function)
 - `get_active_user_count` (function)
 - `get_active_users` (function)
@@ -261,6 +272,7 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - `get_revenue_metrics` (function)
 - `get_session_action_distribution` (function)
 - `get_table_row_counts` (function)
+- `get_trial_info` (function)
 - `get_usage_analytics` (function)
 - `get_user_by_email` (function)
 - `get_user_count` (function)
@@ -288,6 +300,7 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - `run_migrations` (function)
 - `save_profile` (function)
 - `set_platform_setting` (function)
+- `set_trial_start` (function)
 - `set_user_subscription` (function)
 - `shutil` (constant)
 - `sqlite3` (constant)
@@ -298,6 +311,7 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 - `update_organization_fields` (function)
 - `update_user_fields` (function)
 - `update_user_status` (function)
+- `validate_reset_token` (function)
 
 ### logic
 - `ColorScorer` (function)
@@ -478,6 +492,10 @@ ANTHROPIC_API_KEY is set — cannot test missing key behavior
 | suspended_at | TIMESTAMP |  |  | NULL |
 | suspended_reason | TEXT |  |  | NULL |
 | suspended_by | TEXT |  |  | NULL |
+| trial_start_date | TIMESTAMP |  |  | NULL |
+| trial_expired | BOOLEAN |  |  | 0 |
+| renews_at | TIMESTAMP |  |  | NULL |
+| ends_at | TIMESTAMP |  |  | NULL |
 
 ## MANUAL TESTING REQUIRED
 

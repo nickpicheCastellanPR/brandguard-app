@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # --- CONFIG ---
 LS_API_KEY = os.environ.get("LEMONSQUEEZY_API_KEY", "")
-LS_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID", "")
+LS_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID", "291028")
 LS_CACHE_TTL_SECONDS = 3600  # 60 minutes
 
 _LS_HEADERS = {
@@ -146,6 +146,22 @@ def resolve_user_tier(username: str) -> dict:
         except (ValueError, TypeError):
             pass
 
+    # 1d. Trial — if user has an active trial and no paid subscription
+    trial_info = db.get_trial_info(username)
+    if trial_info and trial_info.get("trial_start_date"):
+        has_paid_sub = bool(user.get("lemon_squeezy_subscription_id"))
+        if not has_paid_sub:
+            if trial_info.get("days_remaining", 0) > 0 and not trial_info.get("trial_expired"):
+                result = _build_tier_result("solo", "active")
+                result["_is_trial"] = True
+                result["_trial_days_remaining"] = trial_info["days_remaining"]
+                return result
+            else:
+                # Trial expired — mark it and return inactive
+                if not trial_info.get("trial_expired"):
+                    db.expire_trial(username)
+                return _build_tier_result("solo", "inactive")
+
     # 2. DB cache — skip LS if synced recently
     last_sync = user.get("last_subscription_sync")
     if last_sync:
@@ -192,6 +208,100 @@ def sync_user_status(username: str, email: str) -> dict:
 def resolve_tier_from_ls_variant(variant_id) -> str | None:
     """Maps a Lemon Squeezy variant_id to a tier key."""
     return get_tier_from_variant_id(variant_id)
+
+
+def is_trial_active(username: str) -> bool:
+    """Returns True if the user is on an active trial (not expired, not subscribed)."""
+    trial_info = db.get_trial_info(username)
+    if not trial_info or not trial_info.get("trial_start_date"):
+        return False
+    if trial_info.get("trial_expired"):
+        return False
+    user = db.get_user_full(username)
+    if not user:
+        return False
+    # If they have a paid subscription, trial is irrelevant
+    tier_key = user.get("subscription_tier") or "solo"
+    sub_status = user.get("subscription_status") or "inactive"
+    if tier_key in PROTECTED_TIERS or sub_status == "active":
+        ls_sub_id = user.get("lemon_squeezy_subscription_id")
+        if ls_sub_id:
+            return False
+    return trial_info.get("days_remaining", 0) > 0
+
+
+def get_trial_days_remaining(username: str) -> int:
+    """Returns days remaining in trial, or 0 if no trial / expired."""
+    trial_info = db.get_trial_info(username)
+    if not trial_info:
+        return 0
+    return trial_info.get("days_remaining", 0)
+
+
+def check_trial_expired(username: str) -> bool:
+    """Checks if trial has expired and marks it if so. Returns True if expired."""
+    trial_info = db.get_trial_info(username)
+    if not trial_info or not trial_info.get("trial_start_date"):
+        return False
+    if trial_info.get("trial_expired"):
+        return True
+    if trial_info.get("days_remaining", 0) <= 0:
+        # Check they don't have a paid subscription
+        user = db.get_user_full(username)
+        if user and user.get("lemon_squeezy_subscription_id"):
+            return False
+        db.expire_trial(username)
+        return True
+    return False
+
+
+# ── Checkout & Subscription Management ────────────────────────────────────────
+
+LS_STORE_SLUG = "castellanpr"
+
+# Variant IDs for each tier (must match tier_config.py)
+_CHECKOUT_VARIANTS = {
+    "solo": 1357832,
+    "agency": 1357830,
+    "enterprise": 1357831,
+}
+
+
+def get_checkout_url(tier_key: str, username: str, email: str = "") -> str | None:
+    """Build a Lemon Squeezy checkout URL with custom data passthrough."""
+    variant_id = _CHECKOUT_VARIANTS.get(tier_key)
+    if not variant_id:
+        return None
+    base = f"https://{LS_STORE_SLUG}.lemonsqueezy.com/checkout/buy/{variant_id}"
+    params = f"?checkout[custom][user_id]={username}"
+    if email:
+        params += f"&checkout[email]={email}"
+    return base + params
+
+
+def get_customer_portal_url(username: str) -> str | None:
+    """Get the Lemon Squeezy customer portal URL for managing subscriptions."""
+    if not LS_API_KEY:
+        return None
+    user = db.get_user_full(username)
+    if not user:
+        return None
+    sub_id = user.get("lemon_squeezy_subscription_id")
+    if not sub_id:
+        return None
+    try:
+        resp = requests.get(
+            f"https://api.lemonsqueezy.com/v1/subscriptions/{sub_id}",
+            headers=_LS_HEADERS,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            attrs = resp.json().get("data", {}).get("attributes", {})
+            urls = attrs.get("urls", {})
+            return urls.get("customer_portal")
+    except Exception as e:
+        logger.warning(f"Failed to get customer portal URL for {username!r}: {e}")
+    return None
 
 
 # ── Brand & seat limits ──────────────────────────────────────────────────────

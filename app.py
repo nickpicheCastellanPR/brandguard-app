@@ -14,6 +14,7 @@ import visual_audit
 import html
 from prompt_builder import build_brand_context, build_social_context, build_mh_context, CONTENT_TYPE_TO_CLUSTER
 import brand_ui
+import email_helper
 
 # --- PAGE CONFIG ---
 icon_path = "Signet_Icon_Color.png"
@@ -1003,8 +1004,52 @@ def add_palette_color(key):
 def remove_palette_color(key, index):
     st.session_state[key].pop(index)
 
+# --- PASSWORD RESET TOKEN HANDLING ---
+_reset_token = st.query_params.get("reset_token")
+_checkout_success = st.query_params.get("checkout") == "success"
+
 # --- LOGIN / AUTH SCREEN (HERO LAYOUT V3 - FIXED) ---
 if not st.session_state['authenticated']:
+
+    # Handle password reset token flow
+    if _reset_token:
+        _reset_username = db.validate_reset_token(_reset_token)
+        st.markdown("""<style>
+            .stApp { background-color: #f5f5f0 !important; }
+            section[data-testid="stSidebar"] { display: none; }
+            [data-testid="stAppViewContainer"], [data-testid="stMain"],
+            [data-testid="stMainBlockContainer"], [data-testid="stHeader"],
+            [data-testid="stBottom"] { background-color: transparent !important; background: transparent !important; }
+            .stTextInput input { background-color: #ffffff !important; color: #24363b !important;
+                border: 1px solid #c0c0c0 !important; -webkit-text-fill-color: #24363b !important; }
+        </style>""", unsafe_allow_html=True)
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        _rc1, _rc2, _rc3 = st.columns([1, 1.2, 1])
+        with _rc2:
+            st.markdown("<h4 style='text-align:center; color:#ab8f59; letter-spacing:2px; margin-bottom:20px;'>RESET PASSWORD</h4>", unsafe_allow_html=True)
+            if not _reset_username:
+                st.error("This reset link is invalid or has expired. Please request a new one.")
+                if st.button("Back to Login"):
+                    st.query_params.clear()
+                    st.rerun()
+            else:
+                with st.form("reset_password_form"):
+                    rp_new = st.text_input("New Password", type="password", key="rp_new")
+                    rp_confirm = st.text_input("Confirm Password", type="password", key="rp_confirm")
+                    if st.form_submit_button("Set New Password"):
+                        if not rp_new or len(rp_new) < 8:
+                            st.error("Password must be at least 8 characters.")
+                        elif rp_new != rp_confirm:
+                            st.error("Passwords do not match.")
+                        else:
+                            db.reset_user_password(_reset_username, rp_new)
+                            db.consume_reset_token(_reset_token)
+                            st.success("Password updated. You can now log in.")
+                            st.query_params.clear()
+                            import time as _rst; _rst.sleep(2)
+                            st.rerun()
+        st.stop()
+
     # 1. GLOBAL STYLES + LOGIN CARD CSS
     st.markdown("""<style>
         .stApp {
@@ -1030,6 +1075,10 @@ if not st.session_state['authenticated']:
             -webkit-text-fill-color: #24363b !important; 
         } 
         .stTextInput input:focus { border-color: #24363b !important; }
+        .stTextInput label, .stTextArea label {
+            color: #ab8f59 !important;
+            -webkit-text-fill-color: #ab8f59 !important;
+        }
         
         /* FIX: TARGET THE RIGHT COLUMN TO CREATE THE CARD LOOK WITHOUT HTML WRAPPERS */
         div[data-testid="column"]:nth-of-type(2) > div[data-testid="stVerticalBlock"] {
@@ -1042,7 +1091,7 @@ if not st.session_state['authenticated']:
 
         /* --- TYPOGRAPHY & LAYOUT --- */
         .login-content-left h1 {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Montserrat', sans-serif !important;
             font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: 0.12em;
@@ -1051,8 +1100,14 @@ if not st.session_state['authenticated']:
             line-height: 1.2;
         }
 
+        .login-content-left p,
+        .login-content-left a,
+        .login-content-left span {
+            font-family: 'Montserrat', sans-serif !important;
+        }
+
         .login-value {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Montserrat', sans-serif !important;
             font-size: 1.1rem;
             line-height: 1.7;
             color: #24363b;
@@ -1061,7 +1116,7 @@ if not st.session_state['authenticated']:
         }
 
         .login-workflow {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Montserrat', sans-serif !important;
             font-size: 1rem;
             line-height: 1.7;
             color: #24363b;
@@ -1070,7 +1125,7 @@ if not st.session_state['authenticated']:
         }
 
         .login-credibility {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Montserrat', sans-serif !important;
             font-size: 0.85rem;
             color: #24363b;
             line-height: 1.5;
@@ -1197,27 +1252,28 @@ if not st.session_state['authenticated']:
             if st.session_state.get('_show_forgot_username'):
                 with st.form("forgot_username_form"):
                     fu_email = st.text_input("Enter your email address", key="fu_email")
-                    if st.form_submit_button("Look Up Username"):
+                    if st.form_submit_button("Send Username Reminder"):
+                        # Anti-enumeration: always show the same message
                         found = db.get_user_by_email(fu_email)
-                        if found:
-                            st.success(f"Your username is: **{found}**")
-                        else:
-                            st.error("No account found with that email address.")
+                        if found and fu_email:
+                            email_helper.send_username_reminder(fu_email, found)
+                        st.success("If an account exists with that email, we've sent a reminder.")
                         st.session_state['_show_forgot_username'] = False
 
             if st.session_state.get('_show_forgot_password'):
-                st.markdown("""
-                <div style="background:rgba(36,54,59,0.05); border-left:3px solid #ab8f59;
-                            padding:12px 16px; font-size:0.85rem; color:#24363b; margin-top:8px;">
-                    <strong>Password Reset</strong><br>
-                    Contact your organization admin to reset your password.
-                    If you are the admin, contact <a href="mailto:support@castellanpr.com"
-                    style="color:#24363b; font-weight:600;">support@castellanpr.com</a>.
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button("Close", key="close_forgot_pw"):
-                    st.session_state['_show_forgot_password'] = False
-                    st.rerun()
+                with st.form("forgot_password_form"):
+                    fp_email = st.text_input("Enter your email address", key="fp_email")
+                    if st.form_submit_button("Send Reset Link"):
+                        # Anti-enumeration: always show the same message
+                        fp_username = db.get_user_by_email(fp_email)
+                        if fp_username and fp_email:
+                            _token = db.create_reset_token(fp_username)
+                            # Look up actual email from user record for safety
+                            _fp_user = db.get_user_full(fp_username)
+                            _fp_addr = _fp_user.get('email', fp_email) if _fp_user else fp_email
+                            email_helper.send_password_reset(_fp_addr, _token)
+                        st.success("If an account exists with that email, we've sent a reset link.")
+                        st.session_state['_show_forgot_password'] = False
 
         with reg_tab:
             r_user = st.text_input("CHOOSE USERNAME", key="r_user", max_chars=64)
@@ -1230,11 +1286,15 @@ if not st.session_state['authenticated']:
             if st.button("CREATE ACCOUNT", width="stretch"):
                 # Create user as Admin of their new Org
                 if db.create_user(r_user, r_email, r_pass, org_id=r_org, is_admin=True):
+                    # Start 14-day trial
+                    db.set_trial_start(r_user)
+                    # Auto-load Meridian Labs sample brand
+                    db.load_sample_brand(r_user)
                     # Analytics: registration + onboarding milestone
                     db.track_event("user_registered", r_user,
-                                   metadata={"source": "direct"}, org_id=r_org)
+                                   metadata={"source": "direct", "trial": True}, org_id=r_org)
                     db.check_milestone(r_user, "account_created", org_id=r_org)
-                    st.success(f"Account created! You are the Admin of {r_org}. Please log in.")
+                    st.success(f"Account created! Your 14-day trial is active. Please log in.")
                 else:
                     st.error("Username already taken.")
 
@@ -1461,6 +1521,18 @@ with st.sidebar:
                     else:
                         st.markdown("<span style='color:#24363b; font-size:0.75rem;'>System fully calibrated.</span>", unsafe_allow_html=True)
 
+    # TRIAL BANNER
+    _sb_is_trial = st.session_state.get('tier', {}).get('_is_trial')
+    if _sb_is_trial:
+        _sb_trial_days = st.session_state.get('tier', {}).get('_trial_days_remaining', 0)
+        st.markdown(f"""
+            <div style="background:rgba(171,143,89,0.12); border:1px solid #ab8f59; padding:10px 12px;
+                        border-radius:4px; margin-bottom:12px; text-align:center;">
+                <div style="font-weight:700; color:#24363b; font-size:0.8rem; letter-spacing:0.05em;">TRIAL</div>
+                <div style="color:#3d3d3d; font-size:0.75rem; margin-top:4px;">{_sb_trial_days} days remaining</div>
+            </div>
+        """, unsafe_allow_html=True)
+
     # 4. NAVIGATION
     st.markdown('<div class="nav-header">APPS</div>', unsafe_allow_html=True)
 
@@ -1478,6 +1550,7 @@ with st.sidebar:
     # ADMIN TOOLS (NO DIVIDER)
     st.button("BRAND ARCHITECT", width="stretch", on_click=set_page, args=("BRAND ARCHITECT",))
     st.button("TEAM MANAGEMENT", width="stretch", on_click=set_page, args=("TEAM MANAGEMENT",))
+    st.button("SUBSCRIPTION", width="stretch", on_click=set_page, args=("SUBSCRIPTION",))
 
     # SUPER ADMIN ONLY
     _sb_tier = st.session_state.get('tier', {}).get('_tier_key', '')
@@ -1556,6 +1629,32 @@ def _is_super_admin() -> bool:
 def _subscription_active() -> bool:
     return st.session_state.get('subscription_status', 'inactive') == 'active'
 
+def _is_trial_user() -> bool:
+    return bool(st.session_state.get('tier', {}).get('_is_trial'))
+
+def _trial_days_remaining() -> int:
+    return st.session_state.get('tier', {}).get('_trial_days_remaining', 0)
+
+def _is_sample_brand_active() -> bool:
+    """True if the currently selected brand is the sample brand."""
+    active = st.session_state.get('active_profile_name', '')
+    return active and 'Meridian Labs' in active and '(Sample' in active
+
+
+def _show_trial_gate():
+    """Renders a trial gate notice when a trial user selects a non-sample brand."""
+    st.markdown("""
+        <div style="background:rgba(171,143,89,0.08); border-left:3px solid #ab8f59;
+                    padding:16px 20px; margin:12px 0 20px 0; border-radius:2px;">
+            <div style="font-weight:700; color:#24363b; font-size:0.95rem;">Trial Mode</div>
+            <div style="color:#3d3d3d; margin-top:6px; font-size:0.85rem; line-height:1.5;">
+                During your trial, you can run modules against the <strong>Meridian Labs sample brand</strong>
+                to explore the platform. Select the sample brand from the sidebar to continue.<br><br>
+                Subscribe to unlock full access with your own brands.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
 
 def _track_module_and_cost(module_name, metadata_extra=None):
     """Fire module_action and api_cost events after an AI module action."""
@@ -1601,9 +1700,18 @@ def _track_module_and_cost(module_name, metadata_extra=None):
 
 def show_paywall():
     """Renders inline inactive subscription message (no st.stop — module UI still visible)."""
-    st.markdown("""
+    _pw_is_trial_expired = st.session_state.get('tier', {}).get('_subscription_status') == 'inactive' and \
+                           db.get_trial_info(st.session_state.get('username', '')).get('trial_expired') if \
+                           db.get_trial_info(st.session_state.get('username', '')) else False
+    _pw_title = "Trial Expired" if _pw_is_trial_expired else "Subscription Inactive"
+    _pw_desc = (
+        "Your 14-day trial has ended. Your brand data is safe &mdash; subscribe to pick up where you left off."
+        if _pw_is_trial_expired else
+        "Your subscription is inactive. Your brand data is safe &mdash; reactivate anytime to pick up where you left off."
+    )
+    st.markdown(f"""
         <style>
-            .paywall-card {
+            .paywall-card {{
                 background-color: #1b2a2e;
                 border: 1px solid #ab8f59;
                 padding: 40px;
@@ -1612,40 +1720,31 @@ def show_paywall():
                 margin-top: 20px;
                 margin-bottom: 20px;
                 box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            }
-            .paywall-icon { margin-bottom: 20px; display: flex; justify-content: center; }
-            .paywall-title {
+            }}
+            .paywall-icon {{ margin-bottom: 20px; display: flex; justify-content: center; }}
+            .paywall-title {{
                 color: #f5f5f0; font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
                 font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
                 font-size: 1.5rem; margin-bottom: 10px;
-            }
-            .paywall-desc { color: #5c6b61; margin-bottom: 30px; font-size: 1rem; line-height: 1.6; }
+            }}
+            .paywall-desc {{ color: #5c6b61; margin-bottom: 30px; font-size: 1rem; line-height: 1.6; }}
         </style>
         <div class="paywall-card">
             <div class="paywall-icon">
                 <svg width="40" height="48" viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#24363b"/>
-                    <line x1="6" y1="4" x2="13" y2="12" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="13" y1="12" x2="8" y2="20" stroke="#a6784d" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="14" y1="6" x2="10" y2="15" stroke="#a6784d" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M10 0L20 4V12C20 18.6 14.2 22.8 10 24C5.8 22.8 0 18.6 0 12V4L10 0Z" fill="#ab8f59"/>
+                    <line x1="6" y1="4" x2="13" y2="12" stroke="#24363b" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="13" y1="12" x2="8" y2="20" stroke="#24363b" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="14" y1="6" x2="10" y2="15" stroke="#24363b" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
             </div>
-            <div class="paywall-title">Subscription Inactive</div>
-            <div class="paywall-desc">
-                Your subscription is inactive. Your brand data is safe &mdash; reactivate anytime to pick up where you left off.<br><br>
-                Signet is the brand fidelity platform built by Castellan PR &mdash; it calibrates to your brand&rsquo;s positioning
-                and ensures every piece of content stays aligned as you scale.
-            </div>
-            <a href="https://castellanpr.lemonsqueezy.com" target="_blank">
-                <button style="
-                    background-color: #ab8f59; color: #1b2a2e; border: none;
-                    padding: 12px 30px; font-weight: 800; letter-spacing: 0.1em;
-                    cursor: pointer; text-transform: uppercase;">
-                    Reactivate Subscription
-                </button>
-            </a>
+            <div class="paywall-title">{_pw_title}</div>
+            <div class="paywall-desc">{_pw_desc}</div>
         </div>
     """, unsafe_allow_html=True)
+    if st.button("VIEW PLANS", use_container_width=True):
+        st.session_state['app_mode'] = "SUBSCRIPTION"
+        st.rerun()
 
 
 def _show_suspension_notice():
@@ -1687,6 +1786,32 @@ if st.session_state.get('admin_session'):
 _announcement = db.get_platform_setting("announcement") if st.session_state.get('authenticated') else None
 if _announcement:
     st.info(_announcement)
+
+# --- POST-CHECKOUT RETURN ---
+if _checkout_success and st.session_state.get('authenticated'):
+    st.markdown("""
+        <div style="background:rgba(171,143,89,0.12); border:1px solid #ab8f59; padding:16px 20px;
+                    border-radius:4px; margin-bottom:16px; text-align:center;">
+            <div style="font-weight:700; color:#24363b; font-size:1rem; letter-spacing:0.05em;">SUBSCRIPTION PROCESSING</div>
+            <div style="color:#3d3d3d; margin-top:8px; font-size:0.85rem; line-height:1.5;">
+                Your subscription is being activated. This usually takes a few seconds.
+                If your status doesn't update automatically, click the button below.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    _pcc1, _pcc2, _pcc3 = st.columns([1, 1, 1])
+    with _pcc2:
+        if st.button("SYNC NOW", use_container_width=True):
+            import time as _pct
+            st.session_state.pop('_tier_resolved_at', None)
+            _new_tier = sub_manager.resolve_user_tier(st.session_state.get('username', ''))
+            st.session_state['tier'] = _new_tier
+            st.session_state['subscription_status'] = _new_tier.get('_subscription_status', 'inactive')
+            st.session_state['status'] = st.session_state['subscription_status']
+            st.session_state['_tier_resolved_at'] = _pct.time()
+            st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('username', ''))
+            st.query_params.clear()
+            st.rerun()
 
 # --- ADMIN PANEL ROUTING ---
 if app_mode == "ADMIN PANEL":
@@ -2082,6 +2207,15 @@ elif app_mode == "DASHBOARD":
         brand_check = sub_manager.check_brand_limit(_bm_uid)
         st.caption(f"Brands: {brand_check['current']} / {'Unlimited' if brand_check['max'] == -1 else brand_check['max']}")
 
+        # Downgrade notice: over limit
+        if not brand_check['allowed'] and brand_check['max'] > 0 and brand_check['current'] > brand_check['max']:
+            st.markdown("""
+                <div style="background:rgba(166,120,77,0.08); border-left:3px solid #a6784d;
+                            padding:10px 12px; margin-bottom:10px; border-radius:2px; font-size:0.8rem; color:#3d3d3d;">
+                    Your brands are preserved, but you can't create new ones until you're under your plan limit.
+                </div>
+            """, unsafe_allow_html=True)
+
         _del_candidates = [
             name for name in profiles.keys()
             if not db.is_profile_sample(_bm_uid, name)
@@ -2135,6 +2269,10 @@ elif app_mode == "DASHBOARD":
 elif app_mode == "VISUAL COMPLIANCE":
     st.title("VISUAL COMPLIANCE AUDIT")
     brand_ui.render_module_help("visual_audit")
+
+    # Trial gate: must use sample brand
+    if _is_trial_user() and not _is_sample_brand_active():
+        _show_trial_gate()
 
     # --- CSS INJECTION ---
     st.markdown("""
@@ -2726,6 +2864,10 @@ elif app_mode == "COPY EDITOR":
     st.title("COPY EDITOR")
     brand_ui.render_module_help("copy_editor")
 
+    # Trial gate: must use sample brand
+    if _is_trial_user() and not _is_sample_brand_active():
+        _show_trial_gate()
+
     # --- CSS INJECTION ---
     st.markdown("""
         <style>
@@ -3103,6 +3245,10 @@ elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
     brand_ui.render_module_help("content_generator")
 
+    # Trial gate: must use sample brand
+    if _is_trial_user() and not _is_sample_brand_active():
+        _show_trial_gate()
+
     # --- CSS INJECTION ---
     st.markdown("""
         <style>
@@ -3426,6 +3572,10 @@ elif app_mode == "CONTENT GENERATOR":
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
     brand_ui.render_module_help("social_assistant")
+
+    # Trial gate: must use sample brand
+    if _is_trial_user() and not _is_sample_brand_active():
+        _show_trial_gate()
 
     # --- CSS INJECTION ---
     st.markdown("""
@@ -3823,7 +3973,20 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 # ===================================================================
 elif app_mode == "BRAND ARCHITECT":
     st.title("BRAND ARCHITECT")
-    
+
+    # Trial users: read-only notice
+    _ba_trial_readonly = _is_trial_user()
+    if _ba_trial_readonly:
+        st.markdown("""
+            <div style="background:rgba(171,143,89,0.08); border-left:3px solid #ab8f59;
+                        padding:12px 16px; margin-bottom:16px; border-radius:2px;">
+                <span style="font-weight:700; color:#24363b; font-size:0.9rem;">Trial Mode — Read Only</span>
+                <span style="color:#3d3d3d; font-size:0.85rem; margin-left:8px;">
+                    You can explore the sample brand profile. Subscribe to create and edit your own brands.
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+
     # --- CSS INJECTION ---
     st.markdown("""
         <style>
@@ -4006,6 +4169,8 @@ elif app_mode == "BRAND ARCHITECT":
     # TAB 1: BUILD NEW BRAND (FORMERLY WIZARD)
     # -----------------------------------------------------------
     with main_tab1:
+        if _ba_trial_readonly:
+            st.info("Subscribe to create your own brands. During your trial, explore the Meridian Labs sample brand in the Manage Brand tab.")
         st.markdown("### ARCHITECT NEW BRAND")
         st.caption("Build a new brand profile from scratch.")
         
@@ -4220,7 +4385,7 @@ elif app_mode == "BRAND ARCHITECT":
                     max_chars=5000
                 )
                 
-                if st.button("CONFIRM & ADD TO SAMPLES", type="primary"):
+                if st.button("CONFIRM & ADD TO SAMPLES", type="primary", disabled=_ba_trial_readonly):
                     entry = {
                         "file": s_file,
                         "platform": s_plat,
@@ -4300,13 +4465,16 @@ elif app_mode == "BRAND ARCHITECT":
                         st.rerun()
             st.button("ADD ACCENT COLOR", on_click=add_palette_color, args=('palette_accent',))
 
-        if st.button("GENERATE SYSTEM", type="primary"):
+        if st.button("GENERATE SYSTEM", type="primary", disabled=_ba_trial_readonly):
             # Brand limit check
             if not _is_super_admin():
                 brand_check = sub_manager.check_brand_limit(st.session_state.get('user_id', ''))
                 if not brand_check['allowed']:
                     tier_name = st.session_state.get('tier', {}).get('display_name', 'your current plan')
                     st.error(f"Your {tier_name} plan supports up to {brand_check['max']} brands. Delete an existing brand or upgrade to add more.")
+                    if st.button("VIEW PLANS", key="ba_upgrade_brands"):
+                        st.session_state['app_mode'] = "SUBSCRIPTION"
+                        st.rerun()
                     st.stop()
             if not st.session_state.get("wiz_name") or not st.session_state.get("wiz_archetype"): st.error("NAME/ARCHETYPE REQUIRED")
             else:
@@ -4633,7 +4801,7 @@ elif app_mode == "BRAND ARCHITECT":
                         if st.session_state['man_social_analysis']:
                             st.markdown("#### REVIEW FINDINGS")
                             edit_social = st.text_area("EDIT ANALYSIS", value=st.session_state['man_social_analysis'], key="rev_social", height=150, max_chars=5000)
-                            if st.button("CONFIRM & INJECT (SOCIAL)", type="primary"):
+                            if st.button("CONFIRM & INJECT (SOCIAL)", type="primary", disabled=_ba_trial_readonly):
                                 from datetime import datetime
                                 timestamp = datetime.now().strftime("%Y-%m-%d")
                                 
@@ -4793,7 +4961,7 @@ elif app_mode == "BRAND ARCHITECT":
                         
                         if 'man_voice_analysis' not in st.session_state: st.session_state['man_voice_analysis'] = ""
                         
-                        if st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice"):
+                        if st.button("INITIATE PROTOCOL ANALYSIS", type="primary", key="btn_cal_voice", disabled=_ba_trial_readonly):
                             # VALIDATION
                             valid_input = False
                             raw_txt = ""
@@ -4846,7 +5014,7 @@ elif app_mode == "BRAND ARCHITECT":
                             st.markdown("#### ANALYSIS REVIEW")
                             edit_voice = st.text_area("EXTRACTED PATTERNS", value=st.session_state['man_voice_analysis'], key="rev_voice", height=150)
                             
-                            if st.button("CONFIRM & FORTIFY ENGINE", type="primary"):
+                            if st.button("CONFIRM & FORTIFY ENGINE", type="primary", disabled=_ba_trial_readonly):
                                 from datetime import datetime
                                 timestamp = datetime.now().strftime("%Y-%m-%d")
                                 source_ref = st.session_state.get('temp_voice_source_name', 'Unknown')
@@ -4944,7 +5112,7 @@ elif app_mode == "BRAND ARCHITECT":
                         
                         if 'man_vis_analysis' not in st.session_state: st.session_state['man_vis_analysis'] = ""
                         
-                        if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis"):
+                        if vis_file and st.button("ANALYZE AESTHETIC", type="primary", key="btn_cal_vis", disabled=_ba_trial_readonly):
                             with st.spinner("ANALYZING DESIGN..."):
                                 img = Image.open(vis_file)
                                 st.session_state['man_vis_analysis'] = logic_engine.describe_logo(img)
@@ -4952,7 +5120,7 @@ elif app_mode == "BRAND ARCHITECT":
                         if st.session_state['man_vis_analysis']:
                             st.markdown("#### REVIEW FINDINGS")
                             edit_vis = st.text_area("EDIT ANALYSIS", value=st.session_state['man_vis_analysis'], key="rev_vis", height=150, max_chars=5000)
-                            if st.button("CONFIRM & INJECT (VISUAL)", type="primary"):
+                            if st.button("CONFIRM & INJECT (VISUAL)", type="primary", disabled=_ba_trial_readonly):
                                 from datetime import datetime
                                 timestamp = datetime.now().strftime("%Y-%m-%d")
                                 
@@ -5062,7 +5230,7 @@ elif app_mode == "BRAND ARCHITECT":
                         with edit_tab3:
                             st.text_area("VISUAL SAMPLES BLOB", inputs['visual_dna'], height=200, disabled=True)
 
-                    if st.button("SAVE STRATEGY CHANGES", type="primary"):
+                    if st.button("SAVE STRATEGY CHANGES", type="primary", disabled=_ba_trial_readonly):
                         # 1. Update Standard Inputs
                         profile_obj['inputs']['wiz_name'] = new_name
                         profile_obj['inputs']['wiz_archetype'] = new_arch
@@ -5172,7 +5340,7 @@ elif app_mode == "BRAND ARCHITECT":
                 else:
                     st.warning("This profile was created from a PDF/Raw Text. Structured editing is unavailable.")
                     new_raw = st.text_area("EDIT RAW TEXT", final_text_view, height=500, max_chars=20000)
-                    if st.button("SAVE RAW CHANGES"):
+                    if st.button("SAVE RAW CHANGES", disabled=_ba_trial_readonly):
                         st.session_state['profiles'][target] = new_raw
                         db.save_profile(st.session_state['user_id'], target, new_raw)
 
@@ -5215,7 +5383,7 @@ elif app_mode == "BRAND ARCHITECT":
         st.file_uploader("UPLOAD BRAND GUIDE", type=["pdf"], key="arch_pdf_uploader")
         
         # The button simply triggers the callback
-        st.button("EXTRACT & MAP TO BRAND", type="primary", on_click=extract_and_map_pdf)
+        st.button("EXTRACT & MAP TO BRAND", type="primary", on_click=extract_and_map_pdf, disabled=_ba_trial_readonly)
     
         # Display Messages based on the flags set in callback
         if st.session_state.get('extraction_success'):
@@ -5450,17 +5618,143 @@ if app_mode == "TEAM MANAGEMENT":
         }
         st.caption(f"**{user_status.upper()}:** {tier_info.get(user_status, 'Contact support')}")
         
-        if st.button("Upgrade Subscription", use_container_width=True):
-            st.info("Contact sales@castellanpr.com to upgrade")
+        if st.button("Manage Subscription", use_container_width=True):
+            st.session_state['app_mode'] = "SUBSCRIPTION"
+            st.rerun()
 
 # ===================================================================
 # END OF TEAM MANAGEMENT MODULE
 # ===================================================================
 
 # ===================================================================
-# FULL ACTIVITY LOG MODULE - NEW MODULE
-# Add this AFTER the Team Management section in app.py
-# Also add navigation button: st.button("ACTIVITY LOG", ...)
+# SUBSCRIPTION MANAGEMENT PAGE
+# ===================================================================
+
+elif app_mode == "SUBSCRIPTION":
+    st.markdown("<h1 style='color:#ab8f59;'>SUBSCRIPTION</h1>", unsafe_allow_html=True)
+    _sub_user = st.session_state.get('username', '')
+    _sub_tier = st.session_state.get('tier', {})
+    _sub_tier_key = _sub_tier.get('_tier_key', 'solo')
+    _sub_status = _sub_tier.get('_subscription_status', 'inactive')
+    _sub_is_trial = _sub_tier.get('_is_trial', False)
+    _sub_trial_days = _sub_tier.get('_trial_days_remaining', 0)
+    _sub_email = ''
+    _sub_user_data = db.get_user_full(_sub_user)
+    if _sub_user_data:
+        _sub_email = _sub_user_data.get('email', '')
+
+    # Current plan display
+    if _sub_is_trial:
+        st.markdown(f"""
+            <div style="background:rgba(171,143,89,0.08); border:1px solid #ab8f59; padding:20px;
+                        border-radius:4px; margin-bottom:20px;">
+                <div style="font-weight:800; color:#24363b; font-size:1.1rem; letter-spacing:0.05em;">FREE TRIAL</div>
+                <div style="color:#3d3d3d; margin-top:8px; font-size:0.9rem;">{_sub_trial_days} days remaining</div>
+                <div style="color:#5c6b61; margin-top:4px; font-size:0.8rem;">
+                    Full access to all modules with the sample brand. Subscribe to use your own brands.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    elif _sub_status == 'active':
+        _sub_display = _sub_tier.get('display_name', 'Solo')
+        _sub_price = _sub_tier.get('price_monthly_usd', 0)
+        st.markdown(f"""
+            <div style="background:rgba(36,54,59,0.05); border:1px solid #24363b; padding:20px;
+                        border-radius:4px; margin-bottom:20px;">
+                <div style="font-weight:800; color:#24363b; font-size:1.1rem; letter-spacing:0.05em;">{_sub_display.upper()} PLAN</div>
+                <div style="color:#3d3d3d; margin-top:8px; font-size:0.9rem;">${_sub_price}/month</div>
+                <div style="color:#5c6b61; margin-top:4px; font-size:0.8rem;">Status: Active</div>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div style="background:#f5f5f0; border:1px solid #ab8f59; padding:20px;
+                        border-radius:4px; margin-bottom:20px;">
+                <div style="font-weight:800; color:#24363b; font-size:1.1rem; letter-spacing:0.05em;">NO ACTIVE SUBSCRIPTION</div>
+                <div style="color:#3d3d3d; margin-top:8px; font-size:0.85rem;">
+                    Your brand data is safe. Subscribe to resume full access.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Usage info
+    _sub_usage = st.session_state.get('usage', {})
+    if _sub_usage.get('limit', 0) > 0:
+        _used = _sub_usage.get('used', 0)
+        _limit = _sub_usage.get('limit', 0)
+        _pct = _sub_usage.get('percentage', 0)
+        st.markdown(f"**Usage this month:** {_used} / {_limit} actions ({_pct:.0f}%)")
+        st.progress(min(_pct / 100, 1.0))
+    st.markdown("---")
+
+    # Plan comparison / subscribe buttons
+    st.markdown("### CHOOSE YOUR PLAN")
+    from tier_config import TIER_CONFIG
+    _plan_cols = st.columns(3)
+    for idx, (tk, tc) in enumerate([("solo", TIER_CONFIG["solo"]), ("agency", TIER_CONFIG["agency"]), ("enterprise", TIER_CONFIG["enterprise"])]):
+        with _plan_cols[idx]:
+            _is_current = (tk == _sub_tier_key and _sub_status == 'active')
+            _border = "#ab8f59" if _is_current else "#c0c0c0"
+            _badge = " (CURRENT)" if _is_current else ""
+            st.markdown(f"""
+                <div style="font-family:'Montserrat',sans-serif; border:2px solid {_border}; padding:20px; border-radius:4px; text-align:center; min-height:280px; background-color:#f5f5f0;">
+                    <div style="font-weight:800; color:#24363b; font-size:1rem; letter-spacing:0.05em;">{tc['display_name'].upper()}{_badge}</div>
+                    <div style="font-size:1.3rem; font-weight:700; color:#24363b; margin:12px 0;">${tc['price_monthly_usd']}<span style="font-size:0.8rem; color:#5c6b61;">/mo</span></div>
+                    <div style="text-align:left; font-size:0.8rem; color:#3d3d3d; line-height:1.8;">
+                        {'Unlimited' if tc['max_brands'] == -1 else tc['max_brands']} brands<br>
+                        {tc['max_seats']} seat{'s' if tc['max_seats'] > 1 else ''}<br>
+                        {tc['monthly_ai_actions']} AI actions/mo
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if not _is_current and not _is_super_admin():
+                _checkout_url = sub_manager.get_checkout_url(tk, _sub_user, _sub_email)
+                if _checkout_url:
+                    st.markdown(f"""
+                        <div style="text-align:center; margin-top:12px;">
+                            <a href="{_checkout_url}" target="_blank" style="
+                                display:inline-block; background-color:#ab8f59; color:#1b2a2e;
+                                padding:10px 24px; text-decoration:none; font-weight:700;
+                                font-size:0.8rem; letter-spacing:0.08em; text-transform:uppercase;
+                            ">SUBSCRIBE</a>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+    # Manage existing subscription
+    if _sub_status == 'active' and not _sub_is_trial and _sub_tier_key not in ('super_admin', 'retainer'):
+        st.markdown("---")
+        st.markdown("### MANAGE SUBSCRIPTION")
+        _portal_url = sub_manager.get_customer_portal_url(_sub_user)
+        if _portal_url:
+            st.markdown(f"""
+                <a href="{_portal_url}" target="_blank" style="
+                    display:inline-block; background-color:#24363b; color:#f5f5f0;
+                    padding:10px 24px; text-decoration:none; font-weight:700;
+                    font-size:0.8rem; letter-spacing:0.08em; text-transform:uppercase;
+                ">MANAGE BILLING</a>
+            """, unsafe_allow_html=True)
+            st.caption("Update payment method, view invoices, or cancel your subscription.")
+        else:
+            st.caption("Contact support@castellanpr.com to manage your subscription.")
+
+    # Manual sync option
+    st.markdown("---")
+    if st.button("SYNC SUBSCRIPTION STATUS"):
+        import time as _sync_t
+        st.session_state.pop('_tier_resolved_at', None)
+        _new_tier = sub_manager.resolve_user_tier(_sub_user)
+        st.session_state['tier'] = _new_tier
+        st.session_state['subscription_status'] = _new_tier.get('_subscription_status', 'inactive')
+        st.session_state['status'] = st.session_state['subscription_status']
+        st.session_state['_tier_resolved_at'] = _sync_t.time()
+        st.session_state['usage'] = sub_manager.check_usage_limit(_sub_user)
+        st.success("Subscription status synced.")
+        _sync_t.sleep(1.5)
+        st.rerun()
+
+
+# ===================================================================
+# FULL ACTIVITY LOG MODULE
 # ===================================================================
 
 elif app_mode == "ACTIVITY LOG":

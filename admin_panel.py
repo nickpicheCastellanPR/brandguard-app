@@ -456,7 +456,7 @@ def _render_subscription_overrides():
         st.info("No users.")
         return
 
-    sub_tabs = st.tabs(["Change Tier", "Grant Comp", "Extend Subscription", "Set Retainer"])
+    sub_tabs = st.tabs(["Change Tier", "Grant Comp", "Extend Subscription", "Set Retainer", "Manage Trial"])
 
     # --- Change User Tier ---
     with sub_tabs[0]:
@@ -576,6 +576,51 @@ def _render_subscription_overrides():
                         st.rerun()
             else:
                 st.info("No organizations.")
+
+    # --- Manage Trial ---
+    with sub_tabs[4]:
+        st.markdown("#### Manage Trial")
+        st.caption("Start, reset, or expire a user's 14-day trial.")
+
+        trial_user = st.selectbox("Select user", usernames, key="admin_trial_user")
+        if trial_user:
+            trial_info = db.get_trial_info(trial_user)
+            trial_user_data = db.get_user_full(trial_user)
+
+            if trial_info and trial_info.get("trial_start_date"):
+                _t_status = "Expired" if trial_info.get("trial_expired") else f"{trial_info.get('days_remaining', 0)} days remaining"
+                st.caption(f"Trial status: **{_t_status}** | Started: {trial_info['trial_start_date'][:10]}")
+            else:
+                st.caption("Trial status: **Never started**")
+
+            _tc1, _tc2, _tc3 = st.columns(3)
+            with _tc1:
+                if st.button("Start / Reset Trial", key="admin_start_trial"):
+                    db.set_trial_start(trial_user)
+                    db.update_user_fields(trial_user, trial_expired=False if db.is_postgres() else 0,
+                                          subscription_status='active')
+                    # Auto-load sample brand if not present
+                    if not db.has_sample_brand(trial_user):
+                        db.load_sample_brand(trial_user)
+                    db.log_admin_action(_admin_user(), "trial_started", "subscription", trial_user,
+                                        {"action": "start_reset"})
+                    st.success(f"14-day trial started for {trial_user}.")
+                    st.rerun()
+            with _tc2:
+                if st.button("Expire Trial Now", key="admin_expire_trial"):
+                    db.expire_trial(trial_user)
+                    db.log_admin_action(_admin_user(), "trial_expired", "subscription", trial_user,
+                                        {"action": "manual_expire"})
+                    st.success(f"Trial expired for {trial_user}.")
+                    st.rerun()
+            with _tc3:
+                if st.button("Clear Trial State", key="admin_clear_trial"):
+                    db.update_user_fields(trial_user, trial_start_date=None,
+                                          trial_expired=False if db.is_postgres() else 0)
+                    db.log_admin_action(_admin_user(), "trial_cleared", "subscription", trial_user,
+                                        {"action": "clear"})
+                    st.success(f"Trial state cleared for {trial_user}.")
+                    st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

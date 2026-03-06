@@ -8,33 +8,33 @@ from __future__ import annotations
 TIER_CONFIG = {
     "solo": {
         "display_name": "Solo",
-        "price_monthly_usd": 50,
+        "price_monthly_usd": 49.99,
         "max_brands": 3,
         "max_seats": 1,  # Solo user is automatic super-user of their account
         "modules": ["content_generator", "social_assistant", "copy_editor", "visual_audit"],
         "monthly_ai_actions": 200,
         "visual_audit_action_weight": 3,  # Each Visual Audit counts as 3 AI actions
-        "lemon_squeezy_variant_ids": [1304018],
+        "lemon_squeezy_variant_ids": [1357832],
     },
     "agency": {
         "display_name": "Agency",
-        "price_monthly_usd": 250,
+        "price_monthly_usd": 299.99,
         "max_brands": 10,
         "max_seats": 5,
         "modules": ["content_generator", "social_assistant", "copy_editor", "visual_audit"],
         "monthly_ai_actions": 800,
         "visual_audit_action_weight": 3,
-        "lemon_squeezy_variant_ids": [1304027],
+        "lemon_squeezy_variant_ids": [1357830],
     },
     "enterprise": {
         "display_name": "Enterprise",
-        "price_monthly_usd": 500,
+        "price_monthly_usd": 499.99,
         "max_brands": -1,  # -1 = unlimited
         "max_seats": 10,
         "modules": ["content_generator", "social_assistant", "copy_editor", "visual_audit"],
         "monthly_ai_actions": 1500,
         "visual_audit_action_weight": 3,
-        "lemon_squeezy_variant_ids": [1303961],
+        "lemon_squeezy_variant_ids": [1357831],
     },
     "retainer": {
         # Retainer clients map to Enterprise. Billing distinction only.

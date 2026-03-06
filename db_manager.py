@@ -238,6 +238,10 @@ def _run_migrations_postgres(conn):
         ("suspended_at", "TIMESTAMP DEFAULT NULL"),
         ("suspended_reason", "TEXT DEFAULT NULL"),
         ("suspended_by", "TEXT DEFAULT NULL"),
+        ("trial_start_date", "TIMESTAMP DEFAULT NULL"),
+        ("trial_expired", "BOOLEAN DEFAULT FALSE"),
+        ("renews_at", "TIMESTAMP DEFAULT NULL"),
+        ("ends_at", "TIMESTAMP DEFAULT NULL"),
     ]
     for col_name, col_def in new_user_cols:
         if col_name not in user_columns:
@@ -246,6 +250,19 @@ def _run_migrations_postgres(conn):
                 conn.commit()
             except Exception:
                 conn.rollback()
+
+    # Create password_reset_tokens table
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
 
     # Add is_sample_brand to profiles
     profile_columns = _get_existing_columns_pg(conn, 'profiles')
@@ -370,6 +387,10 @@ def _run_migrations_sqlite(conn):
         ("suspended_at", "TIMESTAMP DEFAULT NULL"),
         ("suspended_reason", "TEXT DEFAULT NULL"),
         ("suspended_by", "TEXT DEFAULT NULL"),
+        ("trial_start_date", "TIMESTAMP DEFAULT NULL"),
+        ("trial_expired", "BOOLEAN DEFAULT 0"),
+        ("renews_at", "TIMESTAMP DEFAULT NULL"),
+        ("ends_at", "TIMESTAMP DEFAULT NULL"),
     ]
     for col_name, col_def in new_user_cols:
         if col_name not in user_columns:
@@ -377,6 +398,17 @@ def _run_migrations_sqlite(conn):
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
             except sqlite3.OperationalError:
                 pass
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
 
     cursor = conn.execute("PRAGMA table_info(profiles)")
     profile_columns = {row[1] if not isinstance(row, dict) else row['name'] for row in cursor.fetchall()}
@@ -1030,6 +1062,123 @@ def reset_user_password(username, new_password):
         _execute_plain(conn, _q("UPDATE users SET password_hash = ? WHERE username = ?"), (hashed, username))
         conn.commit()
         return True
+    finally:
+        conn.close()
+
+
+# ── Password Reset Tokens ────────────────────────────────────────────────────
+
+def create_reset_token(username):
+    """Create a password reset token (1-hour expiry). Returns token string."""
+    import secrets
+    from datetime import timedelta
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.now() + timedelta(hours=1)).isoformat()
+    conn = _get_connection()
+    try:
+        # Invalidate any existing unused tokens for this user
+        _used_true = "TRUE" if is_postgres() else "1"
+        _used_false = "FALSE" if is_postgres() else "0"
+        _execute_plain(conn, _q(
+            f"UPDATE password_reset_tokens SET used = {_used_true} WHERE username = ? AND used = {_used_false}"
+        ), (username,))
+        _execute_plain(conn, _q(
+            "INSERT INTO password_reset_tokens (username, token, expires_at) VALUES (?, ?, ?)"
+        ), (username, token, expires_at))
+        conn.commit()
+        return token
+    finally:
+        conn.close()
+
+
+def validate_reset_token(token):
+    """Check if a reset token is valid. Returns username or None."""
+    conn = _get_connection()
+    try:
+        _used_false = "FALSE" if is_postgres() else "0"
+        row = _execute_plain(conn, _q(
+            f"SELECT username, expires_at FROM password_reset_tokens WHERE token = ? AND used = {_used_false}"
+        ), (token,)).fetchone()
+        if not row:
+            return None
+        username = row['username'] if isinstance(row, dict) else row[0]
+        expires_at_str = row['expires_at'] if isinstance(row, dict) else row[1]
+        try:
+            expires_at = datetime.fromisoformat(str(expires_at_str).replace('Z', ''))
+            if datetime.now() > expires_at:
+                return None
+        except (ValueError, TypeError):
+            return None
+        return username
+    finally:
+        conn.close()
+
+
+def consume_reset_token(token):
+    """Mark a reset token as used. Returns True on success."""
+    conn = _get_connection()
+    try:
+        _used_true = "TRUE" if is_postgres() else "1"
+        _execute_plain(conn, _q(
+            f"UPDATE password_reset_tokens SET used = {_used_true} WHERE token = ?"
+        ), (token,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+# ── Trial Management ─────────────────────────────────────────────────────────
+
+def set_trial_start(username):
+    """Set the trial start date for a new user."""
+    conn = _get_connection()
+    try:
+        _execute_plain(conn, _q(
+            "UPDATE users SET trial_start_date = ?, subscription_status = 'active' WHERE username = ?"
+        ), (datetime.now().isoformat(), username))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_trial_info(username):
+    """Returns dict with trial_start_date, trial_expired, days_remaining."""
+    conn = _get_connection()
+    try:
+        row = _execute_plain(conn, _q(
+            "SELECT trial_start_date, trial_expired FROM users WHERE username = ?"
+        ), (username,)).fetchone()
+        if not row:
+            return None
+        tsd = row['trial_start_date'] if isinstance(row, dict) else row[0]
+        te = row['trial_expired'] if isinstance(row, dict) else row[1]
+        if not tsd:
+            return {"trial_start_date": None, "trial_expired": bool(te), "days_remaining": 0}
+        try:
+            start = datetime.fromisoformat(str(tsd).replace('Z', ''))
+            elapsed = (datetime.now() - start).days
+            remaining = max(0, 14 - elapsed)
+            return {
+                "trial_start_date": str(tsd),
+                "trial_expired": bool(te) or remaining <= 0,
+                "days_remaining": remaining,
+            }
+        except (ValueError, TypeError):
+            return {"trial_start_date": None, "trial_expired": bool(te), "days_remaining": 0}
+    finally:
+        conn.close()
+
+
+def expire_trial(username):
+    """Mark a user's trial as expired."""
+    _used_true = "TRUE" if is_postgres() else "1"
+    conn = _get_connection()
+    try:
+        _execute_plain(conn, _q(
+            f"UPDATE users SET trial_expired = {_used_true}, subscription_status = 'inactive' WHERE username = ?"
+        ), (username,))
+        conn.commit()
     finally:
         conn.close()
 

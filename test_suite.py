@@ -342,8 +342,8 @@ def test_tier_solo():
     issues = []
     if solo["max_brands"] != 3:
         issues.append(f"max_brands={solo['max_brands']}, expected 3")
-    if 1304018 not in solo["lemon_squeezy_variant_ids"]:
-        issues.append(f"variant_id 1304018 not in {solo['lemon_squeezy_variant_ids']}")
+    if 1357832 not in solo["lemon_squeezy_variant_ids"]:
+        issues.append(f"variant_id 1357832 not in {solo['lemon_squeezy_variant_ids']}")
     if solo["monthly_ai_actions"] != 200:
         issues.append(f"monthly_ai_actions={solo['monthly_ai_actions']}, expected 200")
     return "; ".join(issues) if issues else True
@@ -357,8 +357,8 @@ def test_tier_agency():
     issues = []
     if agency["max_brands"] != 10:
         issues.append(f"max_brands={agency['max_brands']}, expected 10")
-    if 1304027 not in agency["lemon_squeezy_variant_ids"]:
-        issues.append(f"variant_id 1304027 not in {agency['lemon_squeezy_variant_ids']}")
+    if 1357830 not in agency["lemon_squeezy_variant_ids"]:
+        issues.append(f"variant_id 1357830 not in {agency['lemon_squeezy_variant_ids']}")
     if agency["monthly_ai_actions"] != 800:
         issues.append(f"monthly_ai_actions={agency['monthly_ai_actions']}, expected 800")
     return "; ".join(issues) if issues else True
@@ -372,8 +372,8 @@ def test_tier_enterprise():
     issues = []
     if ent["max_brands"] != -1:
         issues.append(f"max_brands={ent['max_brands']}, expected -1 (unlimited)")
-    if 1303961 not in ent["lemon_squeezy_variant_ids"]:
-        issues.append(f"variant_id 1303961 not in {ent['lemon_squeezy_variant_ids']}")
+    if 1357831 not in ent["lemon_squeezy_variant_ids"]:
+        issues.append(f"variant_id 1357831 not in {ent['lemon_squeezy_variant_ids']}")
     if ent["monthly_ai_actions"] != 1500:
         issues.append(f"monthly_ai_actions={ent['monthly_ai_actions']}, expected 1500")
     return "; ".join(issues) if issues else True
@@ -1148,7 +1148,7 @@ def test_unsuspension_clears_fields():
 def test_suspension_survives_status_update():
     import db_manager as db
     db.suspend_user("suspendme", "Test reason", "admin")
-    db.set_user_subscription("suspendme", "solo", "active", "ls_123", "1304018")
+    db.set_user_subscription("suspendme", "solo", "active", "ls_123", "1357832")
     is_susp, reason = db.is_user_suspended("suspendme")
     if not is_susp:
         return "Suspension cleared by subscription update"
@@ -1377,9 +1377,9 @@ def test_webhook_signature_missing_secret():
 def test_webhook_variant_mapping():
     from tier_config import get_tier_from_variant_id
     cases = [
-        (1304018, "solo"),
-        (1304027, "agency"),
-        (1303961, "enterprise"),
+        (1357832, "solo"),
+        (1357830, "agency"),
+        (1357831, "enterprise"),
         (9999999, None),
         (None, None),
         ("garbage", None),
@@ -1416,7 +1416,8 @@ def test_webhook_subscription_created():
         from webhook_handler import _handle_subscription_active
     except ImportError:
         return "webhook_handler import failed"
-    _handle_subscription_active("test@example.com", "agency", "sub_123", "1304027")
+    # Now takes username directly (not email)
+    _handle_subscription_active("testuser1", "agency", "sub_123", "1357830")
     user = db.get_user_full("testuser1")
     if user["subscription_tier"] != "agency":
         return f"Tier not updated: {user['subscription_tier']}"
@@ -1430,10 +1431,10 @@ def test_webhook_subscription_created():
 def test_webhook_subscription_cancelled():
     import db_manager as db
     try:
-        from webhook_handler import _update_user_by_email
+        from webhook_handler import _update_user_subscription
     except ImportError:
         return "webhook_handler import failed"
-    _update_user_by_email("test@example.com", "solo", "cancelled", "sub_123")
+    _update_user_subscription("testuser1", "solo", "cancelled", "sub_123")
     user = db.get_user_full("testuser1")
     if user["subscription_status"] != "cancelled":
         return f"Status not cancelled: {user['subscription_status']}"
@@ -1448,8 +1449,8 @@ def test_webhook_nonexistent_user():
         from webhook_handler import _handle_subscription_active
     except ImportError:
         return "webhook_handler import failed"
-    # Should log warning, not crash
-    _handle_subscription_active("nobody@nowhere.com", "solo", "sub_999", "1304018")
+    # Now takes username directly — None should not crash
+    _handle_subscription_active(None, "solo", "sub_999", "1357832")
     return True
 
 
@@ -1996,6 +1997,89 @@ def test_edge_table_row_counts():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+# CATEGORY 15: Password Reset Tokens & Trial Management
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_password_reset_token_create():
+    """Create a reset token and validate it."""
+    import db_manager as db
+    token = db.create_reset_token("testuser1")
+    if not token or len(token) < 20:
+        return f"Token too short or None: {token}"
+    username = db.validate_reset_token(token)
+    if username != "testuser1":
+        return f"Validation returned {username}, expected testuser1"
+    return True
+
+
+def test_password_reset_token_consume():
+    """Consuming a token makes it invalid."""
+    import db_manager as db
+    token = db.create_reset_token("testuser1")
+    db.consume_reset_token(token)
+    username = db.validate_reset_token(token)
+    if username is not None:
+        return f"Token still valid after consume: {username}"
+    return True
+
+
+def test_password_reset_token_invalid():
+    """Invalid tokens return None."""
+    import db_manager as db
+    result = db.validate_reset_token("bogus_token_12345")
+    if result is not None:
+        return f"Expected None, got {result}"
+    return True
+
+
+def test_trial_set_and_get():
+    """Set trial start date and retrieve trial info."""
+    import db_manager as db
+    db.set_trial_start("testuser1")
+    info = db.get_trial_info("testuser1")
+    if not info:
+        return "get_trial_info returned None"
+    if not info.get("trial_start_date"):
+        return "trial_start_date not set"
+    if info.get("trial_expired"):
+        return "trial_expired should be False"
+    if info.get("days_remaining", 0) <= 0:
+        return f"days_remaining should be >0, got {info.get('days_remaining')}"
+    return True
+
+
+def test_trial_expire():
+    """Expiring a trial marks it as expired."""
+    import db_manager as db
+    db.set_trial_start("testuser1")
+    db.expire_trial("testuser1")
+    info = db.get_trial_info("testuser1")
+    if not info:
+        return "get_trial_info returned None"
+    if not info.get("trial_expired"):
+        return "trial_expired should be True after expire_trial()"
+    # Reset for other tests
+    db.update_user_fields("testuser1", trial_start_date=None, trial_expired=0)
+    return True
+
+
+def test_password_reset_tokens_table():
+    """Verify password_reset_tokens table exists."""
+    import db_manager as db
+    conn = db._get_connection()
+    try:
+        tables = set()
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall():
+            name = row['name'] if isinstance(row, dict) else row[0]
+            tables.add(name)
+        if 'password_reset_tokens' not in tables:
+            return f"password_reset_tokens table missing. Tables: {tables}"
+        return True
+    finally:
+        conn.close()
+
+
 # Report Generation
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -2383,6 +2467,18 @@ def main():
     run_test("Cat 14: Table row counts", test_edge_table_row_counts)
     cat14_pass = sum(1 for s,_,_ in results[cat14_start:] if s=='PASS')
     print(f"  {cat14_pass}/{len(results)-cat14_start} passed")
+
+    # ── Category 15: Password Reset & Trial ──
+    print("Category 15: Password Reset & Trial Management...")
+    cat15_start = len(results)
+    run_test("Cat 15: password_reset_tokens table", test_password_reset_tokens_table)
+    run_test("Cat 15: Create and validate reset token", test_password_reset_token_create)
+    run_test("Cat 15: Consume reset token", test_password_reset_token_consume)
+    run_test("Cat 15: Invalid token returns None", test_password_reset_token_invalid)
+    run_test("Cat 15: Set and get trial info", test_trial_set_and_get)
+    run_test("Cat 15: Expire trial", test_trial_expire)
+    cat15_pass = sum(1 for s,_,_ in results[cat15_start:] if s=='PASS')
+    print(f"  {cat15_pass}/{len(results)-cat15_start} passed")
 
     # Cleanup
     print("\nCleaning up test database...")

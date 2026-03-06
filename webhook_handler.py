@@ -39,11 +39,33 @@ def _find_username_by_email(email: str) -> str | None:
     return db.get_user_by_email(email)
 
 
-def _handle_subscription_active(email: str, tier_key: str, sub_id: str, variant_id: str):
+def _resolve_username(email: str, payload: dict) -> str | None:
+    """Resolve username from custom_data.user_id first, then email fallback."""
+    custom_data = payload.get("meta", {}).get("custom_data", {})
+    user_id = custom_data.get("user_id")
+    if user_id:
+        user = db.get_user_full(user_id)
+        if user:
+            return user_id
+    return _find_username_by_email(email)
+
+
+def _store_subscription_dates(username: str, attrs: dict):
+    """Store renews_at and ends_at from subscription attributes."""
+    renews_at = attrs.get("renews_at")
+    ends_at = attrs.get("ends_at")
+    updates = {}
+    if renews_at:
+        updates["renews_at"] = renews_at
+    if ends_at:
+        updates["ends_at"] = ends_at
+    if updates:
+        db.update_user_fields(username, **updates)
+
+
+def _handle_subscription_active(username: str, tier_key: str, sub_id: str, variant_id: str, attrs: dict = None):
     """Set user to active status for the resolved tier."""
-    username = _find_username_by_email(email)
     if not username:
-        logger.warning(f"Webhook: no user found for email {email!r}")
         return
     # Capture old tier for analytics
     old_user = db.get_user_full(username)
@@ -51,6 +73,15 @@ def _handle_subscription_active(email: str, tier_key: str, sub_id: str, variant_
 
     db.set_user_subscription(username, tier_key, "active", sub_id, variant_id)
     logger.info(f"Webhook: activated {username!r} → tier={tier_key!r}")
+
+    # Store subscription period dates
+    if attrs:
+        _store_subscription_dates(username, attrs)
+
+    # Clear trial expired flag if they subscribe
+    trial_info = db.get_trial_info(username)
+    if trial_info and trial_info.get("trial_expired"):
+        db.update_user_fields(username, trial_expired=False if db.is_postgres() else 0)
 
     # Analytics: subscription changed
     if old_tier != tier_key:
@@ -60,13 +91,13 @@ def _handle_subscription_active(email: str, tier_key: str, sub_id: str, variant_
         })
 
 
-def _update_user_by_email(email: str, tier_key: str, status: str, sub_id: str):
-    """Update subscription status for user found by email."""
-    username = _find_username_by_email(email)
+def _update_user_subscription(username: str, tier_key: str, status: str, sub_id: str, attrs: dict = None):
+    """Update subscription status for a resolved user."""
     if not username:
-        logger.warning(f"Webhook: no user found for email {email!r}")
         return
     db.set_user_subscription(username, tier_key, status, sub_id)
+    if attrs:
+        _store_subscription_dates(username, attrs)
     logger.info(f"Webhook: updated {username!r} → tier={tier_key!r}, status={status!r}")
 
 
@@ -93,35 +124,42 @@ async def handle_ls_webhook(request: Request):
 
     tier_key = get_tier_from_variant_id(variant_id) or "solo"
 
-    logger.info(f"Webhook event: {event!r} | email={email!r} | tier={tier_key!r}")
+    # Resolve username: custom_data.user_id first, then email lookup
+    username = _resolve_username(email, payload)
+
+    logger.info(f"Webhook event: {event!r} | email={email!r} | user={username!r} | tier={tier_key!r}")
+
+    if not username:
+        logger.warning(f"Webhook: no user found for email={email!r}, event={event!r}")
+        return {"status": "ok", "note": "user_not_found"}
 
     if event == "subscription_created":
-        _handle_subscription_active(email, tier_key, sub_id, str(variant_id))
+        _handle_subscription_active(username, tier_key, sub_id, str(variant_id), attrs)
     elif event == "subscription_updated":
-        _handle_subscription_active(email, tier_key, sub_id, str(variant_id))
+        _handle_subscription_active(username, tier_key, sub_id, str(variant_id), attrs)
     elif event == "subscription_cancelled":
         # Analytics: capture tenure and actions before updating status
-        _cancel_user = _find_username_by_email(email)
-        if _cancel_user:
-            _cancel_data = db.get_user_full(_cancel_user)
-            _tenure_days = 0
-            if _cancel_data and _cancel_data.get('created_at'):
-                try:
-                    _signup = datetime.fromisoformat(_cancel_data['created_at'].replace('Z', ''))
-                    _tenure_days = (datetime.now() - _signup).days
-                except (ValueError, TypeError):
-                    pass
-            _total_actions = db.get_monthly_usage_user(_cancel_user, datetime.now().strftime("%Y-%m"))
-            db.track_event("subscription_cancelled", _cancel_user, metadata={
-                "tier": tier_key,
-                "tenure_days": _tenure_days,
-                "total_actions": _total_actions,
-            })
-        _update_user_by_email(email, tier_key, "cancelled", sub_id)
+        _cancel_data = db.get_user_full(username)
+        _tenure_days = 0
+        if _cancel_data and _cancel_data.get('created_at'):
+            try:
+                _signup = datetime.fromisoformat(_cancel_data['created_at'].replace('Z', ''))
+                _tenure_days = (datetime.now() - _signup).days
+            except (ValueError, TypeError):
+                pass
+        _total_actions = db.get_monthly_usage_user(username, datetime.now().strftime("%Y-%m"))
+        db.track_event("subscription_cancelled", username, metadata={
+            "tier": tier_key,
+            "tenure_days": _tenure_days,
+            "total_actions": _total_actions,
+        })
+        _update_user_subscription(username, tier_key, "cancelled", sub_id, attrs)
     elif event == "subscription_payment_failed":
-        _update_user_by_email(email, tier_key, "past_due", sub_id)
+        # Grace period: set to past_due, don't lock immediately
+        _update_user_subscription(username, tier_key, "past_due", sub_id, attrs)
+        logger.info(f"Webhook: payment failed for {username!r} — set to past_due (grace period)")
     elif event == "subscription_resumed":
-        _handle_subscription_active(email, tier_key, sub_id, str(variant_id))
+        _handle_subscription_active(username, tier_key, sub_id, str(variant_id), attrs)
     else:
         logger.info(f"Webhook: unhandled event {event!r}, ignoring")
 
