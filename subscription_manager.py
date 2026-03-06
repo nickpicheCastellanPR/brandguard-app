@@ -259,20 +259,20 @@ def check_trial_expired(username: str) -> bool:
 
 LS_STORE_SLUG = "castellanpr"
 
-# Variant IDs for each tier (must match tier_config.py)
-_CHECKOUT_VARIANTS = {
-    "solo": 1357832,
-    "agency": 1357830,
-    "enterprise": 1357831,
+# Checkout UUIDs for each tier (from Lemon Squeezy "Share" links)
+_CHECKOUT_UUIDS = {
+    "solo": "d3b3d890-440f-4fee-86d6-50cb9c12451a",
+    "agency": "b055d34d-12b2-4dec-bd86-d3714b352d80",
+    "enterprise": "050b71c0-aac7-4748-b519-68ffb52fc9d5",
 }
 
 
 def get_checkout_url(tier_key: str, username: str, email: str = "") -> str | None:
     """Build a Lemon Squeezy checkout URL with custom data passthrough."""
-    variant_id = _CHECKOUT_VARIANTS.get(tier_key)
-    if not variant_id:
+    checkout_uuid = _CHECKOUT_UUIDS.get(tier_key)
+    if not checkout_uuid:
         return None
-    base = f"https://{LS_STORE_SLUG}.lemonsqueezy.com/checkout/buy/{variant_id}"
+    base = f"https://{LS_STORE_SLUG}.lemonsqueezy.com/checkout/buy/{checkout_uuid}"
     params = f"?checkout[custom][user_id]={username}"
     if email:
         params += f"&checkout[email]={email}"
