@@ -731,8 +731,9 @@ def has_sample_brand(username):
     conn = _get_connection()
     try:
         org_id = _resolve_org_id(conn, username)
+        _true_val = "TRUE" if is_postgres() else "1"
         result = _execute_plain(
-            conn, _q("SELECT id FROM profiles WHERE org_id = ? AND is_sample_brand = 1"),
+            conn, _q(f"SELECT id FROM profiles WHERE org_id = ? AND is_sample_brand = {_true_val}"),
             (org_id,)).fetchone()
         return result is not None
     finally:
@@ -744,8 +745,9 @@ def delete_sample_brand(username):
     conn = _get_connection()
     try:
         org_id = _resolve_org_id(conn, username)
+        _true_val = "TRUE" if is_postgres() else "1"
         _execute_plain(
-            conn, _q("DELETE FROM profiles WHERE org_id = ? AND is_sample_brand = 1"),
+            conn, _q(f"DELETE FROM profiles WHERE org_id = ? AND is_sample_brand = {_true_val}"),
             (org_id,))
         conn.commit()
     finally:
@@ -891,8 +893,9 @@ def count_user_brands(org_id, exclude_sample=True):
     conn = _get_connection()
     try:
         if exclude_sample:
+            _false_val = "FALSE" if is_postgres() else "0"
             count = _fetchone_val(_execute_plain(
-                conn, _q("SELECT COUNT(*) FROM profiles WHERE org_id = ? AND (is_sample_brand = 0 OR is_sample_brand IS NULL)"),
+                conn, _q(f"SELECT COUNT(*) FROM profiles WHERE org_id = ? AND (is_sample_brand = {_false_val} OR is_sample_brand IS NULL)"),
                 (org_id,)), 0)
         else:
             count = _fetchone_val(_execute_plain(
@@ -1423,7 +1426,7 @@ def get_usage_analytics(billing_month=None):
                 LEFT JOIN (
                     SELECT username, SUM(action_weight) as total_actions
                     FROM usage_tracking
-                    WHERE billing_month = ? AND (is_impersonated = 0 OR is_impersonated IS NULL)
+                    WHERE billing_month = ? AND (is_impersonated = {"FALSE" if is_postgres() else "0"} OR is_impersonated IS NULL)
                     GROUP BY username
                 ) curr ON u.username = curr.username
                 LEFT JOIN (
@@ -1840,9 +1843,10 @@ def get_calibration_distribution():
     """Returns calibration score distribution across all non-sample brands."""
     conn = _get_connection()
     try:
-        rows = _execute_plain(conn, """
+        _false_val = "FALSE" if is_postgres() else "0"
+        rows = _execute_plain(conn, f"""
             SELECT data FROM profiles
-            WHERE is_sample_brand = 0 OR is_sample_brand IS NULL
+            WHERE is_sample_brand = {_false_val} OR is_sample_brand IS NULL
         """).fetchall()
 
         buckets = {"0-25": 0, "26-50": 0, "51-75": 0, "76-100": 0}
@@ -1904,9 +1908,10 @@ def get_profile_completion_stats():
     """Returns profile completion breakdown across all non-sample brands."""
     conn = _get_connection()
     try:
-        rows = _execute_plain(conn, """
+        _false_val = "FALSE" if is_postgres() else "0"
+        rows = _execute_plain(conn, f"""
             SELECT data FROM profiles
-            WHERE is_sample_brand = 0 OR is_sample_brand IS NULL
+            WHERE is_sample_brand = {_false_val} OR is_sample_brand IS NULL
         """).fetchall()
 
         total = len(rows)
