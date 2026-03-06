@@ -105,8 +105,8 @@ def _render_user_management():
             "Flags": " | ".join(flags) if flags else "",
             "Brands": brand_count,
             "Actions (Mo)": usage,
-            "Last Login": (u.get('last_login') or 'Never')[:16],
-            "Created": (u.get('created_at') or 'Unknown')[:10],
+            "Last Login": str(u.get('last_login') or 'Never')[:16],
+            "Created": str(u.get('created_at') or 'Unknown')[:10],
         })
 
     if rows:
