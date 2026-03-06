@@ -273,7 +273,7 @@ def _render_user_management():
                 f'padding:10px; margin:8px 0; font-size:0.85rem;">'
                 f'<strong style="color:#a6784d;">SUSPENDED</strong> '
                 f'by {susp_data.get("suspended_by", "unknown")} '
-                f'on {(susp_data.get("suspended_at") or "")[:16]}<br>'
+                f'on {str(susp_data.get("suspended_at") or "")[:16]}<br>'
                 f'<em>Reason: {susp_data.get("suspended_reason", "No reason given")}</em></div>',
                 unsafe_allow_html=True
             )
@@ -330,7 +330,7 @@ def _render_org_management():
             "Owner": o.get('owner_username', ''),
             "Members": f"{member_count}/{tier['max_seats'] if tier['max_seats'] != -1 else 'Unlimited'}",
             "Brands": f"{brand_count}/{tier['max_brands'] if tier['max_brands'] != -1 else 'Unlimited'}",
-            "Created": (o.get('created_at') or '')[:10],
+            "Created": str(o.get('created_at') or '')[:10],
         })
 
     if rows:
@@ -589,7 +589,7 @@ def _render_subscription_overrides():
 
             if trial_info and trial_info.get("trial_start_date"):
                 _t_status = "Expired" if trial_info.get("trial_expired") else f"{trial_info.get('days_remaining', 0)} days remaining"
-                st.caption(f"Trial status: **{_t_status}** | Started: {trial_info['trial_start_date'][:10]}")
+                st.caption(f"Trial status: **{_t_status}** | Started: {str(trial_info['trial_start_date'])[:10]}")
             else:
                 st.caption("Trial status: **Never started**")
 
@@ -897,7 +897,7 @@ def _render_audit_log():
         rows = []
         for log in logs:
             rows.append({
-                "Timestamp": (log.get('timestamp') or '')[:19],
+                "Timestamp": str(log.get('timestamp') or '')[:19],
                 "Admin": log.get('admin_username', ''),
                 "Action": log.get('action_type', ''),
                 "Target Type": log.get('target_type', ''),
