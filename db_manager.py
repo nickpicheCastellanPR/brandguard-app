@@ -1212,8 +1212,9 @@ def suspend_user(username, reason, admin_username):
             tier = row['subscription_tier'] if isinstance(row, dict) else row[0]
         if tier == "super_admin":
             return False
+        _suspended_true = "TRUE" if is_postgres() else "1"
         _execute_plain(conn, _q(
-            "UPDATE users SET is_suspended = 1, suspended_at = ?, suspended_reason = ?, suspended_by = ? WHERE username = ?"),
+            f"UPDATE users SET is_suspended = {_suspended_true}, suspended_at = ?, suspended_reason = ?, suspended_by = ? WHERE username = ?"),
             (datetime.now().isoformat(), reason, admin_username, username))
         conn.commit()
         return True
@@ -1225,8 +1226,9 @@ def unsuspend_user(username):
     """Unsuspend a user account. Returns True on success."""
     conn = _get_connection()
     try:
+        _suspended_false = "FALSE" if is_postgres() else "0"
         _execute_plain(conn, _q(
-            "UPDATE users SET is_suspended = 0, suspended_at = NULL, suspended_reason = NULL, suspended_by = NULL WHERE username = ?"),
+            f"UPDATE users SET is_suspended = {_suspended_false}, suspended_at = NULL, suspended_reason = NULL, suspended_by = NULL WHERE username = ?"),
             (username,))
         conn.commit()
         return True
@@ -1491,7 +1493,7 @@ def record_usage_action_impersonated(username, org_id, module, action_weight, bi
     try:
         _execute_plain(conn, _q('''
             INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month, is_impersonated, action_detail)
-            VALUES (?, ?, ?, ?, ?, 1, ?)
+            VALUES (?, ?, ?, ?, ?, {"TRUE" if is_postgres() else "1"}, ?)
         '''), (username, org_id, module, action_weight, billing_month, action_detail))
         conn.commit()
     finally:
@@ -2059,7 +2061,7 @@ def get_inactive_user_diagnostics(days_threshold=14):
                 org = org_val if org_val else username
 
             profiles = _execute_plain(
-                conn, _q("SELECT data FROM profiles WHERE org_id=? AND (is_sample_brand=0 OR is_sample_brand IS NULL)"),
+                conn, _q(f"SELECT data FROM profiles WHERE org_id=? AND (is_sample_brand={'FALSE' if is_postgres() else '0'} OR is_sample_brand IS NULL)"),
                 (org,)).fetchall()
 
             max_confidence = 0
