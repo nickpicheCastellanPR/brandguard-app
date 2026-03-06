@@ -5519,12 +5519,12 @@ if app_mode == "TEAM MANAGEMENT":
                                 st.warning("Cannot demote last admin")
                             else:
                                 if st.button(f"Demote to Member", key=f"demote_{idx}"):
-                                    db.update_user_fields(username, is_admin=0)
+                                    db.update_user_fields(username, is_admin=False)
                                     st.success(f"{username} demoted to Member")
                                     st.rerun()
                         else:
                             if st.button(f"Promote to Admin", key=f"promote_{idx}"):
-                                db.update_user_fields(username, is_admin=1)
+                                db.update_user_fields(username, is_admin=True)
                                 st.success(f"{username} promoted to Admin")
                                 st.rerun()
                     

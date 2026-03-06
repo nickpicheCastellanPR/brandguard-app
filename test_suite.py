@@ -467,11 +467,11 @@ def test_set_super_admin():
 
 def test_set_beta_tester():
     import db_manager as db
-    db.update_user_fields("testuser1", is_beta_tester=1)
+    db.update_user_fields("testuser1", is_beta_tester=True)
     user = db.get_user_full("testuser1")
     if not user["is_beta_tester"]:
         return f"is_beta_tester not set: {user['is_beta_tester']}"
-    db.update_user_fields("testuser1", is_beta_tester=0)
+    db.update_user_fields("testuser1", is_beta_tester=False)
     return True
 
 
@@ -2060,7 +2060,7 @@ def test_trial_expire():
     if not info.get("trial_expired"):
         return "trial_expired should be True after expire_trial()"
     # Reset for other tests
-    db.update_user_fields("testuser1", trial_start_date=None, trial_expired=0)
+    db.update_user_fields("testuser1", trial_start_date=None, trial_expired=False)
     return True
 
 

@@ -716,9 +716,10 @@ def load_sample_brand(username):
             return False
 
         data_json = json.dumps(SAMPLE_BRAND["profile_data"])
-        _execute_plain(conn, _q('''
+        _sample_true = "TRUE" if is_postgres() else "1"
+        _execute_plain(conn, _q(f'''
             INSERT INTO profiles (org_id, name, data, created_at, updated_by, is_sample_brand)
-            VALUES (?, ?, ?, ?, ?, 1)
+            VALUES (?, ?, ?, ?, ?, {_sample_true})
         '''), (org_id, profile_name, data_json, datetime.now().isoformat(), username))
         conn.commit()
         return True
@@ -1428,7 +1429,7 @@ def get_usage_analytics(billing_month=None):
                 LEFT JOIN (
                     SELECT username, SUM(action_weight) as total_actions
                     FROM usage_tracking
-                    WHERE billing_month = ? AND (is_impersonated = {"FALSE" if is_postgres() else "0"} OR is_impersonated IS NULL)
+                    WHERE billing_month = ? AND (is_impersonated = 0 OR is_impersonated IS NULL)
                     GROUP BY username
                 ) curr ON u.username = curr.username
                 LEFT JOIN (
@@ -1491,9 +1492,10 @@ def record_usage_action_impersonated(username, org_id, module, action_weight, bi
     """Records an AI action flagged as impersonated (does not count toward soft cap)."""
     conn = _get_connection()
     try:
-        _execute_plain(conn, _q('''
+        _imp_true = "TRUE" if is_postgres() else "1"
+        _execute_plain(conn, _q(f'''
             INSERT INTO usage_tracking (username, org_id, module, action_weight, billing_month, is_impersonated, action_detail)
-            VALUES (?, ?, ?, ?, ?, {"TRUE" if is_postgres() else "1"}, ?)
+            VALUES (?, ?, ?, ?, ?, {_imp_true}, ?)
         '''), (username, org_id, module, action_weight, billing_month, action_detail))
         conn.commit()
     finally:
