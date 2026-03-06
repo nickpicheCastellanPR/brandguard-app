@@ -532,8 +532,9 @@ def check_seat_availability(org_id):
     try:
         current_count = _fetchone_val(
             _execute_plain(conn, _q("SELECT COUNT(*) FROM users WHERE org_id = ?"), (org_id,)), 0)
+        _admin_true = "TRUE" if is_postgres() else "1"
         result = _execute_plain(
-            conn, _q("SELECT subscription_status FROM users WHERE org_id = ? AND is_admin = 1"),
+            conn, _q(f"SELECT subscription_status FROM users WHERE org_id = ? AND is_admin = {_admin_true}"),
             (org_id,)).fetchone()
         status = "trial"
         if result:
@@ -874,8 +875,9 @@ def get_org_tier(org_id):
             conn, _q("SELECT subscription_tier FROM organizations WHERE org_id = ?"), (org_id,)).fetchone()
         if row:
             return row['subscription_tier'] if isinstance(row, dict) else row[0]
+        _admin_true = "TRUE" if is_postgres() else "1"
         result = _execute_plain(
-            conn, _q("SELECT subscription_tier FROM users WHERE org_id = ? AND is_admin = 1"),
+            conn, _q(f"SELECT subscription_tier FROM users WHERE org_id = ? AND is_admin = {_admin_true}"),
             (org_id,)).fetchone()
         if result:
             return result['subscription_tier'] if isinstance(result, dict) else result[0]
