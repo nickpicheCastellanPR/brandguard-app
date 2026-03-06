@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import db_manager as db
 import subscription_manager as sub_manager
 from tier_config import TIER_CONFIG
+import product_analytics
 
 
 # ── Access check ─────────────────────────────────────────────────────────────
@@ -48,8 +49,8 @@ def render_admin_panel():
 
     tabs = st.tabs([
         "USERS", "ORGANIZATIONS", "SUBSCRIPTIONS",
-        "IMPERSONATION", "ANALYTICS", "AUDIT LOG",
-        "SYSTEM"
+        "IMPERSONATION", "PRODUCT ANALYTICS", "USAGE",
+        "AUDIT LOG", "SYSTEM"
     ])
 
     with tabs[0]:
@@ -61,10 +62,12 @@ def render_admin_panel():
     with tabs[3]:
         _render_impersonation()
     with tabs[4]:
-        _render_usage_analytics()
+        product_analytics.render_product_analytics()
     with tabs[5]:
-        _render_audit_log()
+        _render_usage_analytics()
     with tabs[6]:
+        _render_audit_log()
+    with tabs[7]:
         _render_system_health()
 
 

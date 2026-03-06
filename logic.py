@@ -236,7 +236,8 @@ class SignetLogic:
         if not client:
             raise ValueError("ANTHROPIC_API_KEY environment variable not set")
         self.client = client
-        self.model = "claude-opus-4-6" # Updated to latest stable Sonnet model
+        self.model = "claude-opus-4-6"
+        self._last_usage = None  # Stores {input_tokens, output_tokens} from last API call
 
     def _safe_generate(self, system_msg, user_msg, max_tokens=4000):
         """
@@ -257,10 +258,17 @@ class SignetLogic:
                         "content": user_msg
                     }]
                 )
-                
+
+                # Capture token usage for cost tracking
+                if hasattr(response, 'usage'):
+                    self._last_usage = {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    }
+
                 # Extract text from response
                 return response.content[0].text
-                
+
             except anthropic.RateLimitError:
                 if attempt < max_retries - 1:
                     wait_time = backoff_factor * (2 ** attempt)
@@ -328,10 +336,17 @@ class SignetLogic:
                         "content": content
                     }]
                 )
-                
+
+                # Capture token usage for cost tracking
+                if hasattr(response, 'usage'):
+                    self._last_usage = {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    }
+
                 # Extract text from response
                 return response.content[0].text
-                
+
             except anthropic.RateLimitError:
                 if attempt < max_retries - 1:
                     wait_time = backoff_factor * (2 ** attempt)
@@ -352,7 +367,7 @@ class SignetLogic:
             except Exception as e:
                 print(f"Claude Vision API Error: {e}")
                 return f"Error: {str(e)}"
-        
+
         return "Error: Request timed out after multiple retries."
 
     def _safe_generate_with_search(self, system_msg, user_msg, max_tokens=4000):
@@ -376,6 +391,13 @@ class SignetLogic:
                         "content": user_msg
                     }]
                 )
+
+                # Capture token usage for cost tracking
+                if hasattr(response, 'usage'):
+                    self._last_usage = {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    }
 
                 # Web search responses have mixed block types — extract text from all TextBlocks
                 text_parts = []

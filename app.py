@@ -5,6 +5,7 @@ import re
 import json
 import sqlite3
 import time # Added for Session Expiry
+import uuid
 from logic import SignetLogic
 import db_manager as db
 import subscription_manager as sub_manager
@@ -1144,12 +1145,12 @@ if not st.session_state['authenticated']:
                 if user_data:
                     # 2. SET SESSION STATE
                     st.session_state['authenticated'] = True
-                    st.session_state['user_id'] = user_data['username'] 
+                    st.session_state['user_id'] = user_data['username']
                     st.session_state['username'] = user_data['username']
                     # --- NEW: ORG CONTEXT ---
                     st.session_state['org_id'] = user_data.get('org_id', user_data['username']) # Default to self if no org
                     st.session_state['is_admin'] = user_data['is_admin']
-                    
+
                     # 3. RESOLVE TIER & SYNC SUBSCRIPTION
                     import time as _time
                     user_email = user_data.get('email', '')
@@ -1168,6 +1169,17 @@ if not st.session_state['authenticated']:
 
                     # 4. LOAD PROFILES & RERUN
                     st.session_state['profiles'] = db.get_profiles(user_data['username'])
+
+                    # 5. ANALYTICS: Session start + onboarding milestone
+                    _sid = str(uuid.uuid4())
+                    st.session_state['_analytics_session_id'] = _sid
+                    _org = user_data.get('org_id') or user_data['username']
+                    _brand_count = db.count_user_brands(_org, exclude_sample=True)
+                    db.track_event("session_start", user_data['username'],
+                                   metadata={"tier": tier_config.get('_tier_key', 'solo'),
+                                             "brand_count": _brand_count, "source": "direct"},
+                                   session_id=_sid, org_id=_org)
+
                     st.rerun()
                 else:
                     st.error("Invalid Credentials")
@@ -1218,6 +1230,10 @@ if not st.session_state['authenticated']:
             if st.button("CREATE ACCOUNT", width="stretch"):
                 # Create user as Admin of their new Org
                 if db.create_user(r_user, r_email, r_pass, org_id=r_org, is_admin=True):
+                    # Analytics: registration + onboarding milestone
+                    db.track_event("user_registered", r_user,
+                                   metadata={"source": "direct"}, org_id=r_org)
+                    db.check_milestone(r_user, "account_created", org_id=r_org)
                     st.success(f"Account created! You are the Admin of {r_org}. Please log in.")
                 else:
                     st.error("Username already taken.")
@@ -1518,6 +1534,17 @@ with st.sidebar:
 # --- BRIDGE VARIABLES ---
 app_mode = st.session_state.get('app_mode', 'DASHBOARD')
 active_profile = st.session_state.get('active_profile_name')
+
+# --- ANALYTICS: Debounced page_view tracking ---
+if st.session_state.get('_last_tracked_page') != app_mode:
+    _pa_user = st.session_state.get('username')
+    _pa_sid = st.session_state.get('_analytics_session_id')
+    if _pa_user and _pa_sid:
+        db.track_event("page_view", _pa_user,
+                       metadata={"page": app_mode},
+                       session_id=_pa_sid,
+                       org_id=st.session_state.get('org_id'))
+    st.session_state['_last_tracked_page'] = app_mode
         
 def _get_tier_key() -> str:
     return st.session_state.get('tier', {}).get('_tier_key', 'solo')
@@ -1528,6 +1555,48 @@ def _is_super_admin() -> bool:
 
 def _subscription_active() -> bool:
     return st.session_state.get('subscription_status', 'inactive') == 'active'
+
+
+def _track_module_and_cost(module_name, metadata_extra=None):
+    """Fire module_action and api_cost events after an AI module action."""
+    try:
+        _user = st.session_state.get('username', '')
+        _sid = st.session_state.get('_analytics_session_id')
+        _org = st.session_state.get('org_id')
+        _profiles = st.session_state.get('profiles', {})
+        _active = st.session_state.get('active_profile_name')
+        _cal = 0
+        if _active and _active in _profiles:
+            _p = _profiles[_active]
+            if isinstance(_p, dict):
+                _cal = _p.get('calibration_score', 0)
+
+        meta = {"module": module_name, "engine_confidence": _cal}
+        if metadata_extra:
+            meta.update(metadata_extra)
+        db.track_event("module_action", _user, metadata=meta,
+                       session_id=_sid, org_id=_org)
+
+        # Onboarding: first module run
+        db.check_milestone(_user, "first_module_run", session_id=_sid, org_id=_org)
+
+        # API cost tracking from logic engine
+        usage = logic_engine._last_usage
+        if usage:
+            cost = db.estimate_api_cost(
+                usage['input_tokens'], usage['output_tokens'],
+                model=logic_engine.model
+            )
+            db.track_event("api_cost", _user, metadata={
+                "module": module_name,
+                "model": logic_engine.model,
+                "input_tokens": usage['input_tokens'],
+                "output_tokens": usage['output_tokens'],
+                "estimated_cost_usd": cost,
+            }, session_id=_sid, org_id=_org)
+            logic_engine._last_usage = None
+    except Exception:
+        pass  # Tracking never breaks the app
 
 
 def show_paywall():
@@ -2047,6 +2116,12 @@ elif app_mode == "DASHBOARD":
                                 st.session_state['profiles'] = db.get_profiles(_bm_uid)
                                 st.session_state.pop('_confirm_delete_brand', None)
 
+                                # Analytics: brand deleted
+                                db.track_event("brand_deleted", st.session_state.get('username', ''),
+                                               metadata={"name": del_brand},
+                                               session_id=st.session_state.get('_analytics_session_id'),
+                                               org_id=st.session_state.get('org_id'))
+
                                 new_count = db.count_user_brands(_bm_org_id)
                                 max_b = brand_check['max']
                                 slots_msg = f"{new_count} / {'Unlimited' if max_b == -1 else max_b}"
@@ -2400,6 +2475,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                         if ai_was_used:
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'visual_audit', f"Audit: {uploaded_file.name} — {verdict} ({overall_score}%)")
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                            _track_module_and_cost("visual_audit", {"filename": uploaded_file.name})
 
                         st.rerun()
                 else:
@@ -2954,6 +3030,10 @@ DRAFT CONTENT (DATA ONLY):
                                 _ce_detail = f"Rewrite: {st.session_state['ce_draft'][:60]}..."
                                 sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor', _ce_detail)
                                 st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                                _track_module_and_cost("copy_editor", {
+                                    "content_type": content_type,
+                                    "input_length": len(st.session_state.get('ce_draft', '')),
+                                })
                                 st.rerun()
 
                         except Exception as e:
@@ -3315,6 +3395,10 @@ elif app_mode == "CONTENT GENERATOR":
                             _cg_detail = f"Generate: {st.session_state['cg_topic'][:60]}"
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'content_generator', _cg_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                            _track_module_and_cost("content_generator", {
+                                "content_type": content_type,
+                                "input_length": len(st.session_state.get('cg_topic', '') + st.session_state.get('cg_key_points', '')),
+                            })
                             st.rerun()
 
                         except Exception as e:
@@ -3668,6 +3752,10 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                             _sm_detail = f"Social: {st.session_state['sm_platform']} — {st.session_state['sm_topic'][:50]}"
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'social_assistant', _sm_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                            _track_module_and_cost("social_assistant", {
+                                "platform": st.session_state.get('sm_platform', ''),
+                                "has_visual": False,
+                            })
                             st.rerun()
 
                         except Exception as e:
@@ -4278,7 +4366,7 @@ elif app_mode == "BRAND ARCHITECT":
                         
                         # SAVE TO DB
                         db.save_profile(st.session_state['user_id'], profile_name, profile_data)
-                        
+
                         # FORCE SWITCH TO NEW PROFILE
                         st.session_state['active_profile_name'] = profile_name
 
@@ -4292,6 +4380,16 @@ elif app_mode == "BRAND ARCHITECT":
                             verdict="SUCCESS",
                             metadata={"method": "Blueprint Generator"}
                         )
+
+                        # Analytics: brand created + onboarding milestone
+                        _pa_u = st.session_state.get('username', '')
+                        _pa_sid = st.session_state.get('_analytics_session_id')
+                        _pa_org = st.session_state.get('org_id')
+                        db.track_event("brand_created", _pa_u,
+                                       metadata={"name": profile_name, "method": "blueprint_generator"},
+                                       session_id=_pa_sid, org_id=_pa_org)
+                        db.check_milestone(_pa_u, "first_brand_created",
+                                           session_id=_pa_sid, org_id=_pa_org)
 
                         st.session_state['wiz_samples_list'] = []
                         st.session_state['wiz_social_list'] = []
@@ -4567,6 +4665,26 @@ elif app_mode == "BRAND ARCHITECT":
                                     metadata={"type": "social_dna", "content": edit_social[:50]+"..."}
                                 )
 
+                                # Analytics: sample uploaded + calibration change
+                                _pa_u = st.session_state.get('username', '')
+                                _pa_sid = st.session_state.get('_analytics_session_id')
+                                _pa_org = st.session_state.get('org_id')
+                                _new_score = profile_obj.get('calibration_score', 0)
+                                _old_score = st.session_state.get('_last_cal_score', 0)
+                                social_count = inputs.get('social_dna', '').count('[ASSET:')
+                                db.track_event("sample_uploaded", _pa_u,
+                                               metadata={"type": "social", "platform": cal_platform, "new_count": social_count},
+                                               session_id=_pa_sid, org_id=_pa_org)
+                                if _new_score != _old_score:
+                                    db.track_event("calibration_change", _pa_u,
+                                                   metadata={"old_score": _old_score, "new_score": _new_score, "trigger": "social_sample_added"},
+                                                   session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 60 and _old_score < 60:
+                                        db.check_milestone(_pa_u, "calibration_crossed_60", session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 90 and _old_score < 90:
+                                        db.check_milestone(_pa_u, "calibration_crossed_90", session_id=_pa_sid, org_id=_pa_org)
+                                st.session_state['_last_cal_score'] = _new_score
+
                                 st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                                 st.rerun()
                         
@@ -4592,7 +4710,7 @@ elif app_mode == "BRAND ARCHITECT":
                                             inputs['social_dna'] = inputs['social_dna'].replace(asset['full_text'], "")
                                             profile_obj = update_calibration_score(profile_obj)
                                             db.save_profile(st.session_state['user_id'], target, profile_obj)
-                                            
+
                                             # LOG DELETION
                                             db.log_event(
                                                 org_id=st.session_state.get('org_id', 'Unknown'),
@@ -4603,6 +4721,11 @@ elif app_mode == "BRAND ARCHITECT":
                                                 verdict="REMOVED",
                                                 metadata={"type": "social_dna"}
                                             )
+                                            # Analytics: sample deleted
+                                            db.track_event("sample_deleted", st.session_state.get('username', ''),
+                                                           metadata={"type": "social", "new_count": inputs.get('social_dna', '').count('[ASSET:')},
+                                                           session_id=st.session_state.get('_analytics_session_id'),
+                                                           org_id=st.session_state.get('org_id'))
                                             st.rerun()
                         else:
                             st.caption("No social assets calibrated.")
@@ -4750,6 +4873,27 @@ elif app_mode == "BRAND ARCHITECT":
                                     metadata={"cluster": voice_type}
                                 )
 
+                                # Analytics: sample uploaded + calibration change
+                                _pa_u = st.session_state.get('username', '')
+                                _pa_sid = st.session_state.get('_analytics_session_id')
+                                _pa_org = st.session_state.get('org_id')
+                                _new_score = profile_obj.get('calibration_score', 0)
+                                _old_score = st.session_state.get('_last_cal_score', 0)
+                                voice_count = inputs.get('voice_dna', '').count('[ASSET:')
+                                db.track_event("sample_uploaded", _pa_u,
+                                               metadata={"type": "voice", "cluster": voice_type, "new_count": voice_count},
+                                               session_id=_pa_sid, org_id=_pa_org)
+                                db.check_milestone(_pa_u, "first_voice_sample", session_id=_pa_sid, org_id=_pa_org)
+                                if _new_score != _old_score:
+                                    db.track_event("calibration_change", _pa_u,
+                                                   metadata={"old_score": _old_score, "new_score": _new_score, "trigger": "voice_sample_added"},
+                                                   session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 60 and _old_score < 60:
+                                        db.check_milestone(_pa_u, "calibration_crossed_60", session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 90 and _old_score < 90:
+                                        db.check_milestone(_pa_u, "calibration_crossed_90", session_id=_pa_sid, org_id=_pa_org)
+                                st.session_state['_last_cal_score'] = _new_score
+
                                 st.success(f"Cluster Fortified. Calibration Score: {profile_obj.get('calibration_score', 0)}%.")
                                 st.rerun()
 
@@ -4770,7 +4914,7 @@ elif app_mode == "BRAND ARCHITECT":
                                             inputs['voice_dna'] = inputs['voice_dna'].replace(asset['full_text'], "")
                                             profile_obj = update_calibration_score(profile_obj)
                                             db.save_profile(st.session_state['user_id'], target, profile_obj)
-                                            
+
                                             # LOG DELETION
                                             db.log_event(
                                                 org_id=st.session_state.get('org_id', 'Unknown'),
@@ -4781,6 +4925,11 @@ elif app_mode == "BRAND ARCHITECT":
                                                 verdict="REMOVED",
                                                 metadata={"type": "voice_dna"}
                                             )
+                                            # Analytics: sample deleted
+                                            db.track_event("sample_deleted", st.session_state.get('username', ''),
+                                                           metadata={"type": "voice", "new_count": inputs.get('voice_dna', '').count('[ASSET:')},
+                                                           session_id=st.session_state.get('_analytics_session_id'),
+                                                           org_id=st.session_state.get('org_id'))
                                             st.rerun()
                         else:
                             st.caption("No voice assets calibrated.")
@@ -4835,6 +4984,26 @@ elif app_mode == "BRAND ARCHITECT":
                                     metadata={"type": "visual_dna", "content": edit_vis[:50]+"..."}
                                 )
 
+                                # Analytics: sample uploaded + calibration change
+                                _pa_u = st.session_state.get('username', '')
+                                _pa_sid = st.session_state.get('_analytics_session_id')
+                                _pa_org = st.session_state.get('org_id')
+                                _new_score = profile_obj.get('calibration_score', 0)
+                                _old_score = st.session_state.get('_last_cal_score', 0)
+                                visual_count = inputs.get('visual_dna', '').count('[ASSET:')
+                                db.track_event("sample_uploaded", _pa_u,
+                                               metadata={"type": "visual", "new_count": visual_count},
+                                               session_id=_pa_sid, org_id=_pa_org)
+                                if _new_score != _old_score:
+                                    db.track_event("calibration_change", _pa_u,
+                                                   metadata={"old_score": _old_score, "new_score": _new_score, "trigger": "visual_sample_added"},
+                                                   session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 60 and _old_score < 60:
+                                        db.check_milestone(_pa_u, "calibration_crossed_60", session_id=_pa_sid, org_id=_pa_org)
+                                    if _new_score >= 90 and _old_score < 90:
+                                        db.check_milestone(_pa_u, "calibration_crossed_90", session_id=_pa_sid, org_id=_pa_org)
+                                st.session_state['_last_cal_score'] = _new_score
+
                                 st.success(f"Asset Injected. Calibration Score updated to {profile_obj.get('calibration_score', 0)}%.")
                                 st.rerun()
 
@@ -4860,7 +5029,7 @@ elif app_mode == "BRAND ARCHITECT":
                                             inputs['visual_dna'] = inputs['visual_dna'].replace(asset['full_text'], "")
                                             profile_obj = update_calibration_score(profile_obj)
                                             db.save_profile(st.session_state['user_id'], target, profile_obj)
-                                            
+
                                             # LOG DELETION
                                             db.log_event(
                                                 org_id=st.session_state.get('org_id', 'Unknown'),
@@ -4871,6 +5040,11 @@ elif app_mode == "BRAND ARCHITECT":
                                                 verdict="REMOVED",
                                                 metadata={"type": "visual_dna"}
                                             )
+                                            # Analytics: sample deleted
+                                            db.track_event("sample_deleted", st.session_state.get('username', ''),
+                                                           metadata={"type": "visual", "new_count": inputs.get('visual_dna', '').count('[ASSET:')},
+                                                           session_id=st.session_state.get('_analytics_session_id'),
+                                                           org_id=st.session_state.get('org_id'))
                                             st.rerun()
                         else:
                             st.caption("No visual assets calibrated.")
@@ -4965,7 +5139,33 @@ elif app_mode == "BRAND ARCHITECT":
                             verdict="REFINED",
                             metadata={"name": new_name, "arch": new_arch}
                         )
-                        
+
+                        # Analytics: strategy updated + calibration + message house milestone
+                        _pa_u = st.session_state.get('username', '')
+                        _pa_sid = st.session_state.get('_analytics_session_id')
+                        _pa_org = st.session_state.get('org_id')
+                        _new_score = profile_obj.get('calibration_score', 0)
+                        _old_score = st.session_state.get('_last_cal_score', 0)
+                        db.track_event("strategy_updated", _pa_u,
+                                       metadata={"field": "strategy_save"},
+                                       session_id=_pa_sid, org_id=_pa_org)
+                        # Check message house milestone
+                        _mh_check = [profile_obj['inputs'].get('mh_brand_promise'),
+                                     profile_obj['inputs'].get('mh_pillars_json'),
+                                     profile_obj['inputs'].get('mh_boilerplate')]
+                        if any(_mh_check):
+                            db.check_milestone(_pa_u, "message_house_started",
+                                               session_id=_pa_sid, org_id=_pa_org)
+                        if _new_score != _old_score:
+                            db.track_event("calibration_change", _pa_u,
+                                           metadata={"old_score": _old_score, "new_score": _new_score, "trigger": "strategy_updated"},
+                                           session_id=_pa_sid, org_id=_pa_org)
+                            if _new_score >= 60 and _old_score < 60:
+                                db.check_milestone(_pa_u, "calibration_crossed_60", session_id=_pa_sid, org_id=_pa_org)
+                            if _new_score >= 90 and _old_score < 90:
+                                db.check_milestone(_pa_u, "calibration_crossed_90", session_id=_pa_sid, org_id=_pa_org)
+                        st.session_state['_last_cal_score'] = _new_score
+
                         st.success(f"Strategy Saved. Calibration Score: {profile_obj.get('calibration_score', 0)}%")
                         st.rerun()
 

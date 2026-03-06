@@ -190,6 +190,31 @@ def run_migrations():
         )
     ''')
 
+    # --- Create product_events table (analytics layer) ---
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS product_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            username TEXT NOT NULL,
+            org_id TEXT,
+            brand_id INTEGER,
+            metadata_json TEXT,
+            session_id TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Indices for product_events
+    for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_pe_type ON product_events(event_type)",
+        "CREATE INDEX IF NOT EXISTS idx_pe_user ON product_events(username)",
+        "CREATE INDEX IF NOT EXISTS idx_pe_session ON product_events(session_id)",
+        "CREATE INDEX IF NOT EXISTS idx_pe_timestamp ON product_events(timestamp)",
+    ]:
+        try:
+            conn.execute(idx_sql)
+        except sqlite3.OperationalError:
+            pass
+
     conn.commit()
 
     # --- One-time data migration for existing users ---
@@ -935,10 +960,20 @@ def record_usage_action_impersonated(username, org_id, module, action_weight, bi
     conn.close()
 
 
+def update_last_login(username):
+    """Updates last_login to now for a user."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("UPDATE users SET last_login = ? WHERE username = ?",
+                 (datetime.now().isoformat(), username))
+    conn.commit()
+    conn.close()
+
+
 def get_table_row_counts():
     """Returns dict of table_name → row_count for admin health check."""
     conn = sqlite3.connect(DB_NAME)
-    tables = ['users', 'profiles', 'usage_tracking', 'organizations', 'activity_log', 'admin_audit_log', 'platform_settings']
+    tables = ['users', 'profiles', 'usage_tracking', 'organizations',
+              'activity_log', 'admin_audit_log', 'platform_settings', 'product_events']
     counts = {}
     for t in tables:
         try:
@@ -949,13 +984,546 @@ def get_table_row_counts():
     return counts
 
 
-def update_last_login(username):
-    """Updates last_login to now for a user."""
+# ── 8. PRODUCT ANALYTICS (event tracking) ────────────────────────────────────
+
+# API cost constants — update when Anthropic changes pricing
+_API_PRICING = {
+    "claude-opus-4-6":   {"input_per_m": 5.00,  "output_per_m": 25.00},
+    "claude-sonnet-4-6": {"input_per_m": 3.00,  "output_per_m": 15.00},
+    "claude-haiku-4-5":  {"input_per_m": 1.00,  "output_per_m": 5.00},
+}
+
+
+def estimate_api_cost(input_tokens, output_tokens, model="claude-opus-4-6"):
+    """Estimate USD cost from Anthropic API token usage."""
+    pricing = _API_PRICING.get(model, _API_PRICING["claude-opus-4-6"])
+    cost = (input_tokens / 1_000_000 * pricing["input_per_m"]) + \
+           (output_tokens / 1_000_000 * pricing["output_per_m"])
+    return round(cost, 6)
+
+
+def track_event(event_type, username, metadata=None, brand_id=None,
+                session_id=None, org_id=None):
+    """Record a product analytics event. Fails silently — tracking never breaks the app."""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.execute(
+            """INSERT INTO product_events
+               (event_type, username, org_id, brand_id, metadata_json, session_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (event_type, username, org_id, brand_id,
+             json.dumps(metadata) if metadata else None,
+             session_id)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.warning(f"Event tracking failed ({event_type}): {e}")
+
+
+def check_milestone(username, step_name, session_id=None, org_id=None):
+    """Fire onboarding milestone only if not already recorded for this user."""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        existing = conn.execute(
+            "SELECT 1 FROM product_events WHERE event_type='onboarding_step' "
+            "AND username=? AND metadata_json LIKE ?",
+            (username, f'%"{step_name}"%')
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                """INSERT INTO product_events
+                   (event_type, username, org_id, metadata_json, session_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                ("onboarding_step", username, org_id,
+                 json.dumps({"step": step_name}), session_id)
+            )
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+# ── Analytics query functions ─────────────────────────────────────────────────
+
+def get_active_users(days=7):
+    """Returns count of users with at least 1 module_action in last N days."""
     conn = sqlite3.connect(DB_NAME)
-    conn.execute("UPDATE users SET last_login = ? WHERE username = ?",
-                 (datetime.now().isoformat(), username))
-    conn.commit()
+    result = conn.execute(
+        """SELECT COUNT(DISTINCT username) FROM product_events
+           WHERE event_type='module_action'
+           AND timestamp >= datetime('now', ?)""",
+        (f'-{days} days',)
+    ).fetchone()
     conn.close()
+    return result[0] if result else 0
+
+
+def get_user_sessions_per_week(days=28):
+    """Returns avg sessions per active user per week over last N days."""
+    conn = sqlite3.connect(DB_NAME)
+    rows = conn.execute(
+        """SELECT username, COUNT(DISTINCT session_id) as sessions
+           FROM product_events
+           WHERE event_type='session_start'
+           AND timestamp >= datetime('now', ?)
+           GROUP BY username""",
+        (f'-{days} days',)
+    ).fetchall()
+    conn.close()
+    if not rows:
+        return 0.0
+    weeks = max(days / 7, 1)
+    total_sessions = sum(r[1] for r in rows)
+    return round(total_sessions / len(rows) / weeks, 1)
+
+
+def get_user_return_table():
+    """Returns per-user retention data for the return table."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT
+            u.username,
+            u.created_at as signed_up,
+            u.subscription_tier,
+            MAX(pe.timestamp) as last_active,
+            COUNT(DISTINCT CASE WHEN pe.event_type='module_action' THEN pe.id END) as total_actions,
+            COUNT(DISTINCT strftime('%W', pe.timestamp)) as weeks_active
+        FROM users u
+        LEFT JOIN product_events pe ON u.username = pe.username
+            AND pe.event_type = 'module_action'
+        WHERE u.subscription_tier != 'super_admin'
+        GROUP BY u.username
+        ORDER BY MAX(pe.timestamp) DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_module_engagement():
+    """Returns module engagement data for the analytics dashboard."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT
+            json_extract(metadata_json, '$.module') as module,
+            COUNT(*) as total_actions,
+            COUNT(DISTINCT username) as unique_users
+        FROM product_events
+        WHERE event_type = 'module_action'
+        AND json_extract(metadata_json, '$.module') IS NOT NULL
+        GROUP BY json_extract(metadata_json, '$.module')
+        ORDER BY total_actions DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_module_engagement_week(weeks_ago=0):
+    """Returns module action counts for a specific week."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    start = f'-{(weeks_ago + 1) * 7} days'
+    end = f'-{weeks_ago * 7} days'
+    rows = conn.execute("""
+        SELECT
+            json_extract(metadata_json, '$.module') as module,
+            COUNT(*) as actions
+        FROM product_events
+        WHERE event_type = 'module_action'
+        AND timestamp >= datetime('now', ?)
+        AND timestamp < datetime('now', ?)
+        GROUP BY json_extract(metadata_json, '$.module')
+    """, (start, end)).fetchall()
+    conn.close()
+    return {r['module']: r['actions'] for r in rows}
+
+
+def get_session_action_distribution():
+    """Returns distribution of actions per session."""
+    conn = sqlite3.connect(DB_NAME)
+    rows = conn.execute("""
+        SELECT session_id, COUNT(*) as actions
+        FROM product_events
+        WHERE event_type = 'module_action'
+        AND session_id IS NOT NULL
+        GROUP BY session_id
+    """).fetchall()
+    conn.close()
+
+    # Also count sessions with zero module actions
+    all_sessions = conn if False else None  # placeholder
+    conn2 = sqlite3.connect(DB_NAME)
+    total_sessions = conn2.execute(
+        "SELECT COUNT(DISTINCT session_id) FROM product_events WHERE event_type='session_start'"
+    ).fetchone()[0]
+    conn2.close()
+
+    action_sessions = len(rows)
+    zero_sessions = max(total_sessions - action_sessions, 0)
+
+    buckets = {"0": zero_sessions, "1": 0, "2-3": 0, "4+": 0}
+    for _, count in rows:
+        if count == 1:
+            buckets["1"] += 1
+        elif count <= 3:
+            buckets["2-3"] += 1
+        else:
+            buckets["4+"] += 1
+
+    return buckets, total_sessions
+
+
+def get_api_costs(days=30):
+    """Returns API cost data for the last N days."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+
+    # Total cost
+    total = conn.execute("""
+        SELECT COALESCE(SUM(json_extract(metadata_json, '$.estimated_cost_usd')), 0) as total_cost,
+               COUNT(*) as total_actions
+        FROM product_events
+        WHERE event_type = 'api_cost'
+        AND timestamp >= datetime('now', ?)
+    """, (f'-{days} days',)).fetchone()
+
+    # Cost per module
+    per_module = conn.execute("""
+        SELECT json_extract(metadata_json, '$.module') as module,
+               SUM(json_extract(metadata_json, '$.estimated_cost_usd')) as cost,
+               COUNT(*) as actions
+        FROM product_events
+        WHERE event_type = 'api_cost'
+        AND timestamp >= datetime('now', ?)
+        GROUP BY json_extract(metadata_json, '$.module')
+        ORDER BY cost DESC
+    """, (f'-{days} days',)).fetchall()
+
+    # Daily trend
+    daily = conn.execute("""
+        SELECT DATE(timestamp) as day,
+               SUM(json_extract(metadata_json, '$.estimated_cost_usd')) as cost
+        FROM product_events
+        WHERE event_type = 'api_cost'
+        AND timestamp >= datetime('now', ?)
+        GROUP BY DATE(timestamp)
+        ORDER BY DATE(timestamp)
+    """, (f'-{days} days',)).fetchall()
+
+    conn.close()
+    return {
+        "total_cost": total['total_cost'] if total else 0,
+        "total_actions": total['total_actions'] if total else 0,
+        "per_module": [dict(r) for r in per_module],
+        "daily": [dict(r) for r in daily],
+    }
+
+
+def get_active_user_count(days=30):
+    """Returns count of distinct active users (with module_action) in last N days."""
+    conn = sqlite3.connect(DB_NAME)
+    result = conn.execute(
+        """SELECT COUNT(DISTINCT username) FROM product_events
+           WHERE event_type='module_action'
+           AND timestamp >= datetime('now', ?)""",
+        (f'-{days} days',)
+    ).fetchone()
+    conn.close()
+    return result[0] if result else 0
+
+
+def get_calibration_distribution():
+    """Returns calibration score distribution across all non-sample brands."""
+    conn = sqlite3.connect(DB_NAME)
+    rows = conn.execute("""
+        SELECT data FROM profiles
+        WHERE is_sample_brand = 0 OR is_sample_brand IS NULL
+    """).fetchall()
+    conn.close()
+
+    buckets = {"0-25": 0, "26-50": 0, "51-75": 0, "76-100": 0}
+    scores = []
+    for row in rows:
+        try:
+            data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            score = data.get('calibration_score', 0) if isinstance(data, dict) else 0
+            scores.append(score)
+            if score <= 25:
+                buckets["0-25"] += 1
+            elif score <= 50:
+                buckets["26-50"] += 1
+            elif score <= 75:
+                buckets["51-75"] += 1
+            else:
+                buckets["76-100"] += 1
+        except (json.JSONDecodeError, TypeError):
+            buckets["0-25"] += 1
+    return buckets, scores
+
+
+def get_avg_calibration_trend(weeks=8):
+    """Returns weekly average calibration score from calibration_change events."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT strftime('%Y-W%W', timestamp) as week,
+               AVG(json_extract(metadata_json, '$.new_score')) as avg_score
+        FROM product_events
+        WHERE event_type = 'calibration_change'
+        AND timestamp >= datetime('now', ?)
+        GROUP BY week
+        ORDER BY week
+    """, (f'-{weeks * 7} days',)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_profile_completion_stats():
+    """Returns profile completion breakdown across all non-sample brands."""
+    conn = sqlite3.connect(DB_NAME)
+    rows = conn.execute("""
+        SELECT data FROM profiles
+        WHERE is_sample_brand = 0 OR is_sample_brand IS NULL
+    """).fetchall()
+    conn.close()
+
+    total = len(rows)
+    if total == 0:
+        return {}
+
+    stats = {
+        "strategy_fields": 0,
+        "voice_samples": 0,
+        "voice_3plus": 0,
+        "message_house": 0,
+        "visual_identity": 0,
+        "social_samples": 0,
+    }
+
+    for row in rows:
+        try:
+            data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            if not isinstance(data, dict):
+                continue
+            inputs = data.get('inputs', {})
+
+            # Strategy fields: name + mission + values + archetype
+            strat_count = sum(1 for k in ['wiz_name', 'wiz_mission', 'wiz_values', 'wiz_archetype']
+                              if inputs.get(k))
+            if strat_count >= 3:
+                stats["strategy_fields"] += 1
+
+            if len(inputs.get('voice_dna', '')) > 20 or '[ASSET:' in inputs.get('voice_dna', ''):
+                stats["voice_samples"] += 1
+                # Count individual voice assets
+                voice_count = inputs.get('voice_dna', '').count('[ASSET:')
+                if voice_count >= 3:
+                    stats["voice_3plus"] += 1
+
+            if any(inputs.get(k) for k in ['mh_brand_promise', 'mh_pillars_json', 'mh_boilerplate']):
+                stats["message_house"] += 1
+
+            if len(inputs.get('visual_dna', '')) > 20 or '[ASSET:' in inputs.get('visual_dna', ''):
+                stats["visual_identity"] += 1
+
+            if len(inputs.get('social_dna', '')) > 20 or '[ASSET:' in inputs.get('social_dna', ''):
+                stats["social_samples"] += 1
+
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return {k: round(v / total * 100) for k, v in stats.items()} if total > 0 else stats
+
+
+def get_onboarding_funnel():
+    """Returns onboarding funnel data."""
+    conn = sqlite3.connect(DB_NAME)
+    total_users = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE subscription_tier != 'super_admin'"
+    ).fetchone()[0]
+
+    steps = [
+        "account_created", "first_brand_created", "first_voice_sample",
+        "first_module_run", "message_house_started",
+        "calibration_crossed_60", "calibration_crossed_90"
+    ]
+    funnel = {}
+    for step in steps:
+        count = conn.execute(
+            "SELECT COUNT(DISTINCT username) FROM product_events "
+            "WHERE event_type='onboarding_step' AND metadata_json LIKE ?",
+            (f'%"{step}"%',)
+        ).fetchone()[0]
+        funnel[step] = count
+
+    conn.close()
+    return funnel, total_users
+
+
+def get_inactive_user_diagnostics(days_threshold=14):
+    """Returns diagnostics for users inactive for N+ days."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+
+    users = conn.execute("""
+        SELECT u.username, u.created_at,
+            MAX(pe.timestamp) as last_active,
+            COUNT(DISTINCT CASE WHEN pe.event_type='module_action' THEN pe.id END) as total_actions
+        FROM users u
+        LEFT JOIN product_events pe ON u.username = pe.username
+        WHERE u.subscription_tier != 'super_admin'
+        GROUP BY u.username
+        HAVING last_active IS NULL OR last_active < datetime('now', ?)
+    """, (f'-{days_threshold} days',)).fetchall()
+
+    results = []
+    for u in users:
+        username = u['username']
+
+        # Get modules used
+        modules = conn.execute(
+            """SELECT DISTINCT json_extract(metadata_json, '$.module')
+               FROM product_events
+               WHERE username=? AND event_type='module_action'""",
+            (username,)
+        ).fetchall()
+        modules_used = [m[0] for m in modules if m[0]]
+        all_modules = {"content_generator", "copy_editor", "social_assistant", "visual_audit"}
+        modules_never = all_modules - set(modules_used)
+
+        # Get onboarding steps completed
+        steps = conn.execute(
+            """SELECT json_extract(metadata_json, '$.step')
+               FROM product_events
+               WHERE username=? AND event_type='onboarding_step'""",
+            (username,)
+        ).fetchall()
+        steps_done = [s[0] for s in steps if s[0]]
+
+        # Get last calibration score from profiles
+        org_id = conn.execute(
+            "SELECT org_id FROM users WHERE username=?", (username,)
+        ).fetchone()
+        org = org_id['org_id'] if org_id and org_id['org_id'] else username
+        profiles = conn.execute(
+            "SELECT data FROM profiles WHERE org_id=? AND (is_sample_brand=0 OR is_sample_brand IS NULL)",
+            (org,)
+        ).fetchall()
+
+        max_confidence = 0
+        has_voice = False
+        has_mh = False
+        for p in profiles:
+            try:
+                d = json.loads(p[0]) if isinstance(p[0], str) else p[0]
+                if isinstance(d, dict):
+                    max_confidence = max(max_confidence, d.get('calibration_score', 0))
+                    inp = d.get('inputs', {})
+                    if len(inp.get('voice_dna', '')) > 20:
+                        has_voice = True
+                    if any(inp.get(k) for k in ['mh_brand_promise', 'mh_pillars_json']):
+                        has_mh = True
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        missing = []
+        if not has_voice:
+            missing.append("No voice samples")
+        if not has_mh:
+            missing.append("No message house")
+        for m in sorted(modules_never):
+            missing.append(f"Never tried {m.replace('_', ' ').title()}")
+
+        results.append({
+            "username": username,
+            "last_active": u['last_active'] or "Never",
+            "total_actions": u['total_actions'],
+            "confidence": max_confidence,
+            "missing": ", ".join(missing) if missing else "Complete",
+        })
+
+    conn.close()
+    return results
+
+
+def get_acquisition_sources():
+    """Returns acquisition source breakdown."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT json_extract(metadata_json, '$.source') as source,
+               COUNT(*) as count
+        FROM product_events
+        WHERE event_type = 'user_registered'
+        GROUP BY source
+        ORDER BY count DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_revenue_metrics():
+    """Returns revenue and conversion metrics."""
+    conn = sqlite3.connect(DB_NAME)
+
+    # Count by tier
+    tier_counts = {}
+    rows = conn.execute(
+        "SELECT subscription_tier, COUNT(*) FROM users "
+        "WHERE subscription_tier != 'super_admin' GROUP BY subscription_tier"
+    ).fetchall()
+    for tier, count in rows:
+        tier_counts[tier] = count
+
+    # Count paying users (active status, non-free tiers)
+    paying = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE subscription_status='active' "
+        "AND subscription_tier IN ('solo', 'agency', 'enterprise')"
+    ).fetchone()[0]
+
+    total_non_admin = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE subscription_tier != 'super_admin'"
+    ).fetchone()[0]
+
+    # Avg days to conversion
+    avg_days = conn.execute("""
+        SELECT AVG(julianday(pe.timestamp) - julianday(u.created_at))
+        FROM product_events pe
+        JOIN users u ON pe.username = u.username
+        WHERE pe.event_type = 'subscription_changed'
+        AND json_extract(pe.metadata_json, '$.new_tier') IN ('solo', 'agency', 'enterprise')
+    """).fetchone()[0]
+
+    conn.close()
+    return {
+        "tier_counts": tier_counts,
+        "paying_users": paying,
+        "total_users": total_non_admin,
+        "conversion_rate": round(paying / total_non_admin * 100, 1) if total_non_admin > 0 else 0,
+        "avg_days_to_conversion": round(avg_days, 1) if avg_days else None,
+    }
+
+
+def get_product_events_csv():
+    """Returns all product_events as CSV string for export."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM product_events ORDER BY timestamp DESC").fetchall()
+    conn.close()
+
+    if not rows:
+        return "id,event_type,username,org_id,brand_id,metadata_json,session_id,timestamp\n"
+
+    import csv
+    import io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(rows[0].keys())
+    for row in rows:
+        writer.writerow(tuple(row))
+    return output.getvalue()
 
 
 def create_user_admin(username, email, password, tier='solo', org_id=None, org_role='member'):
