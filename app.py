@@ -3,7 +3,7 @@ from PIL import Image
 import os
 import re
 import json
-import sqlite3
+
 import time # Added for Session Expiry
 import uuid
 from logic import SignetLogic
@@ -5351,18 +5351,12 @@ if app_mode == "TEAM MANAGEMENT":
                                 st.warning("Cannot demote last admin")
                             else:
                                 if st.button(f"Demote to Member", key=f"demote_{idx}"):
-                                    conn = sqlite3.connect(db.DB_NAME)
-                                    conn.execute("UPDATE users SET is_admin = 0 WHERE username = ?", (username,))
-                                    conn.commit()
-                                    conn.close()
+                                    db.update_user_fields(username, is_admin=0)
                                     st.success(f"{username} demoted to Member")
                                     st.rerun()
                         else:
                             if st.button(f"Promote to Admin", key=f"promote_{idx}"):
-                                conn = sqlite3.connect(db.DB_NAME)
-                                conn.execute("UPDATE users SET is_admin = 1 WHERE username = ?", (username,))
-                                conn.commit()
-                                conn.close()
+                                db.update_user_fields(username, is_admin=1)
                                 st.success(f"{username} promoted to Admin")
                                 st.rerun()
                     
@@ -5375,13 +5369,7 @@ if app_mode == "TEAM MANAGEMENT":
                             new_pass = st.text_input(f"New temp password for {username}", type="password", key=f"newpw_{idx}")
                             if st.button(f"Confirm Reset", key=f"confirm_reset_{idx}"):
                                 if new_pass:
-                                    from argon2 import PasswordHasher
-                                    ph = PasswordHasher()
-                                    hashed = ph.hash(new_pass)
-                                    conn = sqlite3.connect(db.DB_NAME)
-                                    conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hashed, username))
-                                    conn.commit()
-                                    conn.close()
+                                    db.reset_user_password(username, new_pass)
                                     st.success(f"Password reset for {username}")
                                     st.session_state[f'reset_password_for_{username}'] = False
                                     st.rerun()
@@ -5398,11 +5386,7 @@ if app_mode == "TEAM MANAGEMENT":
                             conf_col1, conf_col2 = st.columns(2)
                             with conf_col1:
                                 if st.button("Yes, Remove", key=f"yes_remove_{idx}"):
-                                    # Delete user
-                                    conn = sqlite3.connect(db.DB_NAME)
-                                    conn.execute("DELETE FROM users WHERE username = ?", (username,))
-                                    conn.commit()
-                                    conn.close()
+                                    db.delete_user_full(username)
                                     st.success(f"{username} removed from organization")
                                     st.session_state[f'confirm_remove_{username}'] = False
                                     st.rerun()
@@ -5729,32 +5713,41 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
         st.markdown("<h3 style='color: #ab8f59; letter-spacing: 0.1em;'>GLOBAL SYSTEM STATUS</h3>", unsafe_allow_html=True)
         
         # 1. METRICS ROW
-        conn = sqlite3.connect(db.DB_NAME)
-        
+        _gs_conn = db._get_connection()
+        try:
+            user_count = db._fetchone_val(db._execute_plain(_gs_conn, "SELECT COUNT(*) FROM users"), 0)
+            org_count = db._fetchone_val(db._execute_plain(_gs_conn, "SELECT COUNT(DISTINCT org_id) FROM users"), 0)
+            log_count = db._fetchone_val(db._execute_plain(_gs_conn, "SELECT COUNT(*) FROM activity_log"), 0)
+
+            _gs_users_raw = db._execute_plain(
+                _gs_conn, "SELECT username, email, org_id, is_admin, created_at FROM users").fetchall()
+            _gs_users = [db._dict_row(r) for r in _gs_users_raw]
+
+            _gs_logs_raw = db._execute_plain(
+                _gs_conn, "SELECT timestamp, org_id, username, activity_type, asset_name, verdict, metadata_json FROM activity_log ORDER BY id DESC LIMIT 100").fetchall()
+            _gs_logs = [db._dict_row(r) for r in _gs_logs_raw]
+        finally:
+            _gs_conn.close()
+
         # Global Counts
-        user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        org_count = conn.execute("SELECT COUNT(DISTINCT org_id) FROM users").fetchone()[0]
-        log_count = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
-        
         m1, m2, m3 = st.columns(3)
         with m1: st.metric("TOTAL USERS", user_count)
         with m2: st.metric("ACTIVE ORGANIZATIONS", org_count)
         with m3: st.metric("TOTAL ACTIONS LOGGED", log_count)
-        
+
         st.markdown("<br>", unsafe_allow_html=True)
 
         # 2. TABS FOR DATA
         tab_users, tab_logs = st.tabs(["GLOBAL USER DATABASE", "GLOBAL AUDIT LOGS"])
-        
+
         import pandas as pd
 
         with tab_users:
-            users_raw = conn.execute("SELECT username, email, org_id, is_admin, created_at FROM users").fetchall()
-            if users_raw:
+            if _gs_users:
                 _u_rows = ""
-                for row in users_raw:
-                    role = "ADMIN" if row[3] else "USER"
-                    _u_rows += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{role}</td><td>{row[4]}</td></tr>"
+                for row in _gs_users:
+                    role = "ADMIN" if row['is_admin'] else "USER"
+                    _u_rows += f"<tr><td>{row['username']}</td><td>{row['email']}</td><td>{row['org_id']}</td><td>{role}</td><td>{row['created_at']}</td></tr>"
                 st.markdown(f"""
                 <div style="overflow-x:auto; max-height:400px; overflow-y:auto; border:1px solid #5c6b61;">
                 <table class="activity-log-table">
@@ -5766,13 +5759,10 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 st.info("No users found.")
 
         with tab_logs:
-            # Fetch last 100 logs globally
-            logs_raw = conn.execute("SELECT timestamp, org_id, username, activity_type, asset_name, verdict, metadata_json FROM activity_log ORDER BY id DESC LIMIT 100").fetchall()
-
-            if logs_raw:
+            if _gs_logs:
                 _l_rows = ""
-                for row in logs_raw:
-                    _l_rows += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[5]}</td></tr>"
+                for row in _gs_logs:
+                    _l_rows += f"<tr><td>{row['timestamp']}</td><td>{row['org_id']}</td><td>{row['username']}</td><td>{row['activity_type']}</td><td>{row['verdict']}</td></tr>"
                 st.markdown(f"""
                 <div style="overflow-x:auto; max-height:400px; overflow-y:auto; border:1px solid #5c6b61;">
                 <table class="activity-log-table">
@@ -5784,31 +5774,29 @@ if st.session_state.get("authenticated") and st.session_state.get("is_admin"):
                 # Detail View (The Inspector)
                 st.markdown("<h5 style='color: #ab8f59; margin-top: 20px;'>DEEP INSPECTOR</h5>", unsafe_allow_html=True)
                 _log_options = [
-                    f"{i+1}. {row[3]} — {row[2]} ({row[0][:16]})"
-                    for i, row in enumerate(logs_raw)
+                    f"{i+1}. {row['activity_type']} — {row['username']} ({str(row['timestamp'])[:16]})"
+                    for i, row in enumerate(_gs_logs)
                 ]
                 _sel_idx = st.selectbox(
                     "SELECT ENTRY", range(len(_log_options)),
                     format_func=lambda i: _log_options[i],
                     key="godmode_log_detail_select"
                 )
-                _sel_row = logs_raw[_sel_idx]
+                _sel_row = _gs_logs[_sel_idx]
                 c_meta, c_raw = st.columns(2)
                 with c_meta:
                     st.caption("ACTION METADATA")
-                    st.write(f"**Org:** {_sel_row[1]}")
-                    st.write(f"**User:** {_sel_row[2]}")
-                    st.write(f"**Asset:** {_sel_row[4]}")
+                    st.write(f"**Org:** {_sel_row['org_id']}")
+                    st.write(f"**User:** {_sel_row['username']}")
+                    st.write(f"**Asset:** {_sel_row['asset_name']}")
                 with c_raw:
                     st.caption("PAYLOAD (JSON)")
                     try:
-                        st.json(_sel_row[6])
+                        st.json(_sel_row['metadata_json'])
                     except:
-                        st.code(_sel_row[6])
+                        st.code(_sel_row['metadata_json'])
             else:
                 st.info("No global logs generated yet.")
-        
-        conn.close()
 
 # --- FOOTER ---
 st.markdown("""<div class="footer">POWERED BY CASTELLAN PR</div>""", unsafe_allow_html=True)

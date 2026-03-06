@@ -1,12 +1,12 @@
 # SIGNET TEST REPORT
-Generated: 2026-03-03 18:29:03
+Generated: 2026-03-06 08:51:05
 Python: 3.14.2
 SQLite: 3.50.4
 
 ## SUMMARY
 - Total Tests: 135
-- Passed: 124
-- Warnings: 11
+- Passed: 132
+- Warnings: 3
 - Failed: 0
 - Errors: 0
 
@@ -14,44 +14,9 @@ SQLite: 3.50.4
 None!
 
 ## WARNINGS
-### [WARN] Cat 1: Import webhook_handler
+### [WARN] Cat 1: Import subscription_manager
 ```
-Import failed (likely FastAPI/uvicorn dependency): No module named 'fastapi'
-```
-
-### [WARN] Cat 10: Valid signature
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Invalid signature
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Missing secret (dev mode)
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Find user by email
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Subscription created
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Subscription cancelled
-```
-webhook_handler import failed
-```
-
-### [WARN] Cat 10: Non-existent user
-```
-webhook_handler import failed
+Import failed (likely streamlit dependency): No module named 'streamlit'
 ```
 
 ### [WARN] Cat 11: FORTIFIED/UNSTABLE/EMPTY labels
@@ -64,22 +29,17 @@ Found 25 string-literal occurrences of FORTIFIED/UNSTABLE/EMPTY. These appear in
 ANTHROPIC_API_KEY is set — cannot test missing key behavior
 ```
 
-### [WARN] Cat 14: Webhook empty body
-```
-webhook_handler import failed
-```
-
 ## FULL RESULTS
 
 ### Cat 1
 
 - [PASS] Cat 1: Import db_manager
 - [PASS] Cat 1: Import tier_config
-- [PASS] Cat 1: Import subscription_manager
+- [WARN] Cat 1: Import subscription_manager — Import failed (likely streamlit dependency): No module named 'streamlit'
 - [PASS] Cat 1: Import brand_ui
 - [PASS] Cat 1: Import sample_brand_data
 - [PASS] Cat 1: Import prompt_builder
-- [WARN] Cat 1: Import webhook_handler — Import failed (likely FastAPI/uvicorn dependency): No module named 'fastapi'
+- [PASS] Cat 1: Import webhook_handler
 - [PASS] Cat 1: Import logic
 - [PASS] Cat 1: Import visual_audit
 ### Cat 2
@@ -172,14 +132,14 @@ webhook_handler import failed
 - [PASS] Cat 9: MH builder
 ### Cat 10
 
-- [WARN] Cat 10: Valid signature — webhook_handler import failed
-- [WARN] Cat 10: Invalid signature — webhook_handler import failed
-- [WARN] Cat 10: Missing secret (dev mode) — webhook_handler import failed
+- [PASS] Cat 10: Valid signature
+- [PASS] Cat 10: Invalid signature
+- [PASS] Cat 10: Missing secret (dev mode)
 - [PASS] Cat 10: Variant ID mapping
-- [WARN] Cat 10: Find user by email — webhook_handler import failed
-- [WARN] Cat 10: Subscription created — webhook_handler import failed
-- [WARN] Cat 10: Subscription cancelled — webhook_handler import failed
-- [WARN] Cat 10: Non-existent user — webhook_handler import failed
+- [PASS] Cat 10: Find user by email
+- [PASS] Cat 10: Subscription created
+- [PASS] Cat 10: Subscription cancelled
+- [PASS] Cat 10: Non-existent user
 ### Cat 11
 
 - [PASS] Cat 11: No 'Brand Governance Engine'
@@ -231,7 +191,7 @@ webhook_handler import failed
 - [PASS] Cat 14: Activity log empty
 - [PASS] Cat 14: Long prompt builder input
 - [PASS] Cat 14: ColorScorer edge cases
-- [WARN] Cat 14: Webhook empty body — webhook_handler import failed
+- [PASS] Cat 14: Webhook empty body
 - [PASS] Cat 14: Platform settings CRUD
 - [PASS] Cat 14: Table row counts
 
@@ -253,12 +213,14 @@ webhook_handler import failed
 - `render_severity` (function)
 
 ### db_manager
+- `DATABASE_URL` (constant)
 - `DB_FOLDER` (constant)
 - `DB_NAME` (constant)
 - `PasswordHasher` (function)
 - `SEAT_LIMITS` (constant)
 - `VerifyMismatchError` (function)
 - `check_login` (function)
+- `check_milestone` (function)
 - `check_seat_availability` (function)
 - `count_user_brands` (function)
 - `create_organization` (function)
@@ -269,29 +231,47 @@ webhook_handler import failed
 - `delete_profile` (function)
 - `delete_sample_brand` (function)
 - `delete_user_full` (function)
+- `estimate_api_cost` (function)
+- `get_acquisition_sources` (function)
+- `get_active_user_count` (function)
+- `get_active_users` (function)
 - `get_admin_audit_log` (function)
 - `get_all_organizations` (function)
 - `get_all_users_full` (function)
+- `get_api_costs` (function)
+- `get_avg_calibration_trend` (function)
 - `get_brand_owner_info` (function)
+- `get_calibration_distribution` (function)
 - `get_daily_usage_platform` (function)
+- `get_inactive_user_diagnostics` (function)
+- `get_module_engagement` (function)
+- `get_module_engagement_week` (function)
 - `get_monthly_usage` (function)
 - `get_monthly_usage_all` (function)
 - `get_monthly_usage_trend` (function)
 - `get_monthly_usage_user` (function)
+- `get_onboarding_funnel` (function)
 - `get_org_logs` (function)
 - `get_org_tier` (function)
 - `get_organization` (function)
 - `get_platform_setting` (function)
+- `get_product_events_csv` (function)
+- `get_profile_completion_stats` (function)
 - `get_profiles` (function)
+- `get_revenue_metrics` (function)
+- `get_session_action_distribution` (function)
 - `get_table_row_counts` (function)
 - `get_usage_analytics` (function)
 - `get_user_by_email` (function)
 - `get_user_count` (function)
 - `get_user_full` (function)
+- `get_user_return_table` (function)
+- `get_user_sessions_per_week` (function)
 - `get_user_status` (function)
 - `get_users_by_org` (function)
 - `has_sample_brand` (function)
 - `init_db` (function)
+- `is_postgres` (function)
 - `is_profile_sample` (function)
 - `is_user_suspended` (function)
 - `json` (constant)
@@ -312,6 +292,7 @@ webhook_handler import failed
 - `shutil` (constant)
 - `sqlite3` (constant)
 - `suspend_user` (function)
+- `track_event` (function)
 - `unsuspend_user` (function)
 - `update_last_login` (function)
 - `update_organization_fields` (function)
@@ -359,31 +340,6 @@ webhook_handler import failed
 - `annotations` (constant)
 - `json` (constant)
 
-### subscription_manager
-- `LS_API_KEY` (constant)
-- `LS_CACHE_TTL_SECONDS` (constant)
-- `LS_STORE_ID` (constant)
-- `PROTECTED_TIERS` (constant)
-- `TIER_CONFIG` (constant)
-- `annotations` (constant)
-- `check_brand_limit` (function)
-- `check_seat_limit` (function)
-- `check_usage_limit` (function)
-- `datetime` (function)
-- `db` (constant)
-- `get_tier_from_variant_id` (function)
-- `get_usage_nudge_message` (function)
-- `logger` (constant)
-- `logging` (constant)
-- `os` (constant)
-- `record_ai_action` (function)
-- `requests` (constant)
-- `resolve_tier_from_ls_variant` (function)
-- `resolve_user_tier` (function)
-- `st` (constant)
-- `sync_user_status` (function)
-- `time` (constant)
-
 ### tier_config
 - `PROTECTED_TIERS` (constant)
 - `TIER_CONFIG` (constant)
@@ -409,6 +365,26 @@ webhook_handler import failed
 - `run_full_audit` (function)
 - `run_visual_identity_check` (function)
 - `sanitize_user_input` (function)
+
+### webhook_handler
+- `FastAPI` (function)
+- `HTTPException` (function)
+- `Request` (function)
+- `WEBHOOK_SECRET` (constant)
+- `annotations` (constant)
+- `app` (function)
+- `datetime` (function)
+- `db` (constant)
+- `get_tier_from_variant_id` (function)
+- `handle_ls_webhook` (function)
+- `hashlib` (constant)
+- `health` (function)
+- `hmac` (constant)
+- `json` (constant)
+- `logger` (constant)
+- `logging` (constant)
+- `os` (constant)
+- `verify_signature` (function)
 
 ## SCHEMA INVENTORY
 

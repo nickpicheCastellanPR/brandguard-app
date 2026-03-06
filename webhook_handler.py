@@ -36,13 +36,7 @@ def verify_signature(payload_body: bytes, signature: str) -> bool:
 
 def _find_username_by_email(email: str) -> str | None:
     """Looks up a username by email address."""
-    import sqlite3
-    conn = sqlite3.connect(db.DB_NAME)
-    result = conn.execute(
-        "SELECT username FROM users WHERE email = ?", (email,)
-    ).fetchone()
-    conn.close()
-    return result[0] if result else None
+    return db.get_user_by_email(email)
 
 
 def _handle_subscription_active(email: str, tier_key: str, sub_id: str, variant_id: str):

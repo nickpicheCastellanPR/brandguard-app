@@ -314,10 +314,12 @@ def _render_org_management():
     orgs = db.get_all_organizations()
     rows = []
     for o in orgs:
-        import sqlite3
-        conn = sqlite3.connect(db.DB_NAME)
-        member_count = conn.execute("SELECT COUNT(*) FROM users WHERE org_id = ?", (o['org_id'],)).fetchone()[0]
-        conn.close()
+        conn = db._get_connection()
+        try:
+            member_count = db._fetchone_val(
+                db._execute_plain(conn, db._q("SELECT COUNT(*) FROM users WHERE org_id = ?"), (o['org_id'],)), 0)
+        finally:
+            conn.close()
         brand_count = db.count_user_brands(o['org_id'], exclude_sample=True)
         tier_key = o.get('subscription_tier', 'agency')
         tier = TIER_CONFIG.get(tier_key, TIER_CONFIG['solo'])

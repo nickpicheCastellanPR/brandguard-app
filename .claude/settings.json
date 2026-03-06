@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(py -c \"import py_compile; py_compile.compile\\(''visual_audit.py'', doraise=True\\); print\\(''visual_audit.py OK''\\)\")"
+      "Bash(py -c \"import py_compile; py_compile.compile\\(''visual_audit.py'', doraise=True\\); print\\(''visual_audit.py OK''\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(/c/Users/nickj/AppData/Local/Python/bin/python3.exe test_suite.py)"
     ]
   }
 }

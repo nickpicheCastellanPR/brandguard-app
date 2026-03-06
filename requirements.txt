@@ -10,3 +10,4 @@ requests
 scikit-learn
 numpy
 python-docx
+psycopg2-binary

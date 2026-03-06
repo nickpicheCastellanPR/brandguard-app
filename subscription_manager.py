@@ -226,12 +226,12 @@ def check_seat_limit(org_id: str) -> dict:
     Returns {"allowed": bool, "current": int, "max": int}.
     Looks up tier via organizations table or org admin.
     """
-    import sqlite3 as _sq
-    conn = _sq.connect(db.DB_NAME)
-    current = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE org_id = ?", (org_id,)
-    ).fetchone()[0]
-    conn.close()
+    conn = db._get_connection()
+    try:
+        current = db._fetchone_val(
+            db._execute_plain(conn, db._q("SELECT COUNT(*) FROM users WHERE org_id = ?"), (org_id,)), 0)
+    finally:
+        conn.close()
 
     tier_key = db.get_org_tier(org_id) or "solo"
 
@@ -297,21 +297,21 @@ def check_usage_limit(username: str) -> dict:
     billing_month = datetime.now().strftime("%Y-%m")
 
     # Exclude impersonated actions from soft cap calculation
-    import sqlite3 as _sq
-    conn = _sq.connect(db.DB_NAME)
-    if tier_key == "solo":
-        used = conn.execute(
-            "SELECT COALESCE(SUM(action_weight), 0) FROM usage_tracking "
-            "WHERE username = ? AND billing_month = ? AND (is_impersonated = 0 OR is_impersonated IS NULL)",
-            (username, billing_month)
-        ).fetchone()[0]
-    else:
-        used = conn.execute(
-            "SELECT COALESCE(SUM(action_weight), 0) FROM usage_tracking "
-            "WHERE org_id = ? AND billing_month = ? AND (is_impersonated = 0 OR is_impersonated IS NULL)",
-            (org_id, billing_month)
-        ).fetchone()[0]
-    conn.close()
+    conn = db._get_connection()
+    try:
+        _imp_filter = "is_impersonated = FALSE OR is_impersonated IS NULL" if db.is_postgres() else "is_impersonated = 0 OR is_impersonated IS NULL"
+        if tier_key == "solo":
+            used = db._fetchone_val(db._execute_plain(
+                conn, db._q(f"SELECT COALESCE(SUM(action_weight), 0) FROM usage_tracking "
+                            f"WHERE username = ? AND billing_month = ? AND ({_imp_filter})"),
+                (username, billing_month)), 0)
+        else:
+            used = db._fetchone_val(db._execute_plain(
+                conn, db._q(f"SELECT COALESCE(SUM(action_weight), 0) FROM usage_tracking "
+                            f"WHERE org_id = ? AND billing_month = ? AND ({_imp_filter})"),
+                (org_id, billing_month)), 0)
+    finally:
+        conn.close()
 
     pct = (used / limit * 100) if limit > 0 else 0.0
 

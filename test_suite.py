@@ -52,6 +52,8 @@ def _setup_test_db():
     global _TEST_DB_PATH, _original_db_name
     import db_manager as db
     _original_db_name = db.DB_NAME
+    # Force SQLite for tests (clear DATABASE_URL)
+    db.DATABASE_URL = ""
     tmp = tempfile.mkdtemp(prefix="signet_test_")
     _TEST_DB_PATH = os.path.join(tmp, "test.db")
     db.DB_NAME = _TEST_DB_PATH
@@ -215,9 +217,14 @@ def test_import_visual_audit():
 _schema_inventory = {}  # table -> [(name, type, notnull, default, pk)]
 
 
-def _get_table_columns(conn, table):
-    """Return column info from PRAGMA."""
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+def _get_table_columns(conn_or_path, table):
+    """Return column info from PRAGMA. Accepts either a connection or path."""
+    if isinstance(conn_or_path, str):
+        conn = sqlite3.connect(conn_or_path)
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        conn.close()
+    else:
+        rows = conn_or_path.execute(f"PRAGMA table_info({table})").fetchall()
     return {row[1]: {"type": row[2], "notnull": row[3], "default": row[4], "pk": row[5]} for row in rows}
 
 
@@ -233,7 +240,7 @@ def test_schema_creation():
     tables = _get_tables(conn)
     conn.close()
     expected = ["users", "profiles", "activity_log", "organizations",
-                "usage_tracking", "admin_audit_log", "platform_settings"]
+                "usage_tracking", "admin_audit_log", "platform_settings", "product_events"]
     missing = [t for t in expected if t not in tables]
     if missing:
         return f"Missing tables: {missing}"
@@ -241,10 +248,8 @@ def test_schema_creation():
 
 
 def test_users_table_columns():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "users")
+    cols = _get_table_columns(_TEST_DB_PATH, "users")
     _schema_inventory["users"] = cols
-    conn.close()
     expected = [
         "username", "email", "password_hash", "is_admin", "org_id",
         "subscription_status", "created_at", "subscription_tier",
@@ -261,10 +266,8 @@ def test_users_table_columns():
 
 
 def test_profiles_table_columns():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "profiles")
+    cols = _get_table_columns(_TEST_DB_PATH, "profiles")
     _schema_inventory["profiles"] = cols
-    conn.close()
     expected = ["id", "org_id", "name", "data", "created_at",
                 "updated_by", "is_sample_brand"]
     missing = [c for c in expected if c not in cols]
@@ -274,10 +277,8 @@ def test_profiles_table_columns():
 
 
 def test_activity_log_table():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "activity_log")
+    cols = _get_table_columns(_TEST_DB_PATH, "activity_log")
     _schema_inventory["activity_log"] = cols
-    conn.close()
     expected = ["id", "org_id", "username", "timestamp", "activity_type",
                 "asset_name", "score", "verdict", "metadata_json"]
     missing = [c for c in expected if c not in cols]
@@ -287,10 +288,8 @@ def test_activity_log_table():
 
 
 def test_usage_tracking_table():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "usage_tracking")
+    cols = _get_table_columns(_TEST_DB_PATH, "usage_tracking")
     _schema_inventory["usage_tracking"] = cols
-    conn.close()
     expected = ["id", "username", "org_id", "module", "action_weight",
                 "billing_month", "timestamp", "is_impersonated", "action_detail"]
     missing = [c for c in expected if c not in cols]
@@ -300,10 +299,8 @@ def test_usage_tracking_table():
 
 
 def test_organizations_table():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "organizations")
+    cols = _get_table_columns(_TEST_DB_PATH, "organizations")
     _schema_inventory["organizations"] = cols
-    conn.close()
     expected = ["org_id", "org_name", "subscription_tier",
                 "owner_username", "created_at"]
     missing = [c for c in expected if c not in cols]
@@ -313,10 +310,8 @@ def test_organizations_table():
 
 
 def test_admin_audit_log_table():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "admin_audit_log")
+    cols = _get_table_columns(_TEST_DB_PATH, "admin_audit_log")
     _schema_inventory["admin_audit_log"] = cols
-    conn.close()
     expected = ["id", "admin_username", "action_type", "target_type",
                 "target_id", "details", "timestamp"]
     missing = [c for c in expected if c not in cols]
@@ -326,10 +321,8 @@ def test_admin_audit_log_table():
 
 
 def test_platform_settings_table():
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    cols = _get_table_columns(conn, "platform_settings")
+    cols = _get_table_columns(_TEST_DB_PATH, "platform_settings")
     _schema_inventory["platform_settings"] = cols
-    conn.close()
     expected = ["key", "value", "updated_at", "updated_by"]
     missing = [c for c in expected if c not in cols]
     if missing:
@@ -1048,14 +1041,14 @@ def test_usage_with_detail():
     billing_month = datetime.now().strftime("%Y-%m")
     db.record_usage_action("testuser1", "testuser1", "visual_audit", 3, billing_month, "audit of logo.png")
     # Verify via direct query
-    conn = sqlite3.connect(_TEST_DB_PATH)
-    row = conn.execute(
+    _conn = sqlite3.connect(_TEST_DB_PATH)
+    _row = _conn.execute(
         "SELECT action_detail FROM usage_tracking WHERE username = ? AND module = 'visual_audit' ORDER BY id DESC LIMIT 1",
         ("testuser1",)
     ).fetchone()
-    conn.close()
-    if not row or row[0] != "audit of logo.png":
-        return f"action_detail not stored correctly: {row}"
+    _conn.close()
+    if not _row or _row[0] != "audit of logo.png":
+        return f"action_detail not stored correctly: {_row}"
     return True
 
 
