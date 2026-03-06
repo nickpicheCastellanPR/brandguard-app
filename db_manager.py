@@ -2201,7 +2201,7 @@ def create_user_admin(username, email, password, tier='solo', org_id=None, org_r
             INSERT INTO users (username, email, password_hash, org_id, is_admin, subscription_tier,
                                subscription_status, org_role, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-        '''), (username, email, hashed, org_id, 1 if org_role == 'owner' else 0,
+        '''), (username, email, hashed, org_id, True if org_role == 'owner' else False,
               tier, org_role, datetime.now().isoformat()))
         conn.commit()
         return True
