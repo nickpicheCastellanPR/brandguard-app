@@ -1,0 +1,29 @@
+=== VISUAL AUDIT PROMPT ANALYSIS ===
+
+The Visual Audit does NOT use prompt_builder.py build_brand_context().
+Instead, logic.py run_visual_audit() builds its own prompt.
+
+The profile_text parameter is assembled by the visual_audit module in app.py,
+which passes brand data directly (not via prompt_builder).
+
+The AI prompt in logic.py includes:
+- System prompt: "You are a Chief Brand Officer conducting brand compliance audits"
+- Brand profile text (passed directly)
+- Detected hex codes from deterministic color analysis
+- Instructions for 5-pillar scoring (Identity 25%, Color 25%, Typography 15%, Vibe 15%, Tone 20%)
+- Output format: JSON with scores, reasons, critical/minor fixes, brand wins
+
+DETERMINISTIC COMPONENT:
+The color score is computed mathematically via ColorScorer (K-Means clustering
++ Euclidean distance + tint/shade vector math) BEFORE the AI call. The math
+score is then merged with AI scores for the final weighted result.
+
+This means color compliance has ZERO false positive risk from AI hallucination.
+
+The Visual Audit's profile_text typically includes:
+- Brand identity (name, archetype, tone)
+- Color palette hex codes
+- Visual identity description
+- Guardrails
+- NOT the full message house (not needed for visual audits)
+- NOT voice samples (irrelevant for visual compliance)

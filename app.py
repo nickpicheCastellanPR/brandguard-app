@@ -1375,6 +1375,9 @@ if not st.session_state['authenticated']:
                     db.track_event("user_registered", r_user,
                                    metadata={"source": "direct", "trial": True}, org_id=r_org)
                     db.check_milestone(r_user, "account_created", org_id=r_org)
+                    # Welcome email (silent failure — never blocks registration)
+                    if r_email:
+                        email_helper.send_welcome_email(r_email, r_user)
                     st.success(f"Account created! Your 14-day trial is active. Please log in.")
                 else:
                     st.error("Username already taken.")

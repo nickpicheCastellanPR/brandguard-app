@@ -4,7 +4,11 @@
       "Bash(py -c \"import py_compile; py_compile.compile\\(''visual_audit.py'', doraise=True\\); print\\(''visual_audit.py OK''\\)\")",
       "Bash(python3 -c \":*)",
       "Bash(/c/Users/nickj/AppData/Local/Python/bin/python3.exe test_suite.py)",
-      "Bash(/c/Users/nickj/AppData/Local/Python/bin/python3.exe c:/Users/nickj/OneDrive/Desktop/brandguard-app/test_suite.py)"
+      "Bash(/c/Users/nickj/AppData/Local/Python/bin/python3.exe c:/Users/nickj/OneDrive/Desktop/brandguard-app/test_suite.py)",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" --version)",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _audit_script.py)",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _cost_script.py)",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _report_gen.py)"
     ]
   }
 }
