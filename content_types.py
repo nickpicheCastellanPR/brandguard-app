@@ -224,6 +224,55 @@ VOICE_CLUSTER_NAMES = [
 ]
 
 
+# ── Display order for content type dropdowns ─────────────────────────────────
+# Grouped by cluster. Most common types first within each group.
+
+CONTENT_TYPE_ORDER = [
+    # ── Corporate Affairs ──
+    "press_release",
+    "company_statement",
+    "fact_sheet",
+    "investor_update",
+    "board_report",
+    # ── Crisis & Response ──
+    "holding_statement",
+    "incident_report",
+    "customer_apology",
+    "crisis_faq",
+    # ── Internal Leadership ──
+    "all_hands_memo",
+    "team_update",
+    "org_change_announcement",
+    "policy_announcement",
+    # ── Thought Leadership ──
+    "blog_post",
+    "op_ed",
+    "byline_article",
+    "conference_talk",
+    "keynote_speech",
+    # ── Brand Marketing ──
+    "product_launch_email",
+    "customer_email",
+    "newsletter",
+    "website_copy",
+    "product_description",
+    "social_campaign_brief",
+    # ── Custom (always last) ──
+    "custom",
+]
+
+
+# ── Cluster display names ────────────────────────────────────────────────────
+
+CLUSTER_DISPLAY_NAMES = {
+    "Corporate Affairs": "Corporate Affairs",
+    "Crisis & Response": "Crisis & Response",
+    "Internal Leadership": "Internal Leadership",
+    "Thought Leadership": "Thought Leadership",
+    "Brand Marketing": "Brand Marketing",
+}
+
+
 # ── Helper functions ─────────────────────────────────────────────────────────
 
 def get_content_types_for_module(module: str) -> dict:
@@ -242,6 +291,34 @@ def get_type_key_by_label(label: str) -> str:
 def get_labels_for_module(module: str) -> list[str]:
     """Get a flat list of display labels for a module's dropdown."""
     return [v["label"] for k, v in CONTENT_TYPES.items() if module in v["modules"]]
+
+
+def get_ordered_display_options(module: str) -> list[str]:
+    """Build ordered dropdown options with cluster context (Approach A).
+
+    Returns labels like 'Press Release  ·  Corporate Affairs' grouped by cluster.
+    Filters to only types available for the given module.
+    """
+    options = []
+    for key in CONTENT_TYPE_ORDER:
+        config = CONTENT_TYPES.get(key)
+        if not config or module not in config["modules"]:
+            continue
+        if key == "custom":
+            options.append(config["label"])
+        else:
+            cluster_name = config["cluster"] or ""
+            options.append(f"{config['label']}  \u00b7  {cluster_name}")
+    return options
+
+
+def get_key_from_display(display_option: str) -> str:
+    """Reverse-lookup content type key from the display string (with cluster suffix)."""
+    label = display_option.split("  \u00b7  ")[0].strip()
+    for key, config in CONTENT_TYPES.items():
+        if config["label"] == label:
+            return key
+    return "custom"
 
 
 def get_cluster_for_type(type_key: str) -> str | None:

@@ -14,9 +14,12 @@ import visual_audit
 import html
 from prompt_builder import build_brand_context, build_social_context, build_mh_context
 from content_types import (CONTENT_TYPES, SOCIAL_PLATFORMS, VISUAL_ASSET_TYPES,
-                           get_labels_for_module, get_type_key_by_label, get_cluster_for_label,
+                           CLUSTER_DISPLAY_NAMES,
+                           get_cluster_for_label,
                            get_word_range, get_length_label, get_social_platform_key,
-                           get_social_length_label, VOICE_CLUSTER_NAMES as CT_CLUSTER_NAMES)
+                           get_social_length_label, get_ordered_display_options,
+                           get_key_from_display,
+                           VOICE_CLUSTER_NAMES as CT_CLUSTER_NAMES)
 import brand_ui
 import email_helper
 
@@ -762,6 +765,77 @@ def format_activity_time(timestamp_str: str, created_at) -> str:
 
 
 # build_mh_context is imported from prompt_builder.py
+
+# --- SHARED: Content Type Selector with Cluster Visibility & Override ---
+def render_content_type_selector(module_name: str, key_prefix: str):
+    """Shared content type selector with ordered dropdown, cluster display, and override.
+
+    Args:
+        module_name: 'generator' or 'editor'
+        key_prefix: prefix for session state keys ('cg' or 'ce')
+
+    Returns:
+        (type_key, active_cluster, custom_desc, display_label)
+        - type_key: content type key (e.g. 'press_release')
+        - active_cluster: resolved cluster (respects override)
+        - custom_desc: user description if custom type, else ''
+        - display_label: clean label for prompts (e.g. 'Press Release')
+    """
+    # Ordered dropdown with cluster context
+    _options = get_ordered_display_options(module_name)
+    selected_display = st.selectbox(
+        "FORMAT" if module_name == "generator" else "CONTENT TYPE",
+        _options,
+        key=f"{key_prefix}_type_display"
+    )
+
+    type_key = get_key_from_display(selected_display)
+    config = CONTENT_TYPES.get(type_key, CONTENT_TYPES["custom"])
+    default_cluster = config["cluster"]
+    display_label = config["label"]
+
+    custom_desc = ""
+
+    if type_key != "custom":
+        # Show cluster assignment + override option
+        cluster_name = CLUSTER_DISPLAY_NAMES.get(default_cluster, "Unknown")
+        _ov_c1, _ov_c2 = st.columns([3, 1])
+        with _ov_c1:
+            st.caption(f"VOICE CLUSTER: {cluster_name.upper()}")
+        with _ov_c2:
+            override = st.checkbox("Override", key=f"{key_prefix}_cluster_override")
+
+        if override:
+            cluster_options = list(CLUSTER_DISPLAY_NAMES.values())
+            selected_cluster_label = st.selectbox(
+                "SELECT VOICE CLUSTER",
+                cluster_options,
+                index=cluster_options.index(cluster_name),
+                key=f"{key_prefix}_cluster_override_select"
+            )
+            active_cluster = selected_cluster_label
+        else:
+            active_cluster = default_cluster
+    else:
+        # Custom type: always show description + cluster selector
+        custom_desc = st.text_input(
+            "DESCRIBE THE CONTENT TYPE",
+            placeholder="e.g. board update, conference abstract, investor FAQ",
+            max_chars=200,
+            key=f"{key_prefix}_custom_desc"
+        )
+        cluster_options = list(CLUSTER_DISPLAY_NAMES.values())
+        selected_cluster_label = st.selectbox(
+            "WHICH VOICE CLUSTER BEST FITS THIS CONTENT?",
+            cluster_options,
+            index=3,  # Default: Thought Leadership
+            key=f"{key_prefix}_custom_cluster"
+        )
+        active_cluster = selected_cluster_label
+
+    return type_key, active_cluster, custom_desc, display_label
+
+
 # --- HELPER: ASSET-AWARE CONFIDENCE ENGINE ---
 def calculate_content_confidence(profile_data, content_type):
     """
@@ -3002,31 +3076,12 @@ elif app_mode == "COPY EDITOR":
             # Context Inputs
             cc1, cc2, cc3 = st.columns(3)
             with cc1:
-                # Trigger: Changing this updates the Confidence Meter — shared config
-                _ce_type_labels = get_labels_for_module("editor")
-                content_type = st.selectbox("CONTENT TYPE", _ce_type_labels)
-                _ce_type_key = get_type_key_by_label(content_type)
+                _ce_type_key, _ce_active_cluster, _ce_custom_desc, _ce_display_label = render_content_type_selector("editor", "ce")
+                content_type = _ce_display_label
             with cc2:
-                # Persisted Sender
                 st.text_input("SENDER / VOICE", placeholder="e.g. CEO", key="ce_sender", max_chars=100)
             with cc3:
-                # Persisted Audience
                 st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors", key="ce_audience", max_chars=100)
-
-            # Custom type: show description + cluster selector below the row
-            _ce_custom_desc = ""
-            _ce_custom_cluster = None
-            if _ce_type_key == "custom":
-                _ce_cc1, _ce_cc2 = st.columns(2)
-                with _ce_cc1:
-                    _ce_custom_desc = st.text_input(
-                        "DESCRIBE THE CONTENT TYPE",
-                        placeholder="e.g. board update, conference abstract",
-                        max_chars=200, key="ce_custom_desc")
-                with _ce_cc2:
-                    _ce_custom_cluster = st.selectbox(
-                        "CLOSEST COMMUNICATION STYLE",
-                        CT_CLUSTER_NAMES, index=3, key="ce_custom_cluster")
                 
         with c2: 
             # --- DYNAMIC CALIBRATION METER ---
@@ -3073,12 +3128,18 @@ elif app_mode == "COPY EDITOR":
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         
                         # --- BRAND CONTEXT (via shared builder) ---
-                        _ce_cluster = _ce_custom_cluster if _ce_type_key == "custom" else get_cluster_for_label(content_type)
+                        _ce_cluster = _ce_active_cluster
                         prof_text = build_brand_context(
                             profile_data,
                             include_voice_samples=True,
                             cluster_filter=_ce_cluster,
                         )
+
+                        # Cluster override note for prompt
+                        _ce_default_cluster = CONTENT_TYPES.get(_ce_type_key, {}).get("cluster")
+                        _ce_override_note = ""
+                        if _ce_cluster and _ce_default_cluster and _ce_cluster != _ce_default_cluster:
+                            _ce_override_note = f"\nNote: The user has overridden the default voice cluster. Default for {content_type} is {_ce_default_cluster}, but the user selected {_ce_cluster}. Use voice samples from the {_ce_cluster} cluster.\n"
 
                         # Length context for auditing
                         _ce_std_range = get_word_range(_ce_type_key, "standard")
@@ -3092,7 +3153,7 @@ elif app_mode == "COPY EDITOR":
 CONTEXT:
 - Brand: {active_profile}
 - Type: {_ce_type_desc}
-- Communication Style: {_ce_cluster or 'General'}
+- Communication Style: {_ce_cluster or 'General'}{_ce_override_note}
 - Sender: {st.session_state['ce_sender']}
 - Audience: {st.session_state['ce_audience']}
 - Intensity: {edit_intensity}
@@ -3398,22 +3459,8 @@ elif app_mode == "CONTENT GENERATOR":
             # Expanded Format List
             cc1, cc2 = st.columns(2)
             with cc1:
-                # Trigger for Dynamic Calibration — shared config
-                _cg_type_labels = get_labels_for_module("generator")
-                content_type = st.selectbox("FORMAT", _cg_type_labels)
-                _cg_type_key = get_type_key_by_label(content_type)
-
-                # Custom type: show description + cluster selector
-                _cg_custom_desc = ""
-                _cg_custom_cluster = None
-                if _cg_type_key == "custom":
-                    _cg_custom_desc = st.text_input(
-                        "DESCRIBE THE CONTENT TYPE",
-                        placeholder="e.g. board update, conference abstract, investor FAQ",
-                        max_chars=200, key="cg_custom_desc")
-                    _cg_custom_cluster = st.selectbox(
-                        "CLOSEST COMMUNICATION STYLE",
-                        CT_CLUSTER_NAMES, index=3, key="cg_custom_cluster")  # Default: Thought Leadership
+                _cg_type_key, _cg_active_cluster, _cg_custom_desc, _cg_display_label = render_content_type_selector("generator", "cg")
+                content_type = _cg_display_label
 
             with cc2:
                 _cg_length = st.select_slider(
@@ -3478,12 +3525,18 @@ elif app_mode == "CONTENT GENERATOR":
                     with st.spinner("ARCHITECTING CONTENT..."):
                         
                         # --- BRAND CONTEXT (via shared builder) ---
-                        _cg_cluster = _cg_custom_cluster if _cg_type_key == "custom" else get_cluster_for_label(content_type)
+                        _cg_cluster = _cg_active_cluster
                         prof_text = build_brand_context(
                             profile_data,
                             include_voice_samples=True,
                             cluster_filter=_cg_cluster,
                         )
+
+                        # Cluster override note for prompt
+                        _cg_default_cluster = CONTENT_TYPES.get(_cg_type_key, {}).get("cluster")
+                        _cg_override_note = ""
+                        if _cg_cluster and _cg_default_cluster and _cg_cluster != _cg_default_cluster:
+                            _cg_override_note = f"\nNote: The user has overridden the default voice cluster. Default for {content_type} is {_cg_default_cluster}, but the user selected {_cg_cluster}. Use voice samples from the {_cg_cluster} cluster.\n"
 
                         # Build content type context for the prompt
                         _cg_type_desc = content_type
@@ -3494,7 +3547,7 @@ elif app_mode == "CONTENT GENERATOR":
                         prompt_wrapper = f"""
                         CONTEXT:
                         - Type: {_cg_type_desc}
-                        - Communication Style: {_cg_cluster or 'General'}
+                        - Communication Style: {_cg_cluster or 'General'}{_cg_override_note}
                         - Target Length: {_cg_word_range[0]}-{_cg_word_range[1]} words
                         - Sender: {sender}
                         - Audience: {audience}
@@ -3773,6 +3826,26 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             if _sm_plat_conf.get("notes"):
                 st.caption(f"_{_sm_plat_conf['notes']}_")
 
+            # --- Cluster visibility & override (default: Brand Marketing) ---
+            _sm_default_cluster = "Brand Marketing"
+            _sm_ov_c1, _sm_ov_c2 = st.columns([3, 1])
+            with _sm_ov_c1:
+                st.caption(f"VOICE CLUSTER: {_sm_default_cluster.upper()}")
+            with _sm_ov_c2:
+                _sm_cluster_override = st.checkbox("Override", key="sm_cluster_override")
+
+            if _sm_cluster_override:
+                _sm_cluster_options = list(CLUSTER_DISPLAY_NAMES.values())
+                _sm_selected_cluster = st.selectbox(
+                    "SELECT VOICE CLUSTER",
+                    _sm_cluster_options,
+                    index=_sm_cluster_options.index(_sm_default_cluster),
+                    key="sm_cluster_override_select"
+                )
+                _sm_active_cluster = _sm_selected_cluster
+            else:
+                _sm_active_cluster = _sm_default_cluster
+
             st.markdown("##### 2. CONTENT CONTEXT")
             # Text Input (Persisted via key)
             st.text_input(
@@ -3823,7 +3896,15 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                     with st.spinner("SCANNING TRENDS & DRAFTING..."):
 
                         # --- BRAND CONTEXT (via shared builder) ---
-                        prof_text = build_social_context(profile_data)
+                        if _sm_active_cluster != _sm_default_cluster:
+                            # User overrode cluster — use build_brand_context with cluster filter
+                            prof_text = build_brand_context(
+                                profile_data,
+                                include_voice_samples=True,
+                                cluster_filter=_sm_active_cluster,
+                            )
+                        else:
+                            prof_text = build_social_context(profile_data)
 
                         # Image Analysis (if present)
                         image_desc = ""
@@ -3834,10 +3915,14 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                         # Engineered Prompt (Trend-Aware, Transparent, Structured)
                         image_line = f"\nIMAGE CONTEXT: {image_desc}" if image_desc else ""
                         _sm_word_range = SOCIAL_PLATFORMS.get(_sm_plat_key, SOCIAL_PLATFORMS["linkedin"])["lengths"].get(st.session_state['sm_length'], (100, 200))
+                        _sm_cluster_note = ""
+                        if _sm_active_cluster != _sm_default_cluster:
+                            _sm_cluster_note = f"\nVOICE CLUSTER OVERRIDE: The user has selected the {_sm_active_cluster} cluster instead of the default Brand Marketing. Match the tone and style of {_sm_active_cluster} voice samples.\n"
                         prompt = (
                             f"ROLE: Expert Social Media Manager for the brand defined in <brand_profile>.\n"
                             f"PLATFORM: {st.session_state['sm_platform']} (Adhere strictly to character limits and cultural norms).\n"
                             f"TARGET LENGTH: Each post option should be approximately {_sm_word_range[0]}-{_sm_word_range[1]} words.\n"
+                            f"{_sm_cluster_note}"
                             f"GOAL: {st.session_state['sm_goal']}\n"
                             f"TOPIC: \"\"\"{st.session_state['sm_topic']}\"\"\""
                             f"{image_line}\n\n"
@@ -4353,7 +4438,7 @@ elif app_mode == "BRAND ARCHITECT":
 
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
-            st.selectbox("CONTENT TYPE", get_labels_for_module("editor"), key="wiz_sample_type")
+            st.selectbox("CONTENT TYPE", get_ordered_display_options("editor"), key="wiz_sample_type")
             v_tab1, v_tab2 = st.tabs(["PASTE TEXT", "UPLOAD FILE"])
             with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150, max_chars=10000)
             with v_tab2:
