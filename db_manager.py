@@ -2173,6 +2173,170 @@ def get_revenue_metrics():
         conn.close()
 
 
+def get_feedback_summary():
+    """Returns overall feedback counts: {yes, close, no, total, total_actions}."""
+    conn = _get_connection()
+    try:
+        rating = _json_extract('metadata_json', 'rating')
+        sql = f"""
+            SELECT {rating} as rating, COUNT(*) as cnt
+            FROM product_events
+            WHERE event_type = 'output_feedback'
+            GROUP BY {rating}
+        """
+        rows = _execute_plain(conn, sql).fetchall()
+        counts = {"yes": 0, "close": 0, "no": 0}
+        for r in rows:
+            d = _dict_row(r)
+            k = d.get('rating', '')
+            if k in counts:
+                counts[k] = d.get('cnt', 0)
+        counts['total'] = counts['yes'] + counts['close'] + counts['no']
+
+        # Total module actions for feedback rate
+        total_actions = _fetchone_val(
+            _execute_plain(conn, "SELECT COUNT(*) FROM product_events WHERE event_type = 'module_action'"),
+            0
+        )
+        counts['total_actions'] = total_actions
+        return counts
+    finally:
+        conn.close()
+
+
+def get_feedback_by_module():
+    """Returns feedback breakdown per module."""
+    conn = _get_connection()
+    try:
+        mod = _json_extract('metadata_json', 'module')
+        rating = _json_extract('metadata_json', 'rating')
+        sql = f"""
+            SELECT {mod} as module, {rating} as rating, COUNT(*) as cnt
+            FROM product_events
+            WHERE event_type = 'output_feedback'
+            GROUP BY {mod}, {rating}
+        """
+        rows = _execute_plain(conn, sql).fetchall()
+        modules = {}
+        for r in rows:
+            d = _dict_row(r)
+            m = d.get('module', '')
+            rt = d.get('rating', '')
+            if m not in modules:
+                modules[m] = {"yes": 0, "close": 0, "no": 0}
+            if rt in modules[m]:
+                modules[m][rt] = d.get('cnt', 0)
+
+        # Get total actions per module for feedback rate
+        mod2 = _json_extract('metadata_json', 'module')
+        sql2 = f"""
+            SELECT {mod2} as module, COUNT(*) as cnt
+            FROM product_events
+            WHERE event_type = 'module_action'
+            GROUP BY {mod2}
+        """
+        action_rows = _execute_plain(conn, sql2).fetchall()
+        action_counts = {}
+        for r in action_rows:
+            d = _dict_row(r)
+            action_counts[d.get('module', '')] = d.get('cnt', 0)
+
+        result = []
+        for m, counts in modules.items():
+            total = counts['yes'] + counts['close'] + counts['no']
+            actions = action_counts.get(m, 0)
+            result.append({
+                "module": m,
+                "yes": counts['yes'], "close": counts['close'], "no": counts['no'],
+                "total": total,
+                "total_actions": actions,
+            })
+        return result
+    finally:
+        conn.close()
+
+
+def get_feedback_by_confidence():
+    """Returns feedback grouped by engine confidence tiers (0-25, 26-50, 51-75, 76-100)."""
+    conn = _get_connection()
+    try:
+        conf = _json_extract('metadata_json', 'engine_confidence')
+        rating = _json_extract('metadata_json', 'rating')
+        sql = f"""
+            SELECT {conf} as confidence, {rating} as rating, COUNT(*) as cnt
+            FROM product_events
+            WHERE event_type = 'output_feedback'
+            GROUP BY {conf}, {rating}
+        """
+        rows = _execute_plain(conn, sql).fetchall()
+
+        buckets = {
+            "0-25": {"yes": 0, "close": 0, "no": 0},
+            "26-50": {"yes": 0, "close": 0, "no": 0},
+            "51-75": {"yes": 0, "close": 0, "no": 0},
+            "76-100": {"yes": 0, "close": 0, "no": 0},
+        }
+        for r in rows:
+            d = _dict_row(r)
+            try:
+                c = int(float(d.get('confidence', 0) or 0))
+            except (ValueError, TypeError):
+                c = 0
+            rt = d.get('rating', '')
+            if c <= 25:
+                bucket = "0-25"
+            elif c <= 50:
+                bucket = "26-50"
+            elif c <= 75:
+                bucket = "51-75"
+            else:
+                bucket = "76-100"
+            if rt in buckets[bucket]:
+                buckets[bucket][rt] += d.get('cnt', 0)
+
+        result = []
+        for label, counts in buckets.items():
+            total = counts['yes'] + counts['close'] + counts['no']
+            result.append({"tier": label, "yes": counts['yes'], "close": counts['close'], "no": counts['no'], "total": total})
+        return result
+    finally:
+        conn.close()
+
+
+def get_feedback_weekly(weeks=8):
+    """Returns weekly feedback counts for trend analysis."""
+    conn = _get_connection()
+    try:
+        rating = _json_extract('metadata_json', 'rating')
+        results = []
+        for w in range(weeks):
+            if is_postgres():
+                start = f"NOW() - INTERVAL '{(w+1)*7} days'"
+                end = f"NOW() - INTERVAL '{w*7} days'"
+            else:
+                start = f"datetime('now', '-{(w+1)*7} days')"
+                end = f"datetime('now', '-{w*7} days')"
+            sql = f"""
+                SELECT {rating} as rating, COUNT(*) as cnt
+                FROM product_events
+                WHERE event_type = 'output_feedback'
+                AND timestamp >= {start} AND timestamp < {end}
+                GROUP BY {rating}
+            """
+            rows = _execute_plain(conn, sql).fetchall()
+            week_data = {"week": w, "yes": 0, "close": 0, "no": 0}
+            for r in rows:
+                d = _dict_row(r)
+                rt = d.get('rating', '')
+                if rt in week_data:
+                    week_data[rt] = d.get('cnt', 0)
+            week_data['total'] = week_data['yes'] + week_data['close'] + week_data['no']
+            results.append(week_data)
+        return list(reversed(results))  # oldest first
+    finally:
+        conn.close()
+
+
 def get_product_events_csv():
     """Returns all product_events as CSV string for export."""
     conn = _get_connection()

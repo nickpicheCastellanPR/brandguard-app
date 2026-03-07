@@ -182,6 +182,7 @@ def render_product_analytics():
     _section_6_onboarding_funnel()
     _section_7_acquisition()
     _section_8_revenue()
+    _section_9_output_quality()
 
     st.divider()
     _section_exports()
@@ -644,6 +645,120 @@ def _section_8_revenue():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9: HOW GOOD IS THE OUTPUT?
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _section_9_output_quality():
+    st.markdown("## How Good Is the Output?")
+
+    summary = db.get_feedback_summary()
+    total = summary['total']
+
+    if total == 0:
+        st.info("No output feedback collected yet. Feedback buttons appear below every module output.")
+        return
+
+    # --- Overall satisfaction bars ---
+    st.markdown("##### Overall Satisfaction")
+
+    feedback_rate = round(total / summary['total_actions'] * 100, 1) if summary['total_actions'] > 0 else 0
+    yes_pct = round(summary['yes'] / total * 100) if total else 0
+    close_pct = round(summary['close'] / total * 100) if total else 0
+    no_pct = round(summary['no'] / total * 100) if total else 0
+
+    def _bar(label, count, pct, color):
+        bar_width = max(pct, 2)
+        st.markdown(f"""
+        <div style="margin-bottom: 10px;">
+            <div style="display:flex; align-items:center; gap: 12px;">
+                <span style="width:50px; font-size:0.85rem; font-weight:700; color:{CHARCOAL};">{label}</span>
+                <div style="flex:1; height:18px; background:#e8e8e4; border-radius:3px; overflow:hidden;">
+                    <div style="width:{bar_width}%; height:100%; background:{color};"></div>
+                </div>
+                <span style="width:80px; font-size:0.85rem; color:{CHARCOAL}; text-align:right;">{pct}%</span>
+                <span style="width:80px; font-size:0.75rem; color:{SAGE}; text-align:right;">({count})</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    _bar("YES", summary['yes'], yes_pct, GOLD)
+    _bar("CLOSE", summary['close'], close_pct, CHARCOAL)
+    _bar("NO", summary['no'], no_pct, COPPER)
+
+    st.markdown(
+        f'<p class="definition-note">Total rated outputs: {total} of {summary["total_actions"]} actions '
+        f'({feedback_rate}% feedback rate)</p>',
+        unsafe_allow_html=True
+    )
+
+    # --- By module ---
+    st.markdown("##### By Module")
+    by_module = db.get_feedback_by_module()
+    if by_module:
+        headers = ["Module", "YES", "CLOSE", "NO", "Feedback Rate"]
+        rows = []
+        for m in by_module:
+            t = m['total']
+            y = round(m['yes'] / t * 100) if t else 0
+            c = round(m['close'] / t * 100) if t else 0
+            n = round(m['no'] / t * 100) if t else 0
+            fr = round(t / m['total_actions'] * 100) if m['total_actions'] > 0 else 0
+            label = m['module'].replace('_', ' ').title()
+            rows.append([label, f"{y}%", f"{c}%", f"{n}%", f"{fr}%"])
+        st.markdown(_html_table(headers, rows), unsafe_allow_html=True)
+
+    # --- By confidence tier ---
+    st.markdown("##### By Engine Confidence")
+    by_conf = db.get_feedback_by_confidence()
+    if by_conf:
+        has_data = any(b['total'] > 0 for b in by_conf)
+        if has_data:
+            headers = ["Confidence", "YES", "CLOSE", "NO", "Avg Rating"]
+            rows = []
+            for b in by_conf:
+                t = b['total']
+                if t == 0:
+                    rows.append([b['tier'], "--", "--", "--", "--"])
+                    continue
+                y = round(b['yes'] / t * 100)
+                c = round(b['close'] / t * 100)
+                n = round(b['no'] / t * 100)
+                # Weighted average: yes=3, close=2, no=1
+                avg = (b['yes'] * 3 + b['close'] * 2 + b['no']) / t
+                rating_label = "Strong" if avg >= 2.6 else "Good" if avg >= 2.2 else "Moderate" if avg >= 1.8 else "Low"
+                rows.append([b['tier'], f"{y}%", f"{c}%", f"{n}%", rating_label])
+            st.markdown(_html_table(headers, rows), unsafe_allow_html=True)
+            st.markdown(
+                f'<p class="definition-note">If higher confidence tiers show higher YES rates, '
+                f'calibration depth is translating to perceived quality.</p>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.caption("No confidence-correlated feedback yet.")
+
+    # --- Weekly trend ---
+    st.markdown("##### Weekly Trend")
+    weekly = db.get_feedback_weekly(8)
+    weeks_with_data = [w for w in weekly if w['total'] > 0]
+    if weeks_with_data:
+        headers = ["Week", "YES", "CLOSE", "NO", "Total"]
+        rows = []
+        for w in weekly:
+            if w['total'] == 0:
+                label = f"{w['week']}w ago" if w['week'] > 0 else "This week"
+                rows.append([label, "--", "--", "--", "0"])
+                continue
+            label = f"{w['week']}w ago" if w['week'] > 0 else "This week"
+            y = round(w['yes'] / w['total'] * 100)
+            c = round(w['close'] / w['total'] * 100)
+            n = round(w['no'] / w['total'] * 100)
+            rows.append([label, f"{y}%", f"{c}%", f"{n}%", str(w['total'])])
+        st.markdown(_html_table(headers, rows), unsafe_allow_html=True)
+    else:
+        st.caption("No weekly trend data yet.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # EXPORTS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -791,4 +906,34 @@ Free-to-paid conversion: {rev['conversion_rate']}%{'' if rev['paying_users'] > 0
 ## Acquisition
 Primary channel: {primary_source} ({primary_pct}% of signups).
 """
+
+    # Output Quality section
+    fb = db.get_feedback_summary()
+    if fb['total'] > 0:
+        fb_yes_pct = round(fb['yes'] / fb['total'] * 100)
+        fb_close_pct = round(fb['close'] / fb['total'] * 100)
+        fb_no_pct = round(fb['no'] / fb['total'] * 100)
+        fb_rate = round(fb['total'] / fb['total_actions'] * 100, 1) if fb['total_actions'] > 0 else 0
+
+        # Confidence correlation
+        by_conf = db.get_feedback_by_confidence()
+        high_conf = next((b for b in by_conf if b['tier'] == '76-100'), None)
+        low_conf = next((b for b in by_conf if b['tier'] == '0-25'), None)
+        high_yes = round(high_conf['yes'] / high_conf['total'] * 100) if high_conf and high_conf['total'] > 0 else 0
+        low_yes = round(low_conf['yes'] / low_conf['total'] * 100) if low_conf and low_conf['total'] > 0 else 0
+
+        report += f"""
+## Output Quality
+{fb_yes_pct}% of rated outputs matched the user's brand (YES rating).
+{fb_close_pct}% were close but needed refinement (CLOSE rating).
+{fb_no_pct}% missed the mark (NO rating).
+Feedback rate: {fb_rate}% of actions received a rating.
+"""
+        if high_conf and high_conf['total'] > 0:
+            report += f"Correlation: brands at 76%+ Engine Confidence received YES ratings {high_yes}% of the time"
+            if low_conf and low_conf['total'] > 0:
+                report += f",\ncompared to {low_yes}% for brands below 25% confidence.\n"
+            else:
+                report += ".\n"
+
     return report

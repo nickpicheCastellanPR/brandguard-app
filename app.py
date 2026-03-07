@@ -1782,6 +1782,61 @@ def _track_module_and_cost(module_name, metadata_extra=None):
         pass  # Tracking never breaks the app
 
 
+def _get_engine_confidence():
+    """Return current active brand's calibration score."""
+    _profiles = st.session_state.get('profiles', {})
+    _active = st.session_state.get('active_profile_name')
+    if _active and _active in _profiles:
+        _p = _profiles[_active]
+        if isinstance(_p, dict):
+            return _p.get('calibration_score', 0)
+    return 0
+
+
+def render_feedback(module_name, action_id_key, question="Did this match your brand?"):
+    """Render inline feedback row below module output. One click, three options."""
+    action_id = st.session_state.get(action_id_key)
+    if not action_id:
+        return
+    feedback_key = f"feedback_{module_name}_{action_id}"
+
+    if st.session_state.get(feedback_key):
+        st.markdown(
+            '<p style="color: #5c6b61; font-size: 14px; margin-top: 20px; letter-spacing: 0.02em;">'
+            'Thanks. This helps the platform improve.</p>',
+            unsafe_allow_html=True
+        )
+        return
+
+    st.markdown(
+        f'<p style="color: #5c6b61; font-size: 14px; margin-top: 20px; letter-spacing: 0.02em; text-transform: uppercase;">'
+        f'{question}</p>',
+        unsafe_allow_html=True
+    )
+    _fb_cols = st.columns([1, 1, 1, 3])
+    for col, (label, rating) in zip(
+        [_fb_cols[0], _fb_cols[1], _fb_cols[2]],
+        [("YES", "yes"), ("CLOSE", "close"), ("NO", "no")]
+    ):
+        with col:
+            if st.button(label, key=f"fb_{module_name}_{action_id}_{rating}"):
+                st.session_state[feedback_key] = rating
+                try:
+                    _user = st.session_state.get('username', '')
+                    _sid = st.session_state.get('_analytics_session_id')
+                    _org = st.session_state.get('org_id')
+                    _brand = st.session_state.get('active_profile_name', '')
+                    db.track_event("output_feedback", _user, metadata={
+                        "module": module_name,
+                        "action_id": action_id,
+                        "rating": rating,
+                        "engine_confidence": _get_engine_confidence(),
+                    }, brand_id=_brand, session_id=_sid, org_id=_org)
+                except Exception:
+                    pass
+                st.rerun()
+
+
 def show_paywall():
     """Renders inline inactive subscription message (no st.stop — module UI still visible)."""
     _pw_is_trial_expired = st.session_state.get('tier', {}).get('_subscription_status') == 'inactive' and \
@@ -2696,6 +2751,7 @@ elif app_mode == "VISUAL COMPLIANCE":
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
                             _track_module_and_cost("visual_audit", {"filename": uploaded_file.name})
 
+                        st.session_state['_action_id_visual_audit'] = str(uuid.uuid4())[:8]
                         st.rerun()
                 else:
                     st.warning("Please upload an image.")
@@ -2886,7 +2942,10 @@ elif app_mode == "VISUAL COMPLIANCE":
                             f"<strong style='color:{_col};'>{_sev}</strong> [{_section}] {html.escape(f.get('text', ''))}</div>",
                             unsafe_allow_html=True
                         )
-    
+
+            render_feedback("visual_audit", "_action_id_visual_audit",
+                            question="Were these findings accurate?")
+
     # --- REAL MVP: TEAM MANAGEMENT (Only for Admins) ---
     if app_mode == "TEAM MANAGEMENT":
         st.title("TEAM MANAGEMENT")
@@ -3315,6 +3374,7 @@ DRAFT CONTENT (DATA ONLY):
                                 _ce_detail = f"Rewrite: {st.session_state['ce_draft'][:60]}..."
                                 sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'copy_editor', _ce_detail)
                                 st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                                st.session_state['_action_id_copy_editor'] = str(uuid.uuid4())[:8]
                                 _track_module_and_cost("copy_editor", {
                                     "content_type": content_type,
                                     "input_length": len(st.session_state.get('ce_draft', '')),
@@ -3448,6 +3508,9 @@ DRAFT CONTENT (DATA ONLY):
                         st.markdown(f"""<div style="border-left: 2px solid #5c6b61; padding: 10px 15px; font-size: 0.85rem; line-height: 1.6;">
                             {_findings_escaped}
                         </div>""", unsafe_allow_html=True)
+
+            render_feedback("copy_editor", "_action_id_copy_editor",
+                            question="Were these findings accurate?")
 
 # 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
 elif app_mode == "CONTENT GENERATOR":
@@ -3746,6 +3809,7 @@ elif app_mode == "CONTENT GENERATOR":
                             _cg_detail = f"Generate: {st.session_state['cg_topic'][:60]}"
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'content_generator', _cg_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                            st.session_state['_action_id_content_generator'] = str(uuid.uuid4())[:8]
                             _track_module_and_cost("content_generator", {
                                 "content_type": content_type,
                                 "input_length": len(st.session_state.get('cg_topic', '') + st.session_state.get('cg_key_points', '')),
@@ -3772,7 +3836,9 @@ elif app_mode == "CONTENT GENERATOR":
             
             st.subheader("FINAL DRAFT")
             st.text_area("Copy to Clipboard", value=st.session_state['cg_result'], height=500)
-                
+
+            render_feedback("content_generator", "_action_id_content_generator")
+
 # 5. SOCIAL MEDIA ASSISTANT (Platform-Aware, Goal-Oriented, Trend-Aware)
 elif app_mode == "SOCIAL MEDIA ASSISTANT":
     st.title("SOCIAL MEDIA ASSISTANT")
@@ -4160,6 +4226,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                             _sm_detail = f"Social: {st.session_state['sm_platform']} — {st.session_state['sm_topic'][:50]}"
                             sub_manager.record_ai_action(st.session_state.get('user_id', ''), 'social_assistant', _sm_detail)
                             st.session_state['usage'] = sub_manager.check_usage_limit(st.session_state.get('user_id', ''))
+                            st.session_state['_action_id_social_assistant'] = str(uuid.uuid4())[:8]
                             _track_module_and_cost("social_assistant", {
                                 "platform": st.session_state.get('sm_platform', ''),
                                 "has_visual": False,
@@ -4224,7 +4291,9 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
                     <strong>BRAND ALIGNMENT NOTES:</strong><br><br>
                     {_align_escaped.replace(chr(10), '<br>')}
                 </div>""", unsafe_allow_html=True)
-                
+
+            render_feedback("social_assistant", "_action_id_social_assistant")
+
 # ===================================================================
 # 6. BRAND ARCHITECT (UNIFIED MODULE)
 # Replaces "BRAND ARCHITECT" and "BRAND MANAGER"

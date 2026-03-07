@@ -8,7 +8,10 @@
       "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" --version)",
       "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _audit_script.py)",
       "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _cost_script.py)",
-      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _report_gen.py)"
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" _report_gen.py)",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''app.py OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" -c \"import py_compile; py_compile.compile\\(''db_manager.py'', doraise=True\\); print\\(''db_manager.py OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\nickj\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" -c \"import py_compile; py_compile.compile\\(''product_analytics.py'', doraise=True\\); print\\(''product_analytics.py OK''\\)\")"
     ]
   }
 }
