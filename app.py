@@ -12,7 +12,11 @@ import subscription_manager as sub_manager
 import admin_panel
 import visual_audit
 import html
-from prompt_builder import build_brand_context, build_social_context, build_mh_context, CONTENT_TYPE_TO_CLUSTER
+from prompt_builder import build_brand_context, build_social_context, build_mh_context
+from content_types import (CONTENT_TYPES, SOCIAL_PLATFORMS, VISUAL_ASSET_TYPES,
+                           get_labels_for_module, get_type_key_by_label, get_cluster_for_label,
+                           get_word_range, get_length_label, get_social_platform_key,
+                           get_social_length_label, VOICE_CLUSTER_NAMES as CT_CLUSTER_NAMES)
 import brand_ui
 import email_helper
 
@@ -774,45 +778,48 @@ def calculate_content_confidence(profile_data, content_type):
     # Lowercase text scan for keywords
     final_text = str(profile_data.get('final_text', '')).lower()
     
-    # --- TIER 1: HIGH RISK (Crisis, Press Release) ---
+    # Resolve cluster for content type
+    _cc_cluster = get_cluster_for_label(content_type)
+
+    # --- TIER 1: HIGH RISK (Crisis & Response, Corporate Affairs) ---
     # Strategy: Start at 0. Trust must be earned. Safety is paramount.
-    if content_type in ["Crisis Statement", "Press Release"]:
+    if _cc_cluster in ["Crisis & Response", "Corporate Affairs"]:
         # 1. GUARDRAILS (The Safety Net) - Critical
-        if inputs.get('wiz_guardrails'): 
+        if inputs.get('wiz_guardrails'):
             score += 40
             assets_found.append("Safety Guardrails")
         else:
             missing_risks.append("Guardrails (Risk of wrong tone)")
-            
+
         # 2. VALUES (The Moral Compass) - Critical
-        if inputs.get('wiz_values'): 
+        if inputs.get('wiz_values'):
             score += 30
             assets_found.append("Core Values")
         else:
             missing_risks.append("Values (Lack of empathy anchor)")
-            
+
         # 3. MISSION (The Identity)
-        if inputs.get('wiz_mission'): 
+        if inputs.get('wiz_mission'):
             score += 20
             assets_found.append("Mission Boilerplate")
         else:
             missing_risks.append("Mission Statement")
-            
+
         # 4. HISTORY (The Precedent)
-        if content_type == "Crisis Statement" and ("crisis" in final_text or "statement" in final_text):
+        if _cc_cluster == "Crisis & Response" and ("crisis" in final_text or "statement" in final_text):
             score += 10
             assets_found.append("Crisis History")
-        elif content_type == "Press Release" and ("press" in final_text or "release" in final_text):
+        elif _cc_cluster == "Corporate Affairs" and ("press" in final_text or "release" in final_text):
             score += 10
             assets_found.append("Press History")
-            
+
         # HARD CAP: If Guardrails are missing, cannot exceed 50%.
         if not inputs.get('wiz_guardrails'):
             score = min(score, 50)
 
-    # --- TIER 2: STRATEGIC INTERNAL (Memo, Email) ---
+    # --- TIER 2: STRATEGIC INTERNAL (Internal Leadership) ---
     # Strategy: Start at 20. Needs Authority and Tone.
-    elif content_type in ["Executive Memo", "Internal Email"]:
+    elif _cc_cluster == "Internal Leadership":
         score = 20 # Base trust
         
         # 1. TONE (The Voice) - Critical
@@ -2421,32 +2428,29 @@ elif app_mode == "VISUAL COMPLIANCE":
             
             with c2:
                 st.markdown("### 2. CONTEXT & STANDARDS")
-                asset_type = st.selectbox("What are we auditing?", [
-                    "Social Media Post",
-                    "Website/Landing Page",
-                    "Email Header/Banner",
-                    "Print/Flyer",
-                    "Presentation Slide"
-                ])
-                
+                _va_labels = [v["label"] for v in VISUAL_ASSET_TYPES.values()]
+                asset_type = st.selectbox("What are we auditing?", _va_labels)
+
                 # Retrieve All Assets (Updated Function)
                 all_assets = get_all_visual_assets(profile_data)
-                
+
                 # Determine Smart Defaults based on Asset Type
                 default_selections = []
                 # 1. Always look for Logo
                 for name in all_assets.keys():
                     if "LOGO" in name.upper(): default_selections.append(name)
-                
+
                 # 2. Look for Context Matches
-                keyword_map = {
-                    "Social Media Post": "SOCIAL",
-                    "Website/Landing Page": "WEB",
-                    "Email Header/Banner": "EMAIL",
-                    "Print/Flyer": "PRINT",
-                    "Presentation Slide": "SLIDE"
+                _va_keyword_map = {
+                    "Social Media Graphic": "SOCIAL",
+                    "Marketing Page / Website": "WEB",
+                    "Email Template": "EMAIL",
+                    "Presentation Slide": "SLIDE",
+                    "Advertisement": "AD",
+                    "Document / Letterhead": "DOC",
+                    "Logo Usage": "LOGO",
                 }
-                key = keyword_map.get(asset_type, "")
+                key = _va_keyword_map.get(asset_type, "")
                 for name in all_assets.keys():
                     if key and key in name.upper() and name not in default_selections:
                         default_selections.append(name)
@@ -2997,23 +3001,32 @@ elif app_mode == "COPY EDITOR":
             
             # Context Inputs
             cc1, cc2, cc3 = st.columns(3)
-            with cc1: 
-                # Trigger: Changing this updates the Confidence Meter
-                content_type = st.selectbox("CONTENT TYPE", [
-                    "Internal Email", 
-                    "Press Release", 
-                    "Blog Post", 
-                    "Executive Memo", 
-                    "Crisis Statement",       
-                    "Speech / Script",        
-                    "Social Campaign"   
-                ])
-            with cc2: 
+            with cc1:
+                # Trigger: Changing this updates the Confidence Meter — shared config
+                _ce_type_labels = get_labels_for_module("editor")
+                content_type = st.selectbox("CONTENT TYPE", _ce_type_labels)
+                _ce_type_key = get_type_key_by_label(content_type)
+            with cc2:
                 # Persisted Sender
                 st.text_input("SENDER / VOICE", placeholder="e.g. CEO", key="ce_sender", max_chars=100)
-            with cc3: 
+            with cc3:
                 # Persisted Audience
                 st.text_input("TARGET AUDIENCE", placeholder="e.g. Investors", key="ce_audience", max_chars=100)
+
+            # Custom type: show description + cluster selector below the row
+            _ce_custom_desc = ""
+            _ce_custom_cluster = None
+            if _ce_type_key == "custom":
+                _ce_cc1, _ce_cc2 = st.columns(2)
+                with _ce_cc1:
+                    _ce_custom_desc = st.text_input(
+                        "DESCRIBE THE CONTENT TYPE",
+                        placeholder="e.g. board update, conference abstract",
+                        max_chars=200, key="ce_custom_desc")
+                with _ce_cc2:
+                    _ce_custom_cluster = st.selectbox(
+                        "CLOSEST COMMUNICATION STYLE",
+                        CT_CLUSTER_NAMES, index=3, key="ce_custom_cluster")
                 
         with c2: 
             # --- DYNAMIC CALIBRATION METER ---
@@ -3060,20 +3073,30 @@ elif app_mode == "COPY EDITOR":
                     with st.spinner("CALIBRATING TONE & SYNTAX..."):
                         
                         # --- BRAND CONTEXT (via shared builder) ---
+                        _ce_cluster = _ce_custom_cluster if _ce_type_key == "custom" else get_cluster_for_label(content_type)
                         prof_text = build_brand_context(
                             profile_data,
                             include_voice_samples=True,
-                            cluster_filter=CONTENT_TYPE_TO_CLUSTER.get(content_type),
+                            cluster_filter=_ce_cluster,
                         )
+
+                        # Length context for auditing
+                        _ce_std_range = get_word_range(_ce_type_key, "standard")
+                        _ce_draft_wc = len(st.session_state['ce_draft'].split())
+                        _ce_type_desc = content_type
+                        if _ce_type_key == "custom" and _ce_custom_desc:
+                            _ce_type_desc = f"Custom — {_ce_custom_desc}"
 
                         # Engineered Prompt
                         prompt_wrapper = f"""
 CONTEXT:
 - Brand: {active_profile}
-- Type: {content_type}
+- Type: {_ce_type_desc}
+- Communication Style: {_ce_cluster or 'General'}
 - Sender: {st.session_state['ce_sender']}
 - Audience: {st.session_state['ce_audience']}
 - Intensity: {edit_intensity}
+- Expected length for a {_ce_type_desc}: {_ce_std_range[0]}-{_ce_std_range[1]} words. The submitted draft is {_ce_draft_wc} words.
 
 STEP 0: ORGANIZATION CHECK
 Read the draft content below. Does it clearly belong to a different organization than "{active_profile}"?
@@ -3375,39 +3398,32 @@ elif app_mode == "CONTENT GENERATOR":
             # Expanded Format List
             cc1, cc2 = st.columns(2)
             with cc1:
-                # Trigger for Dynamic Calibration
-                content_type = st.selectbox("FORMAT", [
-                    # ── Corporate Affairs ──
-                    "Press Release",
-                    "Media Advisory",
-                    "Investor Update",
-                    "Fact Sheet",
-                    # ── Crisis & Response ──
-                    "Crisis Statement",
-                    "Incident Response",
-                    "Holding Statement",
-                    # ── Internal Leadership ──
-                    "Internal Email",
-                    "Executive Memo",
-                    "All-Hands Talking Points",
-                    "Intranet Page",
-                    "Policy Update",
-                    # ── Thought Leadership ──
-                    "Op-Ed / Byline",
-                    "Speech / Script",
-                    "White Paper Summary",
-                    "Conference Talk",
-                    # ── Brand Marketing ──
-                    "Blog Post",
-                    "Marketing Email",
-                    "Newsletter",
-                    "Landing Page Copy",
-                    "Case Study",
-                    "Product Announcement",
-                    "Social Campaign",
-                ])
+                # Trigger for Dynamic Calibration — shared config
+                _cg_type_labels = get_labels_for_module("generator")
+                content_type = st.selectbox("FORMAT", _cg_type_labels)
+                _cg_type_key = get_type_key_by_label(content_type)
+
+                # Custom type: show description + cluster selector
+                _cg_custom_desc = ""
+                _cg_custom_cluster = None
+                if _cg_type_key == "custom":
+                    _cg_custom_desc = st.text_input(
+                        "DESCRIBE THE CONTENT TYPE",
+                        placeholder="e.g. board update, conference abstract, investor FAQ",
+                        max_chars=200, key="cg_custom_desc")
+                    _cg_custom_cluster = st.selectbox(
+                        "CLOSEST COMMUNICATION STYLE",
+                        CT_CLUSTER_NAMES, index=3, key="cg_custom_cluster")  # Default: Thought Leadership
+
             with cc2:
-                length = st.select_slider("TARGET LENGTH", options=["Brief", "Standard", "Deep Dive"])
+                _cg_length = st.select_slider(
+                    "TARGET LENGTH",
+                    options=["brief", "standard", "detailed"],
+                    value="standard",
+                    format_func=lambda x: get_length_label(_cg_type_key, x),
+                    key="cg_length")
+                _cg_word_range = get_word_range(_cg_type_key, _cg_length)
+                st.caption(f"Target: {_cg_word_range[0]}-{_cg_word_range[1]} words")
             
             # Audience Context
             cc3, cc4 = st.columns(2)
@@ -3462,22 +3478,33 @@ elif app_mode == "CONTENT GENERATOR":
                     with st.spinner("ARCHITECTING CONTENT..."):
                         
                         # --- BRAND CONTEXT (via shared builder) ---
+                        _cg_cluster = _cg_custom_cluster if _cg_type_key == "custom" else get_cluster_for_label(content_type)
                         prof_text = build_brand_context(
                             profile_data,
                             include_voice_samples=True,
-                            cluster_filter=CONTENT_TYPE_TO_CLUSTER.get(content_type),
+                            cluster_filter=_cg_cluster,
                         )
+
+                        # Build content type context for the prompt
+                        _cg_type_desc = content_type
+                        if _cg_type_key == "custom" and _cg_custom_desc:
+                            _cg_type_desc = f"Custom — {_cg_custom_desc}"
 
                         # Engineered Prompt (Constraint-Based)
                         prompt_wrapper = f"""
                         CONTEXT:
-                        - Type: {content_type}
-                        - Length: {length}
+                        - Type: {_cg_type_desc}
+                        - Communication Style: {_cg_cluster or 'General'}
+                        - Target Length: {_cg_word_range[0]}-{_cg_word_range[1]} words
                         - Sender: {sender}
                         - Audience: {audience}
-                        
-                        CORE TASK: Write a {content_type} about "{st.session_state['cg_topic']}".
-                        
+
+                        CORE TASK: Write a {_cg_type_desc} about "{st.session_state['cg_topic']}".
+
+                        TARGET LENGTH: {_cg_word_range[0]}-{_cg_word_range[1]} words.
+                        This is a hard constraint. The output must fall within this range.
+                        If the content naturally requires more or fewer words, err toward the middle of the range.
+
                         STRICT CONSTRAINTS:
                         1. You must cover these KEY POINTS:
                         --- BEGIN POINTS ---
@@ -3486,13 +3513,13 @@ elif app_mode == "CONTENT GENERATOR":
                         2. Do NOT invent facts outside these points.
                         3. Use the Brand Voice defined below.
                         4. Adhere to all CRITICAL GUARDRAILS.
-                        
+
                         STEP 1: STRATEGY
                         Briefly outline the tone and structure you will use to meet the audience's needs.
-                        
+
                         STEP 2: DRAFT
                         Write the content.
-                        
+
                         OUTPUT FORMAT:
                         STRATEGY:
                         [Reasoning]
@@ -3701,6 +3728,7 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
         # --- STATE INITIALIZATION (GLOBAL PERSISTENCE) ---
         if 'sm_topic' not in st.session_state: st.session_state['sm_topic'] = ""
         if 'sm_platform' not in st.session_state: st.session_state['sm_platform'] = "LinkedIn"
+        if 'sm_length' not in st.session_state: st.session_state['sm_length'] = "standard"
         if 'sm_goal' not in st.session_state: st.session_state['sm_goal'] = "Reach (Awareness)"
         if 'sm_results' not in st.session_state: st.session_state['sm_results'] = None
         if 'sm_strategy_brief' not in st.session_state: st.session_state['sm_strategy_brief'] = None
@@ -3716,17 +3744,35 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
             with cc1:
                 # Trigger Calibration (Persisted via key)
                 st.selectbox(
-                    "NETWORK", 
+                    "NETWORK",
                     ["LinkedIn", "X (Twitter)", "Instagram"],
                     key="sm_platform"
                 )
             with cc2:
                 st.selectbox(
-                    "OBJECTIVE", 
+                    "OBJECTIVE",
                     ["Reach (Awareness)", "Engagement (Comments)", "Conversion (Clicks)"],
                     key="sm_goal"
                 )
-            
+
+            # --- Target Length Slider (platform-aware) ---
+            _sm_plat_key = get_social_platform_key(st.session_state['sm_platform'])
+            _sm_length_options = ["brief", "standard", "detailed"]
+            _sm_length_labels = [get_social_length_label(_sm_plat_key, l) for l in _sm_length_options]
+            _sm_cur_idx = _sm_length_options.index(st.session_state.get('sm_length', 'standard'))
+            _sm_selected_label = st.select_slider(
+                "TARGET LENGTH",
+                options=_sm_length_labels,
+                value=_sm_length_labels[_sm_cur_idx],
+                key="sm_length_slider"
+            )
+            st.session_state['sm_length'] = _sm_length_options[_sm_length_labels.index(_sm_selected_label)]
+
+            # Platform notes
+            _sm_plat_conf = SOCIAL_PLATFORMS.get(_sm_plat_key, SOCIAL_PLATFORMS["linkedin"])
+            if _sm_plat_conf.get("notes"):
+                st.caption(f"_{_sm_plat_conf['notes']}_")
+
             st.markdown("##### 2. CONTENT CONTEXT")
             # Text Input (Persisted via key)
             st.text_input(
@@ -3787,9 +3833,11 @@ elif app_mode == "SOCIAL MEDIA ASSISTANT":
 
                         # Engineered Prompt (Trend-Aware, Transparent, Structured)
                         image_line = f"\nIMAGE CONTEXT: {image_desc}" if image_desc else ""
+                        _sm_word_range = SOCIAL_PLATFORMS.get(_sm_plat_key, SOCIAL_PLATFORMS["linkedin"])["lengths"].get(st.session_state['sm_length'], (100, 200))
                         prompt = (
                             f"ROLE: Expert Social Media Manager for the brand defined in <brand_profile>.\n"
                             f"PLATFORM: {st.session_state['sm_platform']} (Adhere strictly to character limits and cultural norms).\n"
+                            f"TARGET LENGTH: Each post option should be approximately {_sm_word_range[0]}-{_sm_word_range[1]} words.\n"
                             f"GOAL: {st.session_state['sm_goal']}\n"
                             f"TOPIC: \"\"\"{st.session_state['sm_topic']}\"\"\""
                             f"{image_line}\n\n"
@@ -4305,7 +4353,7 @@ elif app_mode == "BRAND ARCHITECT":
 
         with st.expander("2. VOICE & CALIBRATION"):
             st.caption("Upload existing content to train the engine on your voice.")
-            st.selectbox("CONTENT TYPE", ["Internal Email", "Executive Memo", "Press Release", "Article/Blog", "Social Post", "Website Copy", "Other"], key="wiz_sample_type")
+            st.selectbox("CONTENT TYPE", get_labels_for_module("editor"), key="wiz_sample_type")
             v_tab1, v_tab2 = st.tabs(["PASTE TEXT", "UPLOAD FILE"])
             with v_tab1: st.text_area("PASTE TEXT HERE", key="wiz_temp_text", height=150, max_chars=10000)
             with v_tab2:
@@ -4902,29 +4950,29 @@ elif app_mode == "BRAND ARCHITECT":
                     with cal_tab2:
                         c1, c2 = st.columns([1, 1])
                         with c1:
-                            # THE 5 CLUSTERS
-                            VOICE_CLUSTERS = {
-                                "Corporate Affairs": {
-                                    "role": "STANDARDIZATION & RECORD",
-                                    "desc": "Upload Press Releases and Fact Sheets. Maintains objective accuracy and establishes the baseline narrative."
-                                },
-                                "Crisis & Response": {
-                                    "role": "DEFENSE & MITIGATION",
-                                    "desc": "Upload Holding Statements and Apologies. Fortifies reputation during volatility. Prioritizes empathy and rapid stabilization."
-                                },
-                                "Internal Leadership": {
-                                    "role": "ALIGNMENT & MORALE",
-                                    "desc": "Upload Memos and All-Hands updates. Strengthens cultural cohesion and transmits directives from the top down."
-                                },
-                                "Thought Leadership": {
-                                    "role": "INFLUENCE & AUTHORITY",
-                                    "desc": "Upload Op-Eds and Speeches. Penetrates new markets via argumentation and distinct perspective."
-                                },
-                                "Brand Marketing": {
-                                    "role": "GROWTH & CONVERSION",
-                                    "desc": "Upload Newsletters and Copy. Drives action through persuasion and benefit-driven framing."
-                                }
+                            # THE 5 CLUSTERS — descriptions + content type guidance from shared config
+                            _cluster_roles = {
+                                "Corporate Affairs": "STANDARDIZATION & RECORD",
+                                "Crisis & Response": "DEFENSE & MITIGATION",
+                                "Internal Leadership": "ALIGNMENT & MORALE",
+                                "Thought Leadership": "INFLUENCE & AUTHORITY",
+                                "Brand Marketing": "GROWTH & CONVERSION",
                             }
+                            _cluster_intros = {
+                                "Corporate Affairs": "Maintains objective accuracy and establishes the baseline narrative.",
+                                "Crisis & Response": "Fortifies reputation during volatility. Prioritizes empathy and rapid stabilization.",
+                                "Internal Leadership": "Strengthens cultural cohesion and transmits directives from the top down.",
+                                "Thought Leadership": "Penetrates new markets via argumentation and distinct perspective.",
+                                "Brand Marketing": "Drives action through persuasion and benefit-driven framing.",
+                            }
+                            VOICE_CLUSTERS = {}
+                            for _vc_name in CT_CLUSTER_NAMES:
+                                _vc_types = [v["label"] for v in CONTENT_TYPES.values() if v.get("cluster") == _vc_name]
+                                _vc_type_list = ", ".join(_vc_types) if _vc_types else "various content"
+                                VOICE_CLUSTERS[_vc_name] = {
+                                    "role": _cluster_roles.get(_vc_name, ""),
+                                    "desc": f"{_cluster_intros.get(_vc_name, '')} Upload samples such as: {_vc_type_list}."
+                                }
                             
                             voice_type = st.selectbox("COMMUNICATION CLUSTER", list(VOICE_CLUSTERS.keys()), key="cal_type_voice")
                             
