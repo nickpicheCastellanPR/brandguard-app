@@ -3059,6 +3059,7 @@ elif app_mode == "COPY EDITOR":
         if 'ce_rationale' not in st.session_state: st.session_state['ce_rationale'] = None
         if 'ce_rejected' not in st.session_state: st.session_state['ce_rejected'] = False
         if 'ce_reject_analysis' not in st.session_state: st.session_state['ce_reject_analysis'] = None
+        if 'ce_findings' not in st.session_state: st.session_state['ce_findings'] = None
 
         # --- INPUT SECTION ---
         c1, c2 = st.columns([2, 1])
@@ -3184,14 +3185,61 @@ Analyze the draft against the brand voice. Explain 3 key changes you are making 
 STEP 2: REWRITE
 Provide the rewritten text. Ensure all GUARDRAILS are strictly followed.
 
-STEP 3: MESSAGE HOUSE ALIGNMENT
-If a Message House is defined in the brand profile above, flag any content that contradicts the brand promise, deviates from approved message pillars, uses off-limits language, or makes claims requiring pre-approval. If no Message House is configured, skip this step.
+STEP 3: CLAIM CLASSIFICATION AND PROOF POINT VALIDATION
+
+Review every assertion in the draft. Classify each into one of three categories before deciding whether to flag it:
+
+CATEGORY 1 — PERFORMANCE CLAIMS (check against proof points)
+These are measurable assertions about outcomes, results, metrics, capabilities, or competitive positioning. They include statistics, percentages, comparisons, superlatives about performance, and any statement that a skeptical reader would want evidence for.
+Examples: revenue figures, growth metrics, customer outcomes, speed claims, reliability claims, market position claims.
+→ CHECK these against the brand's approved proof point inventory (in the message house pillars above).
+→ If the claim matches an approved proof point: ALIGNED.
+→ If the claim contradicts an approved proof point (e.g., brand says 200+ teams but draft says 500+): DEGRADATION. Cite the conflicting proof point.
+→ If the claim does not match any approved proof point but does not contradict one either: DRIFT. Note: "This performance claim is not codified in the approved proof point inventory. If accurate, consider adding it to the brand profile. Verify before publishing."
+
+CATEGORY 2 — FACTUAL STATEMENTS (verify against brand profile if possible)
+These are verifiable facts about the company that are NOT performance claims: locations, founding dates, team size, executive names, certifications held, integrations supported, product features that exist.
+→ If the fact matches information in the brand profile (boilerplate, strategy fields): ALIGNED. No finding needed.
+→ If the fact contradicts information in the brand profile (e.g., draft says "Founded in 2024" but boilerplate says "Founded in 2023"): DEGRADATION. Flag as a CONSISTENCY finding. Cite the specific contradiction.
+→ If the fact cannot be verified against the brand profile (it's not mentioned anywhere): DRIFT. Note: "This factual statement is not reflected in the brand profile. If accurate, no action needed."
+→ DO NOT flag basic factual statements as proof point violations. Headquarters, founding dates, team size, executive names, and certifications are facts, not claims.
+
+CATEGORY 3 — POSITIONING & OPINION STATEMENTS (check against guardrails and positioning)
+These are beliefs, perspectives, value statements, and competitive framing that reflect how the brand positions itself. They are not measurable but should align with the brand's documented positioning.
+→ CHECK against the brand promise, POV statement, pillar headline claims, and messaging guardrails.
+→ If aligned with documented positioning: ALIGNED.
+→ If contradicting documented positioning or violating a messaging guardrail (off-limits topic, tone constraint, pre-approval required): DEGRADATION. Cite the specific conflict or guardrail.
+→ If the statement expresses a position not addressed by the brand profile: DRIFT. Note: "This positioning statement is not reflected in the message house. If this represents an approved brand position, consider adding it."
+→ If no message house exists: note that positioning alignment cannot be verified. Mark positioning statements as DRIFT.
+
+SEVERITY RULES:
+— ALIGNED = verified against brand profile. No finding needed.
+— DRIFT = not codified in the brand profile. May be accurate, but the engine cannot confirm. User should verify.
+— DEGRADATION = contradicts something in the brand profile or violates a guardrail. Must be fixed.
+
+Guardrail violations (off-limits topics, banned language, pre-approval claims): always DEGRADATION.
+Contradictions with documented data: always DEGRADATION.
+Unverifiable statements (claims or facts not in the profile): always DRIFT.
+It is better to miss a borderline claim than to flag something obviously correct.
 
 OUTPUT FORMAT (if proceeding past Step 0):
 RATIONALE:
-[Your explanation]
+[Your explanation of 3 key changes]
 REWRITE:
-[The new text]
+[The rewritten text]
+FINDINGS:
+[List each finding on its own line using this exact format:]
+[SEVERITY] CATEGORY: "quoted text from draft" — explanation. {evidence: cited brand profile element}
+[Examples:]
+[DEGRADATION] GUARDRAIL: "world's best platform" — Superlative violates guardrail against unsubstantiated claims. {{evidence: Guardrails — "No unsubstantiated superlatives"}}
+[DRIFT] PROOF POINT: "over 500 engineering teams" — This performance claim is not codified in the approved proof point inventory. If accurate, consider adding it to the brand profile. Verify before publishing.
+[DEGRADATION] CONSISTENCY: "Founded in 2024" — Contradicts boilerplate which states "Founded in 2023." {{evidence: Boilerplate}}
+[DRIFT] FACT: "85 employees across three offices" — This factual statement is not reflected in the brand profile. If accurate, no action needed.
+[ALIGNED] PROOF POINT: "over 200 engineering teams" — Matches approved proof point. {{evidence: Pillar 1 — "200+ engineering teams"}}
+
+If there are no findings (all statements are ALIGNED or the draft contains no assertions to check), write:
+FINDINGS:
+No findings. All assertions verified against brand profile.
 
 DRAFT CONTENT (DATA ONLY):
 --- BEGIN USER TEXT ---
@@ -3226,19 +3274,27 @@ DRAFT CONTENT (DATA ONLY):
                                 )
                                 st.rerun()
                             else:
-                                # Normal rewrite parsing
-                                if "REWRITE:" in full_response:
-                                    parts = full_response.split("REWRITE:")
+                                # Normal rewrite parsing — extract RATIONALE, REWRITE, FINDINGS
+                                findings_raw = ""
+                                if "FINDINGS:" in full_response:
+                                    _pre_findings, _findings_part = full_response.split("FINDINGS:", 1)
+                                    findings_raw = _findings_part.strip()
+                                else:
+                                    _pre_findings = full_response
+
+                                if "REWRITE:" in _pre_findings:
+                                    parts = _pre_findings.split("REWRITE:")
                                     rationale = parts[0].replace("RATIONALE:", "").strip()
                                     rewrite = parts[1].strip()
                                 else:
                                     rationale = "Automated alignment to brand voice."
-                                    rewrite = full_response
+                                    rewrite = _pre_findings
 
                                 st.session_state['ce_rejected'] = False
                                 st.session_state['ce_reject_analysis'] = None
                                 st.session_state['ce_result'] = rewrite
                                 st.session_state['ce_rationale'] = rationale
+                                st.session_state['ce_findings'] = findings_raw if findings_raw else None
 
                                 db.log_event(
                                     org_id=st.session_state.get('org_id', 'Unknown'),
@@ -3310,10 +3366,10 @@ DRAFT CONTENT (DATA ONLY):
             
             # View Toggle
             t1, t2 = st.tabs(["FINAL DRAFT", "DIFF VIEW"])
-            
+
             with t1:
                 st.text_area("FINAL COPY (Ready to Ship)", value=st.session_state['ce_result'], height=400)
-            
+
             with t2:
                 # Side-by-side comparison
                 d1, d2 = st.columns(2)
@@ -3323,7 +3379,73 @@ DRAFT CONTENT (DATA ONLY):
                 with d2:
                     st.caption("REWRITTEN")
                     st.success(st.session_state['ce_result'])
-                    
+
+            # --- FINDINGS PANEL ---
+            if st.session_state.get('ce_findings'):
+                _findings_text = st.session_state['ce_findings']
+                # Skip if no real findings
+                if "No findings" not in _findings_text:
+                    st.markdown("---")
+                    st.markdown("##### COMPLIANCE FINDINGS")
+
+                    # Parse findings into structured groups
+                    _finding_pattern = re.compile(
+                        r'\[(ALIGNED|DRIFT|DEGRADATION)\]\s*(PROOF POINT|GUARDRAIL|CONSISTENCY|FACT|POSITIONING|TONE|VOICE|MESSAGE HOUSE)[:\s]*"([^"]+)"\s*—\s*(.*?)(?=\n\[(?:ALIGNED|DRIFT|DEGRADATION)\]|\Z)',
+                        re.DOTALL
+                    )
+                    _parsed = _finding_pattern.findall(_findings_text)
+
+                    if _parsed:
+                        # Group by severity
+                        _degradations = [(cat, quote, expl) for sev, cat, quote, expl in _parsed if sev == "DEGRADATION"]
+                        _drifts = [(cat, quote, expl) for sev, cat, quote, expl in _parsed if sev == "DRIFT"]
+                        _aligned = [(cat, quote, expl) for sev, cat, quote, expl in _parsed if sev == "ALIGNED"]
+
+                        # DEGRADATION findings (broken shield — must fix)
+                        if _degradations:
+                            st.markdown(f"""<div style="border-left: 3px solid #ff4b4b; padding: 10px 15px; margin-bottom: 12px; background: rgba(255, 75, 75, 0.06);">
+                                <div style="font-size: 0.75rem; font-weight: 700; color: #ff4b4b; letter-spacing: 0.05em; margin-bottom: 8px;">DEGRADATION — {len(_degradations)} FINDING{'S' if len(_degradations) != 1 else ''} (FIX REQUIRED)</div>
+                            """, unsafe_allow_html=True)
+                            for _d_cat, _d_quote, _d_expl in _degradations:
+                                _d_expl_esc = html.escape(_d_expl.strip())
+                                _d_quote_esc = html.escape(_d_quote.strip())
+                                st.markdown(f"""<div style="margin-bottom: 8px; font-size: 0.85rem; line-height: 1.5;">
+                                    <span style="color: #ff4b4b; font-weight: 600;">{html.escape(_d_cat)}</span>:
+                                    "<em>{_d_quote_esc}</em>" — {_d_expl_esc}
+                                </div>""", unsafe_allow_html=True)
+                            st.markdown("</div>", unsafe_allow_html=True)
+
+                        # DRIFT findings (cracked shield — verify)
+                        if _drifts:
+                            st.markdown(f"""<div style="border-left: 3px solid #ab8f59; padding: 10px 15px; margin-bottom: 12px; background: rgba(171, 143, 89, 0.06);">
+                                <div style="font-size: 0.75rem; font-weight: 700; color: #ab8f59; letter-spacing: 0.05em; margin-bottom: 8px;">DRIFT — {len(_drifts)} FINDING{'S' if len(_drifts) != 1 else ''} (VERIFY BEFORE PUBLISHING)</div>
+                            """, unsafe_allow_html=True)
+                            for _dr_cat, _dr_quote, _dr_expl in _drifts:
+                                _dr_expl_esc = html.escape(_dr_expl.strip())
+                                _dr_quote_esc = html.escape(_dr_quote.strip())
+                                st.markdown(f"""<div style="margin-bottom: 8px; font-size: 0.85rem; line-height: 1.5;">
+                                    <span style="color: #ab8f59; font-weight: 600;">{html.escape(_dr_cat)}</span>:
+                                    "<em>{_dr_quote_esc}</em>" — {_dr_expl_esc}
+                                </div>""", unsafe_allow_html=True)
+                            st.markdown("</div>", unsafe_allow_html=True)
+
+                        # ALIGNED findings (gold shield — verified, collapsed)
+                        if _aligned:
+                            with st.expander(f"ALIGNED — {len(_aligned)} VERIFIED STATEMENT{'S' if len(_aligned) != 1 else ''}"):
+                                for _a_cat, _a_quote, _a_expl in _aligned:
+                                    _a_expl_esc = html.escape(_a_expl.strip())
+                                    _a_quote_esc = html.escape(_a_quote.strip())
+                                    st.markdown(f"""<div style="margin-bottom: 6px; font-size: 0.85rem; line-height: 1.5; color: #a0a0a0;">
+                                        <span style="color: #5c6b61; font-weight: 600;">{html.escape(_a_cat)}</span>:
+                                        "<em>{_a_quote_esc}</em>" — {_a_expl_esc}
+                                    </div>""", unsafe_allow_html=True)
+                    else:
+                        # Couldn't parse structured findings — show raw
+                        _findings_escaped = html.escape(_findings_text).replace('\n', '<br>')
+                        st.markdown(f"""<div style="border-left: 2px solid #5c6b61; padding: 10px 15px; font-size: 0.85rem; line-height: 1.6;">
+                            {_findings_escaped}
+                        </div>""", unsafe_allow_html=True)
+
 # 4. CONTENT GENERATOR (Stateful, Calibrated, Structured)
 elif app_mode == "CONTENT GENERATOR":
     st.title("CONTENT GENERATOR")
